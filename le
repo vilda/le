@@ -1,0 +1,2161 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+#
+# Logentries monitoring agent
+# Copyright 2010,2011 Logentries, Jlizard
+# Author: Viliam Holub <viliam.holub@logentries.com>
+#
+
+# For Debian Lenny you will need to install ssl:
+# aptitude install python-dev libbluetooth-dev
+# http://pypi.python.org/pypi/ssl#downloads
+# python setup install.py
+
+
+#
+# Constants
+#
+
+VERSION = "0.4.25"
+API_VERSION = "1"
+
+NOT_SET = None
+
+# Default user and agent keys of none are defined in configuration
+DEFAULT_USER_KEY = NOT_SET
+DEFAULT_AGENT_KEY = NOT_SET
+
+# Configuration files
+CONFIG_DIR_SYSTEM = '/etc/le'
+CONFIG_DIR_USER = '.le'
+LE_CONFIG = 'config'
+LE_CERT_NAME = 'cert.pem'
+
+MAIN_SECT = 'Main'
+USER_KEY_PARAM = 'user-key'
+AGENT_KEY_PARAM = 'agent-key'
+KEY_LEN = 36
+USER_KEY_API = '/agent/user-key/'
+ID_LOGS_API = '/agent/id-logs/'
+
+# Logentries server details
+LE_SERVER = 'logentries.com'
+LE_SERVER_API_DOMAIN = 'api.logentries.com'
+LE_SERVER_CONFIG = '/agent/config'
+LE_SERVER_LOGIN = '/login/'
+LE_SERVER_API = '/'
+LE_SERVER_PORT = 443
+
+CONTENT_LENGTH = 'content-length';
+
+# Log root directory
+LOG_ROOT = '/var/log'
+
+# Timeout after server connection fail. Might be a temporary network
+# failure.
+SRV_RECON_TIMEOUT=5 # in seconds
+
+# Timeout for re-send and re-connect after slave server connection fails.
+LES_RECON_TIMEOUT=2 # Seconds
+
+# Timeout after invalid server response. Might be a version mishmash or
+# temporary server/network failure
+INV_SRV_RESP_TIMEOUT=30 # Seconds
+
+# Time interval between attempts to connect LE server.
+LE_RECON_TIMEOUT=5 # in seconds
+
+# Time interval between config reloads.
+CONFIG_RELOAD_INTERVAL=30 # Multiply of LE_RECON_TIMEOUT
+
+# Time interval between re-trying to open log file
+REOPEN_TRY_INTERVAL=1 # Seconds
+
+# Number of lines which can be sent in one buck, piggybacking
+MAX_LINES_SENT=10
+
+# Time in seconds spend between log re-checks
+TAIL_RECHECK = 0.2 # Seconds
+
+# Number of attemps to read a file, until the name is recheck
+NAME_CHECK = 4 # TAIL_RECHECK cycles
+
+# Number of read line false attemps between are-you-alive packets
+IAA_INTERVAL = 100
+
+# Maximal size of a block of events
+MAX_EVENTS = 65536
+
+# Interval between attampts to open a file
+REOPEN_INT = 1 # Seconds
+
+# Linux CPU stat file
+CPUSTATS_FILE = '/proc/stat'
+# Linux disk stat file
+DISKSTATS_FILE = '/proc/diskstats'
+# Linux mmeory stat file
+MEMSTATS_FILE = '/proc/meminfo'
+# Linux network stat file
+NETSTATS_FILE = '/proc/net/dev'
+
+EPOCH = 5 # in seconds
+
+# Config response parameters
+CONF_RESPONSE = 'response'
+CONF_REASON = 'reason'
+CONF_LOGS = 'logs'
+CONF_SERVERS = 'servers'
+CONF_OK = 'ok'
+
+# Server requests
+RQ_WORKLOAD = 'push_wl'
+
+
+#
+# Usage help
+#
+
+PULL_USAGE = "pull <path> <when> <filter> <limit>"
+PUSH_USAGE = "push <file> <path> <log-type>"
+USAGE="Logentries agent version " +VERSION +"""
+usage: le COMMAND [ARGS]
+
+Where command is one of:
+  init      Write local configuration file
+  reinit    As init but does not reset undefined parameters
+  register  Register this host
+    --name=name name of the host
+    --hostname=hname  hostname of the server
+    --std register standard logs
+    --std_all register all identified logs
+  monitor   Monitor this host
+  follow <filename>  Follow the given log
+    --name=name name of the log
+    --type=type type of the log
+  clean     Removes configuration file
+  new-cluster <name> <hosts...>  Register a new cluster
+  set-cluster <cluster-name> <hosts...>  Set cluster attributes
+    --name  new name of the cluster
+  new-app <name> <logs...>  Register a new application
+  set-app <name> <logs...>  Set application attributes
+    --name  new name of the application
+  ls      List internal filesystem: <path>
+  rm      Remove entity: <path>
+  pull    Pull log file: <path> <when> <filter> <limit>
+  push    Push log file: <file> <path> <log-type>
+
+Where parameters are:
+  --help            show usage help and exit
+  --version         display version number and exit
+  --user-key key    set user key and exit
+  --agent-key key   set local agent key and exit, generate key if key is empty
+  --no-timestamps   no timestamps in agent reportings
+  --force           force given operation
+  --yes	            always respond yes
+"""
+
+# Global indicator of monitoring interruption
+shutdown = False
+
+def set_shutdown():
+	global shutdown
+	shutdown = True
+	print >>sys.stderr, "Shutting down"
+
+def report( what):
+	print >>sys.stderr, what
+
+def print_usage( version_only=False):
+	if version_only:
+		report( VERSION)
+	else:
+		report( USAGE)
+	sys.exit( 1)
+
+
+#
+# Authority certificate
+#
+# Used if not provided by the underlying system
+#
+
+
+authority_certificate = """-----BEGIN CERTIFICATE-----
+MIIDIDCCAomgAwIBAgIENd70zzANBgkqhkiG9w0BAQUFADBOMQswCQYDVQQGEwJV
+UzEQMA4GA1UEChMHRXF1aWZheDEtMCsGA1UECxMkRXF1aWZheCBTZWN1cmUgQ2Vy
+dGlmaWNhdGUgQXV0aG9yaXR5MB4XDTk4MDgyMjE2NDE1MVoXDTE4MDgyMjE2NDE1
+MVowTjELMAkGA1UEBhMCVVMxEDAOBgNVBAoTB0VxdWlmYXgxLTArBgNVBAsTJEVx
+dWlmYXggU2VjdXJlIENlcnRpZmljYXRlIEF1dGhvcml0eTCBnzANBgkqhkiG9w0B
+AQEFAAOBjQAwgYkCgYEAwV2xWGcIYu6gmi0fCG2RFGiYCh7+2gRvE4RiIcPRfM6f
+BeC4AfBONOziipUEZKzxa1NfBbPLZ4C/QgKO/t0BCezhABRP/PvwDN1Dulsr4R+A
+cJkVV5MW8Q+XarfCaCMczE1ZMKxRHjuvK9buY0V7xdlfUNLjUA86iOe/FP3gx7kC
+AwEAAaOCAQkwggEFMHAGA1UdHwRpMGcwZaBjoGGkXzBdMQswCQYDVQQGEwJVUzEQ
+MA4GA1UEChMHRXF1aWZheDEtMCsGA1UECxMkRXF1aWZheCBTZWN1cmUgQ2VydGlm
+aWNhdGUgQXV0aG9yaXR5MQ0wCwYDVQQDEwRDUkwxMBoGA1UdEAQTMBGBDzIwMTgw
+ODIyMTY0MTUxWjALBgNVHQ8EBAMCAQYwHwYDVR0jBBgwFoAUSOZo+SvSspXXR9gj
+IBBPM5iQn9QwHQYDVR0OBBYEFEjmaPkr0rKV10fYIyAQTzOYkJ/UMAwGA1UdEwQF
+MAMBAf8wGgYJKoZIhvZ9B0EABA0wCxsFVjMuMGMDAgbAMA0GCSqGSIb3DQEBBQUA
+A4GBAFjOKer89961zgK5F7WF0bnj4JXMJTENAKaSbn+2kmOeUJXRmm/kEd5jhW6Y
+7qj/WsjTVbJmcVfewCHrPSqnI0kBBIZCe/zuf6IWUrVnZ9NA2zsmWLIodz2uFHdh
+1voqZiegDfqnc1zqcPGUIWVEX/r87yloqaKHee9570+sB3c4
+-----END CERTIFICATE-----"""
+authority_certificate_files = [
+	# Debian 5.0, Debian 6.0, Ubuntu 9.10, Ubuntu 10.4
+	"/etc/ssl/certs/Equifax_Secure_CA.pem",
+	# Fedora 12, Fedora 13, CentOS 5
+	"/usr/share/purple/ca-certs/Equifax_Secure_CA.pem"
+	]
+
+
+#
+# Libraries
+#
+
+#import signal
+import string
+import re
+import errno
+import ConfigParser
+import fileinput
+import getopt
+import glob
+import logging
+import os
+import platform
+import socket
+import subprocess
+import sys
+import threading
+import time
+import datetime
+import urllib
+import httplib
+import getpass
+
+
+#
+# Start logging
+#
+
+log = logging.getLogger( LE_SERVER)
+if not log:
+	report( "Cannot open log output")
+	sys.exit( 4)
+
+stream_handler = None
+
+log.setLevel( logging.INFO)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel( logging.DEBUG)
+stream_handler.setFormatter( logging.Formatter( "%(message)s"))
+log.addHandler( stream_handler)
+
+## Logging for daemon mode
+#log.removeHandler( stream_handler)
+#shandler = logging.StreamHandler()
+#shandler.setLevel( logging.DEBUG)
+#shandler.setFormatter( logging.Formatter( "%(asctime)s  %(message)s"))
+#log.addHandler( shandler)
+
+
+def die(cause, exit_code=0):
+	log.critical( cause)
+	sys.exit( exit_code)
+
+
+#
+# Imports that may not be available
+#
+
+try:
+	import json
+	try:
+		json_loads = json.loads
+		json_dumps = json.dumps
+	except AttributeError:
+		json_loads = json.read
+		json_dumps = json.write
+except ImportError:
+	try: import simplejson
+	except ImportError: die( 'NOTE: Please install Python "simplejson" package (python-simplejson) or a newer Python (2.6).')
+	json_loads = simplejson.loads
+	json_dumps = simplejson.dumps
+
+
+no_ssl = False
+try:
+	import ssl
+	wrap_socket = ssl.wrap_socket
+	CERT_REQUIRED = ssl.CERT_REQUIRED
+
+except ImportError:
+	no_ssl = True
+
+	try: x = httplib.HTTPSConnection
+	except AttributeError:
+		die( 'NOTE: Please install Python "ssl" module.')
+
+	log.warning( 'WARNING: The "ssl" module is not present. Using unreliable workaround, host identity cannot be verified. Please install "ssl" module or newer version of Python (2.6) if possible.')
+
+	def wrap_socket( sock, ca_certs=None, cert_reqs=None):
+		return socket.ssl( sock)
+	CERT_REQUIRED = 0
+	
+
+def call( command):
+	"""
+	Calls the given command in OS environment.
+	"""
+	x = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True).stdout.read()
+	if len(x) == 0: return ''
+	if x[-1] == '\n': x = x[0:len(x)-1]
+	return x
+
+
+def is_uuid( x):
+	"""
+	Returns true if the string given appears to be UUID.
+	"""
+	return re.match( r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', x)
+
+
+def uniq(arr):
+    """
+    Returns the list with duplicate elements removed.
+    """
+    return list( set( arr))
+
+
+def rfile( name):
+	"""
+	Returns content of the file, without trailing newline.
+	"""
+	x = open( name).read()
+	if len(x) != 0 and x[-1] == '\n': x = x[0:len(x)-1]
+	return x
+
+
+def print_total( elems, name):
+	"""
+	Prints total number of elements in the list
+	"""
+	total = len( elems)
+	if total == 0:
+		report( "no %ss"%name)
+	elif total == 1:
+		report( "1 "+name)
+	else:
+		report( "%d %ss"%(total,name))
+
+
+def collect_log_names( system_info):
+	"""
+	Collects standard local logs and identifies them.
+	"""
+	logs = []
+	for root, dirs, files in os.walk(LOG_ROOT):
+		for name in files:
+			if name[-3:] != '.gz' and re.match( r'.*\.\d+$', name) == None:
+				logs.append( os.path.join(root, name))
+	
+	log.debug( "Collected logs: %s"%logs)
+	try:
+		c = httplib.HTTPSConnection( LE_SERVER_API)
+		request = {
+			'logs': json_dumps(logs),
+			'distname': system_info['distname'],
+			'distver': system_info['distver']
+			}
+		log.debug( "Requesting %s"%request)
+		c.request( 'post', ID_LOGS_API, urllib.urlencode( request), {})
+		response = c.getresponse()
+		if not response or response.status != 200:
+			die( 'Error: Unexpected response from logentries (%s).'%response.status)
+		data = json_loads( response.read())
+		log_data = data['logs']
+
+		log.debug( "Identified logs: %s"%log_data)
+	except socket.error, msg:
+		die( 'Error: Cannot contact server, %s'%msg)
+	except ValueError, msg:
+		die( 'Error: Invalid response from the server (Parsing error %s)'%msg)
+	except KeyError:
+		die( 'Error: Invalid response from the server, log data not present.')
+	
+	return log_data
+
+def release_test( filename, distname, system_info):
+	if os.path.isfile( filename):
+		system_info[ 'distname'] = distname
+		system_info[ 'distver'] = rfile( filename)
+		return True
+	return False
+
+
+def system_detect( details):
+	"""
+	Detects the current operating system. Returned information contains:
+
+	distname: distribution name
+	distver: distribution version
+	kernel: kernel type
+	system: system name
+	hostname: host name
+	"""
+	uname = platform.uname()
+	sys = uname[0]
+	system_info = dict( system=sys, hostname=socket.getfqdn(),
+		kernel='', distname='', distver='')
+
+	if not details: return system_info
+
+	if sys == "SunOS":
+		pass
+	elif sys == "AIX":
+		system_info[ 'distver'] = call( "oslevel -r")
+	elif sys == "Linux":
+		system_info[ 'kernel'] = uname[2]
+		# XXX CentOS?
+		releases = [
+			['/etc/debian_version', 'Debian'],
+			['/etc/UnitedLinux-release', 'United Linux'],
+			['/etc/annvix-release', 'Annvix'],
+			['/etc/arch-release', 'Arch Linux'],
+			['/etc/arklinux-release', 'Arklinux'],
+			['/etc/aurox-release', 'Aurox Linux'],
+			['/etc/blackcat-release', 'BlackCat'],
+			['/etc/cobalt-release', 'Cobalt'],
+			['/etc/conectiva-release', 'Conectiva'],
+			['/etc/fedora-release', 'Fedora Core'],
+			['/etc/gentoo-release', 'Gentoo Linux'],
+			['/etc/immunix-release', 'Immunix'],
+			['/etc/knoppix_version', 'Knoppix'],
+			['/etc/lfs-release', 'Linux-From-Scratch'],
+			['/etc/linuxppc-release', 'Linux-PPC'],
+			['/etc/mandriva-release', 'Mandriva Linux'],
+			['/etc/mandrake-release', 'Mandrake Linux'],
+			['/etc/mandakelinux-release', 'Mandrake Linux'],
+			['/etc/mklinux-release', 'MkLinux'],
+			['/etc/nld-release', 'Novell Linux Desktop'],
+			['/etc/pld-release', 'PLD Linux'],
+			['/etc/redhat-release', 'Red Hat'],
+			['/etc/slackware-version', 'Slackware'],
+			['/etc/e-smith-release', 'SME Server'],
+			['/etc/release', 'Solaris SPARC'],
+			['/etc/sun-release', 'Sun JDS'],
+			['/etc/SuSE-release', 'SuSE'],
+			['/etc/sles-release', 'SuSE Linux ES9'],
+			['/etc/tinysofa-release', 'Tiny Sofa'],
+			['/etc/turbolinux-release', 'TurboLinux'],
+			['/etc/ultrapenguin-release', 'UltraPenguin'],
+			['/etc/va-release', 'VA-Linux/RH-VALE'],
+			['/etc/yellowdog-release', 'Yellow Dog'],
+			# Most general
+			['/etc/lsb-release', 'Ubuntu/LSB'],
+			]
+		for release in releases:
+			if release_test( release[0], release[1], system_info):
+				break
+	return system_info
+
+
+# Identified ranges
+
+SEC = 1000
+MIN = 60*SEC
+HOUR = 60*MIN
+DAY = 24*HOUR
+MON = 31*DAY
+YEAR = 365*DAY
+
+def date_patterns():
+	""" Generates date patterns of the form [day<->month year?]. """
+	for year in [' %Y',' %y']:
+		for mon in ['%b','%B','%m']:
+			yield ['%%d %s%s'%(mon, year), DAY, []]
+			yield ['%s %%d%s'%(mon, year), DAY, []]
+	for mon in ['%b','%B']: # Year empty
+		yield ['%%d %s'%(mon), DAY, [YEAR]]
+		yield ['%s %%d'%(mon), DAY, [YEAR]]
+	yield ['%%Y %%d %s'%(mon), DAY, []]
+	yield ['%%Y %s %%d'%(mon), DAY, []]
+	yield ['%Y %m %d', DAY, []]
+
+def time_patterns( c_cols):
+	""" Generates time patterns of the form [hour:min:sec?] including empty time. """
+	if c_cols >= 2:
+		yield ['%H:%M:%S', SEC, []]
+	if c_cols >= 1:
+		yield ['%H:%M', MIN, []]
+		yield ['%I:%M%p', MIN, []]
+	yield ['%I%p', HOUR, []]
+
+def datetime_patterns( c_cols):
+	""" Generates combinations of date and time patterns. """
+	# Generate dates only
+	for d in date_patterns():
+		yield d
+
+	# Generate combinations
+	for t in time_patterns( c_cols):
+		for d in date_patterns():
+			yield ['%s %s'%(d[0], t[0]), t[1], d[2]]
+			yield ['%s %s'%(t[0], d[0]), t[1], d[2]]
+		yield [t[0], t[1], [YEAR, MON, DAY]]
+
+def timestamp_patterns( sample):
+	"""
+	Generates all timestamp patterns we can handle. It is constructed by generating all possible combinations
+	of date, time, day name and zone. The pattern is [day_name? date<->time zone?] plus simple date and time.
+	"""
+	# All timestamps variations
+	day_name = ''
+	if len(sample) > 0:
+		if sample[0] in string.ascii_letters:
+			day_name = '%a '
+	c_cols = sample.count( ':')
+	for zone in ['',' %Z',' %z']:
+		for dt in datetime_patterns( c_cols):
+			yield ['%s%s%s'%(day_name, dt[0], zone), dt[1], dt[2]]
+
+def timestamp_group( text):
+	"""
+	Returns a tuple [timestamp, range] which corresponds to the date and time given. Exists on parse error.
+	"""
+	timep = re.sub( r' +', ' ', re.sub( r'[-,./]', ' ', text)).strip()
+	result = None
+	start_tuple = None
+	for p in timestamp_patterns( timep):
+		pattern, resolution, filling = p
+		try:
+			start_tuple = time.strptime( timep, p[0])
+			break
+		except ValueError, e:
+			pass
+	if not start_tuple:
+		die( "Error: Date '%s' not recognized"%text)
+
+	today = datetime.date.today()
+	# Complete filling
+	if YEAR in filling:
+		start_tuple.rm_year = today.year
+	if MON in filling:
+		start_tuple.rm_month = today.month
+	if DAY in filling:
+		start_tuple.rm_day = today.day
+	return [int(time.mktime( start_tuple))*1000, resolution]
+
+
+def timestamp_range( text):
+	""" Identifies range in the text given. Returns -1 if the range has not
+	been identified. """
+
+	# Parse range
+	m = re.match( r'^(last)?\s*(\d+)?\s*(s|sec|second|m|min|minute|h|hour|d|day|mon|month|y|year)s?$', text.strip())
+	if not m:
+		return -1
+	count = m.group( 2) # Count of time frames
+	tf = m.group( 3) # Time frame
+	# Get count
+	if count: count = int( count)
+	else: count = 1
+	# Get time frame
+	f_groups = [
+		[['s', 'sec', 'second'], SEC],
+		[['m', 'min', 'minute'], MIN],
+		[['h', 'hour'], HOUR],
+		[['d', 'day'], DAY],
+		[['mon', 'month'], MON],
+		[['y', 'year'], YEAR],
+	]
+	for tg in f_groups:
+		if tf in tg[0]:
+			return count*tg[1]
+	return -1
+
+
+def parse_timestamp_range( text):
+	"""
+	Parses the time range given and return start-end pair of timestamps.
+
+	Recognized structures are:
+	t|today
+	y|yesterday
+	last? \d* (m|min|minute|h|hour|d|day|mon|month|y|year) s?
+	range
+	datetime
+	datetime -> range
+	datetime -> datetime
+	"""
+
+	text = text.strip()
+	# No time frame
+	if text == '':
+		return [0,9223372036854775807]
+
+	# Day spec
+	now = datetime.datetime.now()
+	if text in ['t', 'today']:
+		today = int(time.mktime(datetime.datetime( now.year, now.month, now.day).timetuple()))*1000
+		return [today, today+DAY]
+	if text in ['y', 'yesterday']:
+		yesterday = int(time.mktime((datetime.datetime( now.year, now.month, now.day)-datetime.timedelta(days=1)).timetuple()))*1000
+		return [yesterday, yesterday+DAY]
+
+	# Range spec
+	parts = text.split( '->')
+	r = timestamp_range( parts[0])
+	if (r != -1 and len(parts)>1) or len(parts)>2:
+		die( "Error: Date and range '%s' has invalid structure"%text)
+	if r != -1:
+		now = int( time.time()*1000)
+		return [now-r, now]
+
+	# Date spec
+	start_group = timestamp_group( parts[0])
+	start = start_group[0]
+	end = start+start_group[1]
+	
+	if len(parts) > 1:
+		end_range = timestamp_range( parts[1])
+		if end_range != -1:
+			end = start +end_range
+		else:
+			end_group = timestamp_group( parts[1])
+			end = end_group[0]+end_group[1]
+	
+	return [start,end]
+
+
+def retrieve_user_key():
+	"""
+	Retrieves user key from the web server.
+	"""
+	username = raw_input( 'Username: ')
+	password = getpass.getpass()
+
+	try:
+		c = httplib.HTTPSConnection( LE_SERVER)
+
+		c.request( 'post', USER_KEY_API,
+			urllib.urlencode( {'username':username,'password':password}),
+			{'Referer':'https://logentries.com/login/'})
+		response = c.getresponse()
+		if not response or response.status != 200:
+			resp_val = 'err'
+			if response: resp_val = response.status
+			if resp_val == 403:
+				die( 'Error: Login failed. Invalid credentials.')
+			else:
+				die( 'Error: Unexpected login response from logentries (%s).'%resp_val)
+		data = json_loads( response.read())
+		if data['user_key'] == 'invalid':
+			die( 'Error: Invalid user key.')
+		return data['user_key']
+	except socket.error, msg:
+		die( 'Error: Cannot contact server, %s'%msg)
+	except ValueError, msg:
+		die( 'Error: Invalid response from the server (Parsing error %s)'%msg)
+	except KeyError:
+		die( 'Error: Invalid response from the server, user key not present.')
+
+
+class Stats:
+	"""
+	Collects statistics about the system work load.
+	"""
+
+	def __init__(self):
+		self.timer = None
+		self.to_remove = False
+		self.first = True
+
+		# Memory fields we are looking for in /proc/meminfo
+		self.MEM_FIELDS = [ 'MemTotal:', 'Active:', 'Cached:']
+		# Block devices in the system
+		all_devices = [os.path.basename(filename) for filename in glob.glob('/sys/block/*')]
+		# Monitored devices (all devices except loop)
+		self.our_devices = frozenset( [device_name for device_name in all_devices if not device_name.startswith("loop")])
+
+		self.prev_cpu_stats = [ 0, 0, 0, 0, 0, 0, 0];
+		self.prev_disk_stats = [ 0, 0];
+		self.prev_net_stats = [ 0, 0];
+
+		self.send_stats()
+
+
+	def cpu_stats(self,data):
+		"""
+		Collects CPU statistics. Virtual ticks are ignored.
+		"""
+		try:
+			for line in fileinput.input([CPUSTATS_FILE]):
+				if len(line) < 13:
+					continue
+				if line.startswith('cpu '):
+					raw_stats = [ long(part) for part in line.split()[1:8]]
+					break
+			fileinput.close()
+		except IOError:
+			return
+
+		data['cu']  = raw_stats[0] -self.prev_cpu_stats[0]
+		data['cl']  = raw_stats[1] -self.prev_cpu_stats[1]
+		data['cs']  = raw_stats[2] -self.prev_cpu_stats[2]
+		data['ci']  = raw_stats[3] -self.prev_cpu_stats[3]
+		data['cio'] = raw_stats[4] -self.prev_cpu_stats[4]
+		data['cq']  = raw_stats[5] -self.prev_cpu_stats[5]
+		data['csq'] = raw_stats[6] -self.prev_cpu_stats[6]
+		self.prev_cpu_stats = raw_stats
+
+	def disk_stats(self,data):
+		"""
+		Collects disk statistics. Interested in block devices only.
+		"""
+		reads = 0L
+		writes = 0L
+		try:
+			for line in fileinput.input([DISKSTATS_FILE]):
+				if len(line) < 13:
+					continue
+				parts = line.split()
+				if not parts[2] in self.our_devices:
+					continue
+				reads += long( parts[5])
+				writes += long( parts[7])
+			fileinput.close()
+		except IOError:
+			return
+
+		reads *= 512
+		writes *= 512
+		data['dr'] = reads -self.prev_disk_stats[0]
+		data['dw'] = writes -self.prev_disk_stats[1]
+		self.prev_disk_stats = [ reads, writes]
+
+	def mem_stats(self,data):
+		"""
+		Collects memory statistics.
+		"""
+		mem_vars = {}
+		for field in self.MEM_FIELDS:
+			mem_vars[field] = 0L
+		try:
+			for line in fileinput.input([MEMSTATS_FILE]):
+				parts = line.split()
+				name = parts[0]
+				if name in self.MEM_FIELDS:
+					mem_vars[ name] = long( parts[1])
+			fileinput.close()
+		except IOError:
+			return
+		data['mt'] = mem_vars[self.MEM_FIELDS[0]]
+		data['ma'] = mem_vars[self.MEM_FIELDS[1]]
+		data['mc'] = mem_vars[self.MEM_FIELDS[2]]
+
+	def net_stats(self,data):
+		"""
+		Collects network statistics. Collecting only eth and wlan.
+		"""
+		receive=0L
+		transmit=0L
+		try:
+			for line in fileinput.input([NETSTATS_FILE]):
+				if line.startswith( '  eth') or line.startswith( ' wlan'):
+					parts = line.replace( ':', ' ').split()
+					receive += long( parts[1])
+					transmit += long( parts[9])
+			fileinput.close()
+		except IOError:
+			return
+
+		data['ni'] = receive-self.prev_net_stats[0]
+		data['no'] = transmit-self.prev_net_stats[1]
+		# Fix overflow errors
+		if data['ni']<0:
+			data['ni'] = 0
+		if data['no']<0:
+			data['no'] = 0
+		self.prev_net_stats = [receive, transmit]
+
+	def stats(self):
+		"""Collects statistics."""
+		data = {}
+		self.cpu_stats(data)
+		self.disk_stats(data)
+		self.mem_stats(data)
+		self.net_stats(data)
+		return data
+
+	def new_request(self, rq):
+		try:
+			domain_request( rq, silent=not config.debug, die_on_error=False)
+		except socket.error, (err_no, err_str):
+			pass
+
+	def send_stats(self):
+		ethalon = time.time()
+
+		results = self.stats()
+		results['request'] = RQ_WORKLOAD
+		results['host_key'] = config.agent_key
+		if config.debug_stats:
+			log.info( results)
+		if not self.first:
+			# Send data
+			self.new_request( results)
+		else:
+			self.first = False
+
+		ethalon += EPOCH
+		next_step = (ethalon-time.time()) % EPOCH
+		if not self.to_remove:
+			self.timer = threading.Timer( next_step, self.send_stats, ())
+			self.timer.start()
+
+	def cancel(self):
+		self.to_remove = True
+		if self.timer:
+			self.timer.cancel()
+
+class Follower:
+	""" The follower keeps an eye on the file specified and sends new
+	events to the logentries infrastructure.  """
+
+	def __init__(self, name, log_key):
+		""" Initializes the follower. """
+		self.name = name
+		self.log_key = log_key
+		self.log_addr = '/%s/hosts/%s/%s/?realtime=1'%(config.user_key, config.agent_key, log_key)
+		self.first_chunk = True
+		self.flush = True
+		log.info( "Following %s"%name)
+		monitoring_thread = threading.Thread( target=self.monitor, name=self.name)
+		monitoring_thread.daemon = False
+		monitoring_thread.start()
+
+	def file_candidate( self):
+		""" Returns list of file names which corresponds to the
+		specified template. """
+		try:
+			candidates = glob.glob( self.name)
+			if len(candidates) == 0: return None
+
+			candidate_times = [ [os.path.getmtime(name),name] for name in candidates]
+			candidate_times.sort()
+			candidate_times.reverse()
+			return candidate_times[ 0][ 1]
+		except os.error:
+			return None
+
+	def open_log( self):
+		"""Keeps trying to re-open the log file. Returns when the file
+		has been opened or when requested to remove."""
+		error_info = True
+		self.real_name = None
+
+		while not shutdown:
+			candidate = self.file_candidate()
+
+			if candidate:
+				try:
+					self.real_name = candidate
+					self.file = open( self.real_name)
+					break
+				except IOError: pass
+
+			if error_info:
+				log.info( "Cannot open file '%s', re-trying in %ss intervals"%(self.name, REOPEN_INT))
+				error_info = False
+			time.sleep( REOPEN_TRY_INTERVAL)
+
+	def log_rename( self):
+		"""Detects file rename."""
+
+		# Get file candidates
+		candidate = self.file_candidate()
+		if not candidate: return False
+
+		try:
+			# This is tricky routine we found during our work on
+			# Windows machines which we would like to support. Here
+			# we need to detect whether the open log file is the
+			# same as file_adept. This is easy in Linux, but not in
+			# Windows. What we do now is to compare ctime (creation
+			# in Windows and change in Unix) and detect whether
+			# those are the same. This works relialibly for log
+			# renaming.
+			ctime1 = os.fstat( self.file.fileno()).st_mtime
+			ctime_new = os.path.getmtime( candidate)
+			ctime2 = os.fstat( self.file.fileno()).st_mtime
+
+			if ctime1 == ctime2 and ctime1 != ctime_new:
+				# We have a name change according to the time
+				return True
+		except os.error: pass
+		return False
+
+	def read_log_line(self):
+		""" Reads a line from the log. Checks maximal line size. """
+
+		return self.file.read( MAX_EVENTS)
+
+	def get_events( self):
+		""" Returns a block of newly detected events from the log.
+		Returns None in case of timeout. """
+
+		# Moves at the end of the log file 
+		if self.flush:
+			self.file.seek( 0, 2)
+			self.flush = False
+
+		# TODO: investigate select-like approach?
+		idle_cnt = 0
+		iaa_cnt = 0
+		events = ''
+		while iaa_cnt != IAA_INTERVAL and not shutdown:
+			# Collect lines
+			events = self.read_log_line()
+			if len(events) != 0: break
+
+			# No more events, wait
+			time.sleep( TAIL_RECHECK)
+
+			# Log rename check
+			idle_cnt += 1
+			if idle_cnt == NAME_CHECK:
+				if self.log_rename():
+					self.open_log()
+					iaa_cnt = 0
+				else:
+					# Recover from external file modification
+					position = self.file.tell()
+					self.file.seek( 0, 2)
+					file_size = self.file.tell()
+					if file_size < position:
+						# File has been externaly modified
+						position = file_size
+					self.file.seek( position)
+				idle_cnt = 0
+			else:
+				# To reset end-of-line error
+				self.file.seek( self.file.tell())
+			iaa_cnt += 1
+
+		# Send IAA packet if required
+		if iaa_cnt == IAA_INTERVAL:
+			return None
+
+		return events
+	
+	def open_connection(self):
+		""" Opens a push connection to logentries. """
+		log.debug( "Opening connection %s", self.log_addr)
+		retry = 1
+		while True:
+			if retry % 3 == 0:
+				self.flush = True
+				time.sleep( SRV_RECON_TIMEOUT)
+			retry += 1
+			try:
+				self.conn = domain_connect()
+				do_request( self.conn, "PUT", self.log_addr, headers={'transfer-encoding':'chunked'})
+				self.first_chunk = True
+				break
+			except socket.error, err_no:
+				if shutdown: return
+	
+	def new_events( self, events):
+		""" Sends a block of new lines. """
+		while not shutdown:
+			try:
+				if self.first_chunk:
+					self.conn.send( "%x\r\n"%len( events))
+					self.first_chunk = False
+				else:
+					self.conn.send( "\r\n%x\r\n"%len( events))
+				self.conn.send( events)
+				break
+			except socket.error, (err_no, err_str):
+				self.open_connection()
+
+		if config.debug_events:
+			print events
+
+	def monitor(self):
+		""" Opens the log file and starts to collect new events. """
+
+		self.open_connection()
+		self.open_log()
+		while not shutdown:
+			events = self.get_events()
+			if events:
+				self.new_events( events)
+
+class Config:
+	def __init__(self):
+		self.config_dir_name = self.get_config_dir()
+		self.config_filename = self.config_dir_name +LE_CONFIG
+
+		# Configuration variables
+		self.user_key = DEFAULT_USER_KEY
+		self.agent_key = NOT_SET
+		self.name = NOT_SET
+		self.hostname = NOT_SET
+		self.no_timestamps = False
+		self.std = False
+		self.std_all = False
+		self.type_opt = NOT_SET
+		self.xlist = False
+		self.uuid = False
+
+		# Special options
+		self.yes = False
+		self.force = False
+
+		# Debug options
+
+		# Enabled fine-grained logging
+		self.debug = False
+		# All recognized events are logged
+		self.debug_events = False
+		# Adapter connects to locahost
+		self.debug_local = False
+		# Collected statistics are logged
+		self.debug_stats = False
+		# Commands passed to server are logged
+		self.debug_requests = False
+		# Display system information and exit
+		self.debug_system = False
+		# Display list of logs in the system
+		self.debug_loglist = False
+
+	def get_config_dir(self):
+		"""
+		Identifies a configuration directory for the current user.
+		Always terminated with slash.
+		"""
+		if os.name == "posix":
+			if os.geteuid() == 0:
+				# Running as root
+				c_dir = CONFIG_DIR_SYSTEM
+			else:
+				# Running as an ordinary user
+				c_dir = os.path.expanduser('~') +'/' +CONFIG_DIR_USER
+		else:
+			# Running as an ordinary user (Windows)
+			try:
+				from win32com.shell import shellcon, shell
+				c_dir = shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, 0, 0)
+			except ImportError:
+				c_dir = os.path.expanduser('~') +'/' +CONFIG_DIR_USER
+
+		return c_dir + '/'
+
+	def clean(self):
+		"""
+		Wipes out old configuration file. Returns True if successful.
+		"""
+		try:
+			os.remove( self.config_filename)
+		except OSError, e:
+			if e.errno != 2:
+				log.warning( "Error: %s: %s"%(self.config_filename, e.strerror))
+				return False
+		return True
+		
+	def create_conf_dir(self):
+		# Create logentries config
+		try:
+			os.makedirs( self.config_dir_name)
+		except OSError, e:
+			if e.errno != errno.EEXIST:
+				if e.errno == errno.EACCES:
+					die( "You don't have permission to create /etc/logentries config file. Please run logentries agent as root.")
+				die( 'Error: %s'%e)
+
+	def basic_setup(self):
+		pass
+
+	def load(self):
+		"""
+		Initializes configuration parameters from the configuration
+		file.  Returns True if successful, False otherwise. Does not
+		touch already defined parameters.
+		"""
+
+		try:
+			conf = ConfigParser.SafeConfigParser( {USER_KEY_PARAM:'', AGENT_KEY_PARAM:''})
+			conf.read( self.config_filename)
+
+			# Load parameters
+			if self.user_key == NOT_SET:
+				new_user_key = conf.get( MAIN_SECT, USER_KEY_PARAM)
+				if new_user_key != '':
+					self.user_key = new_user_key
+			if self.agent_key == NOT_SET:
+				new_agent_key = conf.get( MAIN_SECT, AGENT_KEY_PARAM)
+				if new_agent_key != '':
+					self.agent_key = new_agent_key
+		except ConfigParser.NoSectionError:
+			return False
+		except ConfigParser.NoOptionError:
+			return False
+		return True
+
+	def save(self):
+		"""
+		Saves configuration parameters into the configuration file.
+		The certification file added as well.
+		"""
+		try:
+			conf = ConfigParser.SafeConfigParser()
+			self.create_conf_dir()
+			conf_file = open( self.config_filename, 'wb')
+			conf.add_section( MAIN_SECT)
+			if self.user_key != NOT_SET:
+				conf.set( MAIN_SECT, USER_KEY_PARAM, self.user_key)
+			if self.agent_key != NOT_SET:
+				conf.set( MAIN_SECT, AGENT_KEY_PARAM, self.agent_key)
+			conf.write( conf_file)
+
+			cert_filename = self.config_dir_name +LE_CERT_NAME;
+			if not os.path.exists( cert_filename):
+				open( cert_filename, 'w').write( authority_certificate)
+		except IOError, e:
+			die( "Error: IO error when writing to config file: %s"%e)
+
+	def check_key(self, key):
+		"""
+		Checks if the key looks fine
+		"""
+		return len(key) == KEY_LEN
+
+	def set_user_key(self, value):
+		if not self.check_key( value):
+			die( 'Error: User key does not look right.')
+		self.user_key = value
+
+	def user_key_required(self):
+		"""
+		Exits with error message if the user key is not defined.
+		"""
+		if self.user_key == NOT_SET:
+			log.info( "User key is required. Enter your login credentials or specify the user key with --user-key parameter.")
+			self.user_key = retrieve_user_key()
+
+	def set_agent_key(self, value):
+		if not self.check_key( value):
+			die( 'Error: Agent key does not look right.')
+		self.agent_key = value
+
+	def agent_key_required(self):
+		"""
+		Exits with error message if the agent key is not defined.
+		"""
+		if self.agent_key == NOT_SET:
+			die( "Agent key is required. Register the host or specify an agent key with the --agent-key parameter.")
+
+	def have_agent_key(self):
+		"""Tests if the agent key has been assigned to this instance."""
+		return self.agent_key != ''
+
+	def hostname_required(self):
+		"""
+		Sets the hostname parameter based on server network name. If
+		the hostname is set already, it is kept untouched.
+		"""
+		if self.hostname == NOT_SET:
+			self.hostname = socket.getfqdn()
+		return self.hostname
+
+	def name_required(self):
+		"""
+		Sets host name if not set already. The new host name is
+		delivered from its hostname. As a side effect this
+		function sets a hostname as well.
+		"""
+		if self.name == NOT_SET:
+			self.name = self.hostname_required().split('.')[0]
+		return self.name
+
+	def process_params(self, params):
+		"""
+		Parses command line parameters and updates config parameters
+		accordingly.
+		"""
+		try:
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= debug".split())
+		except getopt.GetoptError, err:
+			die( "Parameter error: " +str( err));
+		for name, value in optlist:
+			if name == "--help":
+				print_usage()
+			if name == "--version":
+				print_usage( True)
+			if name == "--yes":
+				self.yes = True
+			elif name == "--user-key":
+				self.set_user_key( value)
+			elif name == "--agent-key":
+				self.set_agent_key( value)
+			elif name == "--force":
+				self.force = True
+			elif name == "--list":
+				self.xlist = True
+			elif name == "--uuid":
+				self.uuid = True
+			elif name == "--name":
+				self.name = value
+			elif name == "--hostname":
+				self.hostname = value
+			elif name == "--std":
+				self.std = True
+			elif name == "--type":
+				self.type_opt = value
+			elif name == "--std-all":
+				self.std_all = True
+			elif name == "--no-timestamps":
+				self.no_timestamps = True
+			elif name == "--debug":
+				self.debug = True
+			elif name == "--debug-events":
+				self.debug_events = True
+			elif name == "--local":
+				self.debug_local = True
+			elif name == "--debug-stats":
+				self.debug_stats = True
+			elif name == "--debug-loglist":
+				self.debug_loglist = True
+			elif name == "--debug-requests":
+				self.debug_requests = True
+			elif name == "--debug-system":
+				self.debug_system = True
+		return args
+
+
+config = Config()
+
+def find_cert_file():
+	"""
+	Finds the location of the certificate our lovely site.
+	"""
+	for f in authority_certificate_files:
+		if os.path.exists( f):
+			return f
+	f = config.config_dir_name +LE_CERT_NAME
+	if os.path.exists( f):
+		return f
+	
+	die( "Error: Certificate not found. If the site certificate is not installed by OS distribution you have to set it up by the init command.")
+
+def create_connection( host, port):
+	"""
+	A simplified version of socket.create_connection from Python 2.6.
+	"""
+	for addr_info in socket.getaddrinfo( host, port, 0, socket.SOCK_STREAM):
+		af, stype, proto, cn, sa = addr_info
+		soc = None
+		try:
+			soc = socket.socket( af, stype, proto)
+			soc.connect( sa)
+			return soc
+		except socket.error:
+			if socket:
+				soc.close()
+
+	raise socket.error, "Cannot make connection to %s:%s"%(host,port)
+
+
+class ServerHTTPSConnection(httplib.HTTPSConnection):
+	"""A slight modification of HTTPSConnection to verify the certificate"""
+
+	def __init__(self, api=False):
+		server = LE_SERVER
+		if api:
+			server = LE_SERVER_API_DOMAIN
+		if no_ssl:
+			httplib.HTTPSConnection.__init__( self, server)
+		else:
+			httplib.HTTPSConnection.__init__( self, server, cert_file=find_cert_file())
+
+	def connect(self):
+		if no_ssl:
+			return httplib.HTTPSConnection.connect( self)
+		sock = create_connection( self.host, self.port)
+		try:
+			if self._tunnel_host:
+				self.sock = sock
+				self._tunnel()
+		except AttributeError: pass
+		self.sock = wrap_socket( sock, ca_certs=self.cert_file, cert_reqs=CERT_REQUIRED)
+
+
+def domain_connect(api=True):
+	if config.debug_local:
+		conn = httplib.HTTPConnection( 'localhost:8081')
+	else:
+		conn = ServerHTTPSConnection(api)
+	return conn
+
+
+def do_request( conn, operation, addr, data=None, headers={}):
+	log.debug( 'Domain request: %s %s %s %s'%(operation, addr, data, headers))
+	if data:
+		conn.request( operation, addr, data, headers=headers)
+	else:
+		conn.request( operation, addr, headers=headers)
+
+
+def get_response( operation, addr, data=None, headers={}, silent=False, die_on_error=True):
+	"""
+	Returns response from the domain with a connection.
+	"""
+	response = None
+	conn = None
+	try:
+		conn = domain_connect()
+		do_request( conn, operation, addr, data, headers)
+		response = conn.getresponse()
+		conn.close()
+	except socket.sslerror, msg: # Network error
+		if not silent:
+			log.info( "SSL error: %s"%msg)
+	except socket.error, msg: # Network error
+		if not silent:
+			log.debug( "Network error: %s"%msg)
+	except httplib.BadStatusLine:
+		error = "Internal error, bad satus line"
+		if die_on_error:
+			die( error)
+		else:
+			log.info( error)
+	return response, conn
+
+
+def domain_request( request, required=False, check_status=False, silent=False, die_on_error=True):
+	"""
+	Processes a request on the logentries domain.
+	"""
+	# Obtain response
+	response,_ = get_response( "POST", LE_SERVER_API, urllib.urlencode( request), silent=silent, die_on_error=die_on_error)
+
+	# Check the response
+	if not response:
+		if required:
+			die( "Error: Cannot process LE request, no response")
+		return None
+	if response.status != 200:
+		if required:
+			die( "Error: Cannot process LE request: (%s)"%response.status)
+
+	response = response.read()
+	log.debug( 'Domain response: %s'%response)
+	try:
+		d_response = json_loads( response)
+	except ValueError:
+		error = 'Error: Invalid response, parse error.'
+		if die_on_error:
+			die( error)
+		else:
+			log.info( error)
+
+	if check_status and d_response['response'] != 'ok':
+		error = "Error: %s"%d_response['reason']
+		if die_on_error:
+			die( error)
+		else:
+			log.info( error)
+
+	return d_response
+
+
+def pull_request( what, params):
+	"""
+	Processes a pull request on the logentries domain.
+	"""
+	response = None
+
+	# Obtain response
+	addr = '/%s/%s/?%s'%(config.user_key,what,urllib.urlencode( params))
+	response,_ = get_response( "GET", addr)
+
+	# Check the response
+	if not response:
+		die( "Error: Cannot process LE request, no response")
+	if response.status == 404:
+		die( "Error: Log not found")
+	if response.status != 200:
+		die( "Error: Cannot process LE request: (%s)"%response.status)
+
+	while True:
+		data = response.read( 65536)
+		if len(data) == 0: break
+		sys.stdout.write( data)
+
+
+def push_request( ilog, data_size, where, params):
+	"""
+	Processes a push request to the logentries domain.
+	"""
+	# Obtain response
+	addr = '/%s/%s/?%s'%(config.user_key,where,urllib.urlencode( params))
+	try:
+		conn = domain_connect()
+		do_request( conn, "PUT", addr, headers={CONTENT_LENGTH:'%s'%data_size})
+
+		# Push the file
+		to_send = data_size
+		while to_send != 0:
+			to_read = to_send
+			if to_read > 65536:
+				to_read = 65536
+			data = ilog.read( to_read)
+			if len(data) == 0: break
+			to_send -= len(data)
+			conn.send( data)
+		conn.close()
+	except socket.sslerror, msg: # Network error
+		log.info( "SSL error: %s"%msg)
+	except socket.error, msg: # Network error
+		log.info( "Network error: %s"%msg)
+
+	## Check the response
+	#if not response:
+	#	die( "Error: Cannot process LE request, no response")
+	#if response.status != 200:
+	#	die( "Error: Cannot process LE request: (%s)"%response.status)
+
+
+
+def request( request, required=False, check_status=False, rtype='GET'):
+	"""
+	Processes a list request on the logentries domain.
+	"""
+	# Obtain response
+	response,_ = get_response( rtype, '/'+config.user_key+'/'+request)
+	
+	# Check the response
+	if not response:
+		if required:
+			die( "Error: Cannot process LE request, no response")
+		return None
+
+	response = response.read()
+	log.debug( 'List response: %s'%response)
+	try:
+		d_response = json_loads( response)
+	except ValueError:
+		die( "Error: Invalid response (%s)"%response)
+
+	if check_status and d_response['response'] != 'ok':
+		die( "Error: %s"%d_response['reason'])
+
+	return d_response
+
+
+def no_more_args( args):
+	"""
+	Exits if there are any arguments given.
+	"""
+	if len(args) != 0:
+		die( "No more than one argument is expected.")
+
+
+
+def request_follow( filename, name, type_opt):
+	config.agent_key_required()
+	request = {"request":"new_log",
+		"user_key": config.user_key,
+		"host_key": config.agent_key,
+		"name": name,
+		"filename": filename,
+		"type": type_opt,
+		"follow": "true"}
+	domain_request( request, True, True)
+	log.info( "Will follow %s as %s"%(filename, name))
+
+
+def request_hosts( logs=False):
+	"""
+	Returns list of registered hosts.
+	"""
+	load_logs = 'false'
+	if logs:
+		load_logs = 'true'
+	response = domain_request( {
+		'request': 'get_user',
+		'load_hosts': 'true',
+		'load_logs': load_logs,
+		'user_key': config.user_key}, True, True);
+	return response['hosts']
+
+
+def expr_match( expr, text):
+	"""
+	Returns True if the text matches with expression. If the expression
+	starts with / it is a regular expression.
+	"""
+	if expr[0] == '/':
+		if re.match( expr[1:], text):
+			return True
+	else:
+		if expr[0:2] == '\/':
+			return text == expr[1:]
+		else:
+			return text == expr
+	return False
+
+def uuid_match( uuid, text):
+	"""
+	Returns True if the uuid given is uuid and it matches to the text.
+	"""
+	return is_uuid( uuid) and uuid == text;
+
+
+def find_hosts( expr, hosts):
+	"""
+	Finds host name among hosts.
+	"""
+	result = []
+	for host in hosts:
+		if uuid_match( expr, host['key']) or expr_match( expr, host['name']) or expr_match( expr, host['hostname']):
+			result.append( host)
+	return result
+
+
+def log_match( expr, log_item):
+	"""
+	Returns true if the expression given matches the log. Expression is either
+	a simple word or a regular expression if it starts with '/'.
+
+	We perform the test on UUID, log name, and file name.
+	"""
+	return uuid_match( expr, log_item['key']) or expr_match( expr, log_item['name']) or expr_match( expr, log_item['filename'])
+
+
+def find_logs( expr, hosts):
+	"""
+	Finds log name among hosts. The searching expresion have to parts: host
+	name and logs name. Both parts are divided by :.
+	"""
+	# Decode expression
+	l = expr.find( ':')
+	if l != -1:
+		host_expr = expr[0:l]
+		log_expr = expr[l+1:]
+	else:
+		host_expr = '/.*'
+		log_expr = expr
+
+	adepts = find_hosts( host_expr, hosts)
+	logs = []
+	for host in adepts:
+		for xlog in host['logs']:
+			if log_match( log_expr, xlog):
+				logs.append( xlog)
+	return logs
+
+
+#
+# Commands
+#
+
+def cmd_init( args):
+	"""
+	Saves variables given to the configuration file. Variables not
+	specified are not saved and thus are overwritten with default value.
+	The configuration directory is created if does not exits.
+	"""
+	no_more_args( args)
+	config.user_key_required()
+	config.save()
+	log.info( "Initialized")
+
+
+def cmd_reinit( args):
+	"""
+	Saves variables given to the configuration file. The configuration
+	directory is created if does not exits.
+	"""
+	no_more_args( args)
+	config.load()
+	config.save()
+	log.info( "Reinitialized")
+
+
+def cmd_register( args):
+	"""
+	Registers the agent in logentries infrastructure. The newly obtained
+	agent key is stored in the configuration file.
+	"""
+	no_more_args( args)
+	config.load()
+	if config.agent_key != NOT_SET and not config.force:
+		die( "Server already registered. Use --force to override current registration.")
+	config.user_key_required()
+	config.hostname_required()
+	config.name_required()
+
+	si = system_detect( True)
+
+	request = {"request":"register",
+		'user_key':config.user_key,
+		'name':config.name,
+		'hostname':config.hostname,
+		'system':si['system'],
+		'distname':si['distname'],
+		'distver':si['distver']
+		}
+	response = domain_request( request, True, True)
+
+	config.agent_key = response['host_key']
+	config.save()
+
+	log.info( "Registered %s (%s)"%(config.name, config.hostname))
+
+	# Registering logs
+	logs = []
+	if config.std or config.std_all:
+		logs = collect_log_names( si)
+	for logx in logs:
+		if config.std_all or logx['default'] == '1':
+			request_follow( logx['filename'], logx['name'], logx['type'])
+
+
+def ask_cmd_register( args):
+	if not config.yes:
+		resp = raw_input( 'Host in not registered. Would you like to register it (Y/n)? ')
+		if resp not in ['', 'y', 'Y']:
+			die( "Please register the host first")
+	cmd_register( args)
+
+
+def cmd_monitor( args):
+	"""
+	Monitors host activity and sends events collected to logentries
+	infrastructure.
+	"""
+	no_more_args( args)
+	config.load()
+	if config.agent_key == NOT_SET:
+		ask_cmd_register( args)
+	config.agent_key_required()
+	config.user_key_required()
+
+	stats = None
+	try:
+		# List host's logs and follow them
+		logs = request( 'hosts/%s/'%config.agent_key, True, True)['list']
+		for l in logs:
+			if l['follow'] == 'true':
+				Follower( l['filename'], l['key'])
+
+		# Register resource monitoring
+		stats = Stats()
+
+		while True:
+			time.sleep( 60)
+	except KeyboardInterrupt:
+		if stats: stats.cancel()
+		set_shutdown()
+	#domain.shutdown()
+
+
+def cmd_follow( args):
+	"""
+	Follow the log given.
+	"""
+	if len(args) == 0:
+		die( "Error: Specify the file name of the log to follow.")
+	if len(args) != 1:
+		die( "Error: Too many arguments.")
+	config.load()
+	config.agent_key_required()
+
+	filename = os.path.abspath( args[0])
+	name = config.name
+	if name == NOT_SET:
+		name = os.path.basename( filename)
+	type_opt = config.type_opt
+	if type_opt == NOT_SET:
+		type_opt = ""
+	
+	request_follow( filename, name, type_opt)
+
+
+def cmd_clean( args):
+	"""
+	Wipes out old configuration file.
+	"""
+	no_more_args( args)
+	if config.clean():
+		log.info( 'Configuration clean')
+
+
+def get_all_list( what):
+	return domain_request( {"request":"list_"+what,
+		"user_key": config.user_key}, True, True)['list']
+
+
+def get_all_clusters(): return get_all_list( 'clusters')
+def get_all_apps(): return get_all_list( 'apps')
+def get_all_salogs(): return get_all_list( 'salogs')
+
+def list_object( request, hostnames=False):
+	"""
+	Lists object request given.
+	"""
+	t = request['object']
+	index_name = 'name'
+	item_name = ''
+	if t == 'rootlist':
+		item_name = 'item'
+		pass
+	elif t == 'host':
+		print 'name =', request[ 'name']
+		print 'hostname =', request[ 'hostname']
+		print 'key =', request[ 'key']
+		print 'distribution =', request[ 'distname']
+		print 'distver =', request[ 'distver']
+		return
+	elif t == 'log':
+		print 'name =', request[ 'name']
+		print 'filename =', request[ 'filename']
+		print 'key =', request[ 'key']
+		print 'type =', request[ 'type']
+		print 'follow =', request[ 'follow']
+		return
+	elif t == 'list':
+		print 'name =', request[ 'name']
+		return
+	elif t == 'hostlist':
+		item_name = 'host'
+		if hostnames:
+			index_name = 'hostname'
+		pass
+	elif t == 'loglist':
+		item_name = 'log'
+		pass
+	elif t == 'applist':
+		item_name = 'app'
+		pass
+	elif t == 'clusterlist':
+		item_name = 'cluster'
+		pass
+	else:
+		die( 'Unknown object type "%s". Adapter too old?'%t)
+	
+	# Standard list
+	ilist = request['list']
+	for item in ilist:
+		if config.uuid:
+			print item['key'],
+		print "%s"%(item[ index_name])
+	print_total( ilist, item_name)
+
+
+def cmd_clusters( args):
+	"""
+	Lists all available clusters.
+	"""
+	no_more_args( args)
+	config.load()
+	config.user_key_required()
+	clusters = get_all_clusters()
+
+	if config.xlist:
+		hosts = request_hosts()
+		key2host = {}
+		for host in hosts:
+			key2host[host['key']] = host
+		for cluster in clusters:
+			chosts = (key2host[chost]['name'] for chost in cluster['list'])
+			print "%s  %s"%(cluster['name'], ', '.join( chosts))
+	else:
+		print ', '.join( cluster['name'] for cluster in clusters)
+
+	print_total( clusters, 'cluster')
+
+def get_cluster_params( args):
+	"""
+	Common code for new and set cluster commands. First parameter is
+	a cluster name. Following parameters are host uuids, names, or
+	hostnames identifying host to assign. Host names or hostnames
+	are converted to uuid.
+	"""
+	if len(args) == 0:
+		die( "Error: Specify the cluster name.")
+	if re.search( r' ', args[0]):
+		die( "Error: Name must not contain space.")
+	config.load()
+	config.user_key_required()
+	skeys = []
+	if len(args) > 1:
+		hosts = request_hosts()
+		log.debug( "Matching hosts to the cluster:")
+		for name in args[1:]:
+			if len(name) == 0:
+				die( "Error: Host name is empty.")
+			if is_uuid( name):
+				skeys.append( name)
+				log.debug( '\t%s as UUID'%name)
+			else:
+				# Find name among servers
+				matches = find_hosts( name, hosts)
+				if len(matches) == 0:
+					die( "Error: No host matches '%s'."%name)
+				else:
+					log.debug( "\t%s:"%name)
+					for h in matches:
+						skeys.append( h['key'])
+						log.debug( '\t%s / %s, %s'%(h['key'], h['name'], h['hostname']))
+		skeys = uniq( skeys)
+		if config.debug:
+			log.debug( "Adding following hosts:")
+			for key in skeys:
+				log.debug( '\t'+key)
+	result = [args[0]]
+	result.extend( skeys)
+	return result
+
+
+def cmd_new_cluster( args):
+	"""
+	Creates a new cluster.
+	"""
+	argv = get_cluster_params( args)
+	response = domain_request( {
+		'request': 'new_clusters',
+		'user_key': config.user_key,
+		'names': argv[0]}, True, True)
+	cluster_key = response['clusters'][0]['key']
+	if len(argv) > 1:
+		domain_request( {
+			'request': 'set_cluster',
+			'cluster_key': cluster_key,
+			'list': ' '.join(argv[1:])}, True, True)
+	report( "%s cluster registered"%argv[0])
+
+
+def cmd_set_cluster( args):
+	"""
+	Sets cluster attributes.
+	"""
+	argv = get_cluster_params( args)
+	name = argv[0]
+	cluster_key = None
+	for cluster in get_all_clusters():
+		if cluster['name'] == name:
+			cluster_key = cluster['key']
+			break
+	if cluster_key == None:
+		die( 'Error: Cluster with name "%s" not found'%name)
+
+	request = {
+		'request': 'set_cluster',
+		'cluster_key': cluster_key}
+	if config.name:
+		name = request['name'] = config.name
+	if len(argv) > 1:
+		request['list'] = ' '.join(argv[1:]);
+	domain_request( request, True, True)
+
+	report( "%s cluster set"%name)
+
+
+def cmd_apps( args):
+	"""
+	Lists all available apps.
+	"""
+	no_more_args( args)
+	config.load()
+	config.user_key_required()
+	apps = get_all_apps()
+
+	if config.xlist:
+		hosts = request_hosts( logs=True)
+		key2hostlog = {}
+		for host in hosts:
+			for xlog in host['logs']:
+				key2hostlog[xlog['key']] = host['name']+':'+xlog['name']
+		for app in apps:
+			alogs = (key2hostlog[clog] for clog in app['list'])
+			if config.uuid:
+				print app['key'],
+			print "%s  %s"%(app['name'], ', '.join( alogs))
+	else:
+		if config.uuid:
+			for app in apps:
+				print app['key'] +' ' +app['name']
+		else:
+			print ', '.join( app['name'] for app in apps)
+
+	print_total( apps, 'app')
+
+def get_app_params( args):
+	"""
+	Common code for new and set app commands. First parameter is an app
+	name. Following parameters are log uuids, or server+log names, or
+	hostnames identifying log to assign.
+	"""
+	if len(args) == 0:
+		die( "Error: Specify the app name.")
+	if re.search( r' ', args[0]):
+		die( "Error: Name must not contain space.")
+	config.load()
+	config.user_key_required()
+	skeys = []
+	if len(args) > 1:
+		hosts = request_hosts( logs=True)
+		log.debug( "Matching logs to the app:")
+		for name in args[1:]:
+			if len(name) == 0:
+				die( "Error: Log name is empty.")
+			if is_uuid( name):
+				skeys.append( name)
+				log.debug( '\t%s as UUID'%name)
+			else:
+				# Find name among servers
+				matches = find_logs( name, hosts)
+				if len(matches) == 0:
+					die( "Error: No log matches '%s'."%name)
+				else:
+					log.debug( "\t%s:"%name)
+					for l in matches:
+						skeys.append( l['key'])
+						log.debug( '\t%s / %s, %s'%(l['key'], l['name'], l['filename']))
+		skeys = uniq( skeys)
+		if config.debug:
+			log.debug( "Adding following logs:")
+			for key in skeys:
+				log.debug( '\t'+key)
+	result = [args[0]]
+	result.extend( skeys)
+	return result
+
+
+def is_log_fs( addr):
+	log_addrs = [ r'(logs|apps)/.*/',
+		r'host(name)?s/.*/.*/']
+	for la in log_addrs:
+		if re.match( la, addr):
+			return True
+	return False
+
+
+def cmd_new_app( args):
+	"""
+	Creates a new application.
+	"""
+	argv = get_app_params( args)
+	response = domain_request( {
+		'request': 'new_apps',
+		'user_key': config.user_key,
+		'names': argv[0]}, True, True)
+	app_key = response['apps'][0]['key']
+	if len(argv) > 1:
+		domain_request( {
+			'request': 'set_app',
+			'app_key': app_key,
+			'list': ' '.join(argv[1:])}, True, True)
+	report( "%s app registered"%argv[0])
+
+
+def cmd_set_app( args):
+	"""
+	Sets app attributes.
+	"""
+	argv = get_app_params( args)
+	name = argv[0]
+	app_key = None
+	for app in get_all_apps():
+		if app['name'] == name:
+			app_key = app['key']
+			break
+	if app_key == None:
+		die( 'Error: App with name "%s" not found'%name)
+
+	request = {
+		'request': 'set_app',
+		'app_key': app_key}
+	if config.name:
+		name = request['name'] = config.name
+	if len(argv) > 1:
+		request['list'] = ' '.join(argv[1:]);
+	domain_request( request, True, True)
+
+	report( "%s app set"%name)
+
+
+def cmd_ls( args):
+	"""
+	General list command
+	"""
+	if len(args) == 0:
+		args = ['/']
+	config.load()
+	config.user_key_required()
+
+	addr = args[0]
+	if addr.startswith( '/'):
+		addr = addr[1:]
+	# Make sure we are not downloading log
+	if is_log_fs( addr):
+		die( 'Use pull to get log content.')
+	if addr.count('/') > 2:
+		die( 'Path not found')
+	list_object( request( addr, True, True), hostnames=addr.startswith('hostnames'))
+
+def cmd_rm( args):
+	"""
+	General remove command
+	"""
+	if len(args) == 0:
+		args = ['/']
+	config.load()
+	config.user_key_required()
+
+	addr = args[0]
+	if addr.startswith( '/'):
+		addr = addr[1:]
+	if addr.count('/') > 2:
+		die( 'Path not found')
+	response = request( addr, True, True, rtype='DELETE')
+	report( response['reason'])
+
+
+def cmd_pull( args):
+	"""
+	Log pull command
+	"""
+	if len(args) == 0:
+		die( PULL_USAGE)
+	config.load()
+	config.user_key_required()
+
+	params = {}
+
+	addr = args[0]
+	if addr.endswith( '/'):
+		addr = addr[:-1]
+	if not is_log_fs( addr+'/'):
+		die( 'Error: Not a log')
+
+	if len(args) > 1:
+		time_range = parse_timestamp_range( args[ 1])
+		params['start'] = time_range[ 0]
+		params['end'] = time_range[ 1]
+	if len(args) > 2:
+		params['filter'] = args[ 2]
+	if len(args) > 3:
+		try: params['limit'] = int( args[ 3])
+		except ValueError: die( 'Error: Limit must be integer')
+	
+	pull_request( addr, params)
+
+
+def cmd_push( args):
+	"""
+	Log push command
+	"""
+	if len(args) < 2:
+		die( PUSH_USAGE)
+	config.load()
+	config.user_key_required()
+
+	filename = args[0]
+
+	addr = args[1]
+	if addr.endswith( '/'):
+		addr = addr[:-1]
+	if not is_log_fs( addr+'/'):
+		die( 'Error: Not a suitable log path')
+
+	params = {}
+	if len(args) > 2:
+		params['logtype'] = args[ 2]
+	
+	try:
+		data_size = os.path.getsize( filename)
+		logfile = open( filename, "r")
+	except OSError:
+		die( "Error: Cannot open '%s'"%filename)
+	except IOError:
+		die( "Error: Cannot open '%s'"%filename)
+
+	push_request( logfile, data_size, addr, params)
+
+#
+# Main method
+#
+	
+def main():
+	# Set up logging
+	global log
+
+	## Logging for daemon mode
+	#log.removeHandler( stream_handler)
+	#shandler = logging.StreamHandler()
+	#shandler.setLevel( logging.DEBUG)
+	#shandler.setFormatter( logging.Formatter( "%(asctime)s  %(message)s"))
+	#log.addHandler( shandler)
+
+	# Read command line parameters
+	args = config.process_params( sys.argv[1:])
+
+	if config.debug:
+		log.setLevel( logging.DEBUG)
+	if config.debug_system:
+		die( system_detect( True))
+	if config.debug_loglist:
+		die( collect_log_names( system_detect( True)))
+
+	argv0 = sys.argv[0]
+	if argv0 and argv0 != '':
+		pname = os.path.basename( argv0).split( '-')
+		if len(pname) != 1:
+			args.insert( 0, pname[-1])
+
+	if len(args) == 0:
+		report( USAGE)
+		sys.exit(1)
+
+	commands = {
+		'init': cmd_init,
+		'reinit': cmd_reinit,
+		'register': cmd_register,
+		'monitor': cmd_monitor,
+		'follow': cmd_follow,
+		'clean': cmd_clean,
+		# Clusters
+		'new-cluster': cmd_new_cluster,
+		'set-cluster': cmd_set_cluster,
+		# Apps
+		'new-app': cmd_new_app,
+		'set-app': cmd_set_app,
+		# Filesystem operations
+		'ls': cmd_ls,
+		'rm': cmd_rm,
+		'pull': cmd_pull,
+		'push': cmd_push,
+		# Shortcuts
+		'nc': cmd_new_cluster,
+		'sc': cmd_set_cluster,
+		'na': cmd_new_app,
+		'sa': cmd_set_app,
+	}
+	for cmd, func in commands.items():
+		if cmd == args[0]:
+			return func( args[1:])
+	die( 'Error: Unknown command "%s".'%args[0])
+
+
+if __name__ == '__main__':
+	try:
+		main()
+	except KeyboardInterrupt:
+		log.info( "Interrupted")
+
