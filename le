@@ -7,12 +7,6 @@
 # Author: Viliam Holub <viliam.holub@logentries.com>
 #
 
-# For Debian Lenny you will need to install ssl:
-# aptitude install python-dev libbluetooth-dev
-# http://pypi.python.org/pypi/ssl#downloads
-# python setup install.py
-
-
 #
 # Constants
 #
@@ -2158,4 +2152,10 @@ if __name__ == '__main__':
 		main()
 	except KeyboardInterrupt:
 		log.info( "Interrupted")
+
+
+# For Debian Lenny you will need to install ssl:
+# aptitude install python-dev libbluetooth-dev
+# http://pypi.python.org/pypi/ssl#downloads
+# python setup install.py
 
