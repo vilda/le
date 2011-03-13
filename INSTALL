@@ -9,7 +9,7 @@ Stand-alone
 Just works as a standa-alone application.
 
 
-Debian Lenny
+Debian 5.0 Lenny
 ------------
 su -
 echo 'deb http://rep.logentries.com/ lenny main' >/etc/apt/sources.list.d/logentries.list
@@ -19,7 +19,7 @@ aptitude install logentries
 exit
 
 
-Debian Squeeze
+Debian 6.0 Squeeze
 --------------
 su -
 echo 'deb http://rep.logentries.com/ squeeze main' >/etc/apt/sources.list.d/logentries.list
@@ -29,7 +29,7 @@ aptitude install logentries
 exit
 
 
-Ubuntu Karmic Koala 9.10
+Ubuntu 9.10 Karmic Koala
 ------------------------
 sudo -sH
 echo 'deb http://rep.logentries.com/ karmic main' >/etc/apt/sources.list.d/logentries.list
@@ -39,12 +39,12 @@ aptitude install logentries
 exit
 
 
-Ubuntu Maverick Meerkat 10.10
+Ubuntu 10.10 Maverick Meerkat
 -----------------------------
 sudo -sH
 echo 'deb http://rep.logentries.com/ maverick main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
-aptitude update
-aptitude install logentries
+apt-get update
+apt-get install logentries
 exit
 
