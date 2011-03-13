@@ -10,7 +10,7 @@ Just works as a standa-alone application.
 
 
 Debian 5.0 Lenny
-------------
+----------------
 su -
 echo 'deb http://rep.logentries.com/ lenny main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
@@ -20,7 +20,7 @@ exit
 
 
 Debian 6.0 Squeeze
---------------
+------------------
 su -
 echo 'deb http://rep.logentries.com/ squeeze main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
@@ -46,5 +46,35 @@ echo 'deb http://rep.logentries.com/ maverick main' >/etc/apt/sources.list.d/log
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 apt-get update
 apt-get install logentries
+exit
+
+Fedora 14, 15
+-------------
+su -
+tee /etc/yum.repos.d/logentries.repo <<EOF
+[logentries]
+name=Logentries repo
+enabled=1
+metadata_expire=1d
+baseurl=http://rep.logentries.com/fedora\$releasever/\$basearch
+gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
+EOF
+yum update
+yum install logentries
+exit
+
+CentOS 5
+--------
+su -
+tee /etc/yum.repos.d/logentries.repo <<EOF
+[logentries]
+name=Logentries repo
+enabled=1
+metadata_expire=1d
+gpgcheck=0
+baseurl=http://rep.logentries.com/centos\$releasever/\$basearch
+EOF
+yum update
+yum install logentries
 exit
 
