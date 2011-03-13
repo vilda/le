@@ -11,16 +11,40 @@ Just works as a standa-alone application.
 
 Debian Lenny
 ------------
-cat 'deb http://rep.logentries.com/ lenny main' > /etc/apt/sources.list.d/logentries.list
-gpg --keyserver php.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+su -
+echo 'deb http://rep.logentries.com/ lenny main' >/etc/apt/sources.list.d/logentries.list
+gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
+exit
 
 
 Debian Squeeze
 --------------
-cat 'deb http://rep.logentries.com/ squeeze main' > /etc/apt/sources.list.d/logentries.list
-gpg --keyserver php.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+su -
+echo 'deb http://rep.logentries.com/ squeeze main' >/etc/apt/sources.list.d/logentries.list
+gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
+exit
+
+
+Ubuntu Karmic Koala 9.10
+------------------------
+sudo -sH
+echo 'deb http://rep.logentries.com/ karmic main' >/etc/apt/sources.list.d/logentries.list
+gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+aptitude update
+aptitude install logentries
+exit
+
+
+Ubuntu Maverick Meerkat 10.10
+-----------------------------
+sudo -sH
+echo 'deb http://rep.logentries.com/ maverick main' >/etc/apt/sources.list.d/logentries.list
+gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+aptitude update
+aptitude install logentries
+exit
 
