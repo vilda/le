@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.4.25"
+VERSION = "0.4.30"
 API_VERSION = "1"
 
 NOT_SET = None

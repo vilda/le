@@ -1,0 +1,26 @@
+
+Common packaging and distribution
+---------------------------------
+
+
+Stand-alone
+-----------
+
+Just works as a standa-alone application.
+
+
+Debian Lenny
+------------
+cat 'deb http://rep.logentries.com/ lenny main' > /etc/apt/sources.list.d/logentries.list
+gpg --keyserver php.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+aptitude update
+aptitude install logentries
+
+
+Debian Squeeze
+--------------
+cat 'deb http://rep.logentries.com/ squeeze main' > /etc/apt/sources.list.d/logentries.list
+gpg --keyserver php.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+aptitude update
+aptitude install logentries
+

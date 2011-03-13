@@ -1,15 +1,14 @@
-Source: le
+Source: logentries
 Section: admin
 Priority: extra
 Maintainer: Viliam Holub <vilda@logentries.com>
-Standards-Version: 3.8.4
-Build-Depends: pkg-config, python-support, python-simplejson
+Standards-Version: 3.9.1
+Build-Depends: debhelper (>= 7), python-support, python (>= 2.6)
 Homepage: https://logentries.com/
 
-Package: le
+Package: logentries
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
-Provides: ${python:Provides}
-Description: Logentries agent
-  A command line utility for a convenient access to logentries logging
-  infrastructure.
+Depends: ${misc:Depends}, ${python:Depends}, python-simplejson
+Description: Agent for logentries.com
+ A command line utility for a convenient access to logentries logging
+ infrastructure.
