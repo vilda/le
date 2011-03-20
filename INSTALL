@@ -78,3 +78,5 @@ yum update
 yum install logentries
 exit
 
+# You will need to install python packages separately
+

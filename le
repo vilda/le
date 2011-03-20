@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.4.30"
+VERSION = "0.4.31"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -1355,6 +1355,7 @@ def domain_request( request, required=False, check_status=False, silent=False, d
 			die( error)
 		else:
 			log.info( error)
+			d_response = None
 
 	if check_status and d_response['response'] != 'ok':
 		error = "Error: %s"%d_response['reason']
@@ -1362,6 +1363,7 @@ def domain_request( request, required=False, check_status=False, silent=False, d
 			die( error)
 		else:
 			log.info( error)
+			d_response = None
 
 	return d_response
 

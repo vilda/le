@@ -1,0 +1,95 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:          le
+# Default-Start:     2 3 4 5
+# Default-Stop:		
+# Required-Start:    $remote_fs
+# Required-Stop:     $remote_fs
+# Should-Start:      $network
+# Should-Stop:       $network
+# Short-Description: Logentries monitoring agent
+### END INIT INFO
+
+set -e
+
+test -x /usr/bin/le-monitor || exit 0
+
+umask 022
+
+if test -f /etc/default/le-default; then
+    . /etc/default/le-default
+fi
+
+. /lib/lsb/init-functions
+
+# Are we running from init? - from ssh init script
+run_by_init() {
+    ([ "$previous" ] && [ "$runlevel" ]) || [ "$runlevel" = S ]
+}
+
+check_no_start() {
+    if [ -e /etc/default/le_not_to_be_run ]; then 
+	if [ "$1" = log_end_msg ]; then
+	    log_end_msg 0
+	fi
+	if ! run_by_init; then
+	    log_action_msg "Logentries agent not in use (/etc/default/le_not_to_be_run)"
+	fi
+	exit 0
+    fi
+}
+
+export PATH="${PATH:+$PATH:}/usr/bin:/bin"
+
+case "$1" in
+  start)
+	check_no_start
+	log_daemon_msg "Starting Logentries monitoring agent" "le"
+	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitor ; then
+	    log_end_msg 0
+	else
+	    log_end_msg 1
+	fi
+	;;
+  stop)
+	log_daemon_msg "Stopping Logentries monitoring agent" "le"
+	if start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/le.pid; then
+	    log_end_msg 0
+	else
+	    log_end_msg 1
+	fi
+	;;
+
+  restart)
+	log_daemon_msg "Restarting Logentries monitoring agent" "le"
+	start-stop-daemon --stop --quiet --oknodo --retry 30 --pidfile /var/run/le.pid
+	check_no_start log_end_msg
+	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitor ; then
+	    log_end_msg 0
+	else
+	    log_end_msg 1
+	fi
+	;;
+
+  force-reload)
+	log_daemon_msg "Restarting Logentries monitoring agent" "le"
+	start-stop-daemon --stop --quiet --oknodo --retry 30 --pidfile /var/run/le.pid
+	check_no_start log_end_msg
+	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitor ; then
+	    log_end_msg 0
+	else
+	    log_end_msg 1
+	fi
+	;;
+
+  status)
+	status_of_proc -p /var/run/le.pid /usr/bin/le le && exit 0 || exit $?
+	;;
+
+  *)
+	log_action_msg "Usage: /etc/init.d/le {start|stop|restart|force-reload|status}"
+	exit 1
+esac
+
+exit 0

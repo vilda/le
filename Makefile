@@ -7,6 +7,8 @@ clean:
 install:
 	mkdir -p $(BINDIR)
 	cp le $(BINDIR)/
+	ln -s le $(BINDIR)/le-monitor
 uninstall:
 	rm -f $(BINDIR)/le
+	rm -f $(BINDIR)/le-monitor
 
