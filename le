@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.4.31"
+VERSION = "0.4.34"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -246,12 +246,6 @@ stream_handler.setLevel( logging.DEBUG)
 stream_handler.setFormatter( logging.Formatter( "%(message)s"))
 log.addHandler( stream_handler)
 
-## Logging for daemon mode
-#log.removeHandler( stream_handler)
-#shandler = logging.StreamHandler()
-#shandler.setLevel( logging.DEBUG)
-#shandler.setFormatter( logging.Formatter( "%(asctime)s  %(message)s"))
-#log.addHandler( shandler)
 
 
 def die(cause, exit_code=0):
@@ -329,6 +323,42 @@ def rfile( name):
 	x = open( name).read()
 	if len(x) != 0 and x[-1] == '\n': x = x[0:len(x)-1]
 	return x
+
+
+def daemonize():
+	"""
+	Creates a daemon from the current process.
+	http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
+	Alternative: python-daemon
+	"""
+	try:
+		pid = os.fork()
+		if pid > 0:
+			sys.exit( 0)
+		os.chdir( "/")
+		os.setsid()
+		os.umask(0)
+		pid = os.fork()
+		if pid > 0:
+			sys.exit( 0)
+		sys.stdout.flush()
+		sys.stderr.flush()
+		si = file( '/dev/null', 'r')
+		so = file( '/dev/null', 'a+')
+		se = file( '/dev/null', 'a+', 0)
+		os.dup2( si.fileno(), sys.stdin.fileno())
+		os.dup2( so.fileno(), sys.stdout.fileno())
+		os.dup2( se.fileno(), sys.stderr.fileno())
+	except OSError, e:
+		die( "Cannot daemonize: %s"%e.strerror)
+
+	# Logging for daemon mode
+	log.removeHandler( stream_handler)
+	shandler = logging.StreamHandler()
+	shandler.setLevel( logging.DEBUG)
+	shandler.setFormatter( logging.Formatter( "%(asctime)s  %(message)s"))
+	log.addHandler( shandler)
+
 
 
 def print_total( elems, name):
@@ -519,7 +549,6 @@ def timestamp_group( text):
 	Returns a tuple [timestamp, range] which corresponds to the date and time given. Exists on parse error.
 	"""
 	timep = re.sub( r' +', ' ', re.sub( r'[-,./]', ' ', text)).strip()
-	result = None
 	start_tuple = None
 	for p in timestamp_patterns( timep):
 		pattern, resolution, filling = p
@@ -1004,6 +1033,7 @@ class Config:
 		self.type_opt = NOT_SET
 		self.xlist = False
 		self.uuid = False
+		self.daemon = False
 
 		# Special options
 		self.yes = False
@@ -1181,7 +1211,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= debug".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-cmds debug-system help version yes force uuid daemon list std std-all name= hostname= type= debug".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err));
 		for name, value in optlist:
@@ -1203,6 +1233,8 @@ class Config:
 				self.uuid = True
 			elif name == "--name":
 				self.name = value
+			elif name == "--daemon":
+				self.daemon = True
 			elif name == "--hostname":
 				self.hostname = value
 			elif name == "--std":
@@ -1640,6 +1672,9 @@ def cmd_monitor( args):
 		ask_cmd_register( args)
 	config.agent_key_required()
 	config.user_key_required()
+
+	if config.daemon:
+		daemonize()
 
 	stats = None
 	try:
@@ -2089,16 +2124,6 @@ def cmd_push( args):
 #
 	
 def main():
-	# Set up logging
-	global log
-
-	## Logging for daemon mode
-	#log.removeHandler( stream_handler)
-	#shandler = logging.StreamHandler()
-	#shandler.setLevel( logging.DEBUG)
-	#shandler.setFormatter( logging.Formatter( "%(asctime)s  %(message)s"))
-	#log.addHandler( shandler)
-
 	# Read command line parameters
 	args = config.process_params( sys.argv[1:])
 
