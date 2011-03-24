@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.4.34"
+VERSION = "0.4.35"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -656,33 +656,39 @@ def retrieve_user_key():
 	"""
 	Retrieves user key from the web server.
 	"""
-	username = raw_input( 'Username: ')
-	password = getpass.getpass()
+	while True:
+		username = raw_input( 'Username: ')
+		password = getpass.getpass()
 
-	try:
-		c = httplib.HTTPSConnection( LE_SERVER)
+		try:
+			c = httplib.HTTPSConnection( LE_SERVER)
 
-		c.request( 'post', USER_KEY_API,
-			urllib.urlencode( {'username':username,'password':password}),
-			{'Referer':'https://logentries.com/login/'})
-		response = c.getresponse()
-		if not response or response.status != 200:
-			resp_val = 'err'
-			if response: resp_val = response.status
-			if resp_val == 403:
-				die( 'Error: Login failed. Invalid credentials.')
+			c.request( 'post', USER_KEY_API,
+				urllib.urlencode( {'username':username,'password':password}),
+				{'Referer':'https://logentries.com/login/'})
+			response = c.getresponse()
+			if not response or response.status != 200:
+				resp_val = 'err'
+				if response:
+					resp_val = response.status
+				if resp_val == 403:
+					print >>sys.stderr, 'Error: Login failed. Invalid credentials.'
+				else:
+					print >>sys.stderr, 'Error: Unexpected login response from logentries (%s).'%resp_val
 			else:
-				die( 'Error: Unexpected login response from logentries (%s).'%resp_val)
-		data = json_loads( response.read())
-		if data['user_key'] == 'invalid':
-			die( 'Error: Invalid user key.')
-		return data['user_key']
-	except socket.error, msg:
-		die( 'Error: Cannot contact server, %s'%msg)
-	except ValueError, msg:
-		die( 'Error: Invalid response from the server (Parsing error %s)'%msg)
-	except KeyError:
-		die( 'Error: Invalid response from the server, user key not present.')
+				data = json_loads( response.read())
+				if data['user_key'] == 'invalid':
+					print >>sys.stderr, 'Error: Invalid user key.'
+				else:
+					return data['user_key']
+		except socket.error, msg:
+			print >>sys.stderr, 'Error: Cannot contact server, %s'%msg
+		except ValueError, msg:
+			print >>sys.stderr, 'Error: Invalid response from the server (Parsing error %s)'%msg
+		except KeyError:
+			print >>sys.stderr, 'Error: Invalid response from the server, user key not present.'
+
+		print >>sys.stderr, 'Try to login again, or press Ctrl+C to break'
 
 
 class Stats:
