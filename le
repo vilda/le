@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.4.35"
+VERSION = "0.4.38"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -1217,7 +1217,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-cmds debug-system help version yes force uuid daemon list std std-all name= hostname= type= debug".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= debug".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err));
 		for name, value in optlist:
@@ -1239,8 +1239,6 @@ class Config:
 				self.uuid = True
 			elif name == "--name":
 				self.name = value
-			elif name == "--daemon":
-				self.daemon = True
 			elif name == "--hostname":
 				self.hostname = value
 			elif name == "--std":
@@ -1700,6 +1698,14 @@ def cmd_monitor( args):
 		set_shutdown()
 	#domain.shutdown()
 
+def cmd_monitor_daemon( args):
+	"""
+	Monitors as a daemon host activity and sends events collected to
+	logentries infrastructure.
+	"""
+	config.daemon = True
+	cmd_monitor( args)
+
 
 def cmd_follow( args):
 	"""
@@ -2155,6 +2161,7 @@ def main():
 		'reinit': cmd_reinit,
 		'register': cmd_register,
 		'monitor': cmd_monitor,
+		'monitordaemon': cmd_monitor_daemon,
 		'follow': cmd_follow,
 		'clean': cmd_clean,
 		# Clusters

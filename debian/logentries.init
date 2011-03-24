@@ -46,7 +46,7 @@ case "$1" in
   start)
 	check_no_start
 	log_daemon_msg "Starting Logentries monitoring agent" "le"
-	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitor ; then
+	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitordaemon ; then
 	    log_end_msg 0
 	else
 	    log_end_msg 1
@@ -88,7 +88,7 @@ case "$1" in
 	;;
 
   *)
-	log_action_msg "Usage: /etc/init.d/le {start|stop|restart|force-reload|status}"
+	log_action_msg "Usage: /etc/init.d/logentries {start|stop|restart|force-reload|status}"
 	exit 1
 esac
 
