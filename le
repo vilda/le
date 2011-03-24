@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.4.40"
+VERSION = "0.4.48"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -25,6 +25,7 @@ CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
 LE_CONFIG = 'config'
 LE_CERT_NAME = 'cert.pem'
+PIDFILE = '/var/run/logentries.pid'
 
 MAIN_SECT = 'Main'
 USER_KEY_PARAM = 'user-key'
@@ -206,7 +207,6 @@ authority_certificate_files = [
 # Libraries
 #
 
-#import signal
 import string
 import re
 import errno
@@ -226,6 +226,7 @@ import datetime
 import urllib
 import httplib
 import getpass
+import atexit
 
 
 #
@@ -285,7 +286,7 @@ except ImportError:
 	except AttributeError:
 		die( 'NOTE: Please install Python "ssl" module.')
 
-	log.warning( 'WARNING: The "ssl" module is not present. Using unreliable workaround, host identity cannot be verified. Please install "ssl" module or newer version of Python (2.6) if possible.')
+	log.warning( '\nWARNING: The "ssl" module is not present. Using unreliable workaround, host identity cannot be verified. Please install "ssl" module or newer version of Python (2.6) if possible.')
 
 	def wrap_socket( sock, ca_certs=None, cert_reqs=None):
 		return socket.ssl( sock)
@@ -325,6 +326,16 @@ def rfile( name):
 	return x
 
 
+def rm_pidfile():
+	"""
+	Removes PID file. Calles when the agent exits.
+	"""
+	try:
+		os.remove( PIDFILE)
+	except OSError:
+		pass
+
+
 def daemonize():
 	"""
 	Creates a daemon from the current process.
@@ -332,12 +343,15 @@ def daemonize():
 	Alternative: python-daemon
 	"""
 	try:
+		# Open pid file
+		file( PIDFILE, 'w').close()
+
 		pid = os.fork()
 		if pid > 0:
 			sys.exit( 0)
 		os.chdir( "/")
 		os.setsid()
-		os.umask(0)
+		os.umask( 0)
 		pid = os.fork()
 		if pid > 0:
 			sys.exit( 0)
@@ -349,7 +363,15 @@ def daemonize():
 		os.dup2( si.fileno(), sys.stdin.fileno())
 		os.dup2( so.fileno(), sys.stdout.fileno())
 		os.dup2( se.fileno(), sys.stderr.fileno())
+
+		# Write pid file
+		pid = str( os.getpid())
+		pidfile = file( PIDFILE, 'w')
+		atexit.register( rm_pidfile)
+		pidfile.write( "%s\n"%pid)
+		pidfile.close()
 	except OSError, e:
+		rm_pidfile()
 		die( "Cannot daemonize: %s"%e.strerror)
 
 	# Logging for daemon mode
@@ -2199,3 +2221,7 @@ if __name__ == '__main__':
 # http://pypi.python.org/pypi/ssl#downloads
 # python setup install.py
 
+#
+# Windows event logs:
+# http://www.blog.pythonlibrary.org/2010/07/27/pywin32-getting-windows-event-logs/
+#

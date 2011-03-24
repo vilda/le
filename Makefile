@@ -16,7 +16,6 @@ install:
 	ln -s le $(BINDIR)/le-rm
 	ln -s le $(BINDIR)/le-push
 	ln -s le $(BINDIR)/le-pull
-	ln -s le $(BINDIR)/le-monitordaemon
 uninstall:
 	rm -f $(BINDIR)/le
 	rm -f $(BINDIR)/le-init
@@ -28,5 +27,4 @@ uninstall:
 	rm -f $(BINDIR)/le-rm
 	rm -f $(BINDIR)/le-push
 	rm -f $(BINDIR)/le-pull
-	rm -f $(BINDIR)/le-monitordaemon
 

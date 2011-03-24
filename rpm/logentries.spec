@@ -14,6 +14,9 @@ Release: 		%{release}
 Source: 		%{name}-%{version}.tar.gz
 Prefix: 		/usr
 Group: 			Administration/Tools
+Requires(post):		chkconfig
+Requires(preun):	chkconfig
+Requires(preun):	initscripts
 
 %description
 A command line utility for a convenient access to logentries logging infrastructure.
@@ -30,4 +33,18 @@ cp le $RPM_BUILD_ROOT/usr/bin
 %files
 %defattr(-,root,root)
 /usr/bin/le
+
+%post
+/sbin/chkconfig --add logentries
+
+%preun
+if [ $1 -eq 0 ] ; then
+	/sbin/service logentries stop >/dev/null 2>&1
+	/sbin/chkconfig --del <script>
+fi
+
+%postun
+if [ "$1" -ge "1" ] ; then
+	/sbin/service logentries condrestart >/dev/null 2>&1 || :
+fi
 
