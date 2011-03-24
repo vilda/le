@@ -13,7 +13,7 @@
 
 set -e
 
-test -x /usr/bin/le-monitor || exit 0
+test -x /usr/bin/le-monitordaemon || exit 0
 
 umask 022
 
@@ -65,7 +65,7 @@ case "$1" in
 	log_daemon_msg "Restarting Logentries monitoring agent" "le"
 	start-stop-daemon --stop --quiet --oknodo --retry 30 --pidfile /var/run/le.pid
 	check_no_start log_end_msg
-	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitor ; then
+	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitordaemon ; then
 	    log_end_msg 0
 	else
 	    log_end_msg 1
@@ -76,7 +76,7 @@ case "$1" in
 	log_daemon_msg "Restarting Logentries monitoring agent" "le"
 	start-stop-daemon --stop --quiet --oknodo --retry 30 --pidfile /var/run/le.pid
 	check_no_start log_end_msg
-	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitor ; then
+	if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/le.pid --exec /usr/bin/le-monitordaemon ; then
 	    log_end_msg 0
 	else
 	    log_end_msg 1
