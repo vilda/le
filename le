@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.4.48"
+VERSION = "0.4.53"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -25,7 +25,7 @@ CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
 LE_CONFIG = 'config'
 LE_CERT_NAME = 'cert.pem'
-PIDFILE = '/var/run/logentries.pid'
+PID_FILE = '/var/run/logentries.pid'
 
 MAIN_SECT = 'Main'
 USER_KEY_PARAM = 'user-key'
@@ -194,10 +194,30 @@ MAMBAf8wGgYJKoZIhvZ9B0EABA0wCxsFVjMuMGMDAgbAMA0GCSqGSIb3DQEBBQUA
 A4GBAFjOKer89961zgK5F7WF0bnj4JXMJTENAKaSbn+2kmOeUJXRmm/kEd5jhW6Y
 7qj/WsjTVbJmcVfewCHrPSqnI0kBBIZCe/zuf6IWUrVnZ9NA2zsmWLIodz2uFHdh
 1voqZiegDfqnc1zqcPGUIWVEX/r87yloqaKHee9570+sB3c4
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIDVDCCAjygAwIBAgIDAjRWMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT
+MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMRswGQYDVQQDExJHZW9UcnVzdCBHbG9i
+YWwgQ0EwHhcNMDIwNTIxMDQwMDAwWhcNMjIwNTIxMDQwMDAwWjBCMQswCQYDVQQG
+EwJVUzEWMBQGA1UEChMNR2VvVHJ1c3QgSW5jLjEbMBkGA1UEAxMSR2VvVHJ1c3Qg
+R2xvYmFsIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2swYYzD9
+9BcjGlZ+W988bDjkcbd4kdS8odhM+KhDtgPpTSEHCIjaWC9mOSm9BXiLnTjoBbdq
+fnGk5sRgprDvgOSJKA+eJdbtg/OtppHHmMlCGDUUna2YRpIuT8rxh0PBFpVXLVDv
+iS2Aelet8u5fa9IAjbkU+BQVNdnARqN7csiRv8lVK83Qlz6cJmTM386DGXHKTubU
+1XupGc1V3sjs0l44U+VcT4wt/lAjNvxm5suOpDkZALeVAjmRCw7+OC7RHQWa9k0+
+bw8HHa8sHo9gOeL6NlMTOdReJivbPagUvTLrGAMoUgRx5aszPeE4uwc2hGKceeoW
+MPRfwCvocWvk+QIDAQABo1MwUTAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTA
+ephojYn7qwVkDBF9qn1luMrMTjAfBgNVHSMEGDAWgBTAephojYn7qwVkDBF9qn1l
+uMrMTjANBgkqhkiG9w0BAQUFAAOCAQEANeMpauUvXVSOKVCUn5kaFOSPeCpilKIn
+Z57QzxpeR+nBsqTP3UEaBU6bS+5Kb1VSsyShNwrrZHYqLizz/Tt1kL/6cdjHPTfS
+tQWVYrmm3ok9Nns4d0iXrKYgjy6myQzCsplFAMfOEVEiIuCl6rYVSAlk6l5PdPcF
+PseKUgzbFbS9bZvlxrFUaKnjaZC2mqUPuLk/IH2uSrW4nOQdtqvmlKXBx4Ot2/Un
+hw4EbNX/3aBd7YdStysVAq45pmp06drE57xNNB6pXE0zX5IJL4hmXXeXxx12E6nV
+5fEWCRE11azbJHFwLJhWC9kXtNHjUStedejV0NxPNO3CBWaAocvmMw==
 -----END CERTIFICATE-----"""
 authority_certificate_files = [
 	# Debian 5.0, Debian 6.0, Ubuntu 9.10, Ubuntu 10.4
-	"/etc/ssl/certs/Equifax_Secure_CA.pem",
+	"/etc/ssl/certs/ca-certificates.crt",
 	# Fedora 12, Fedora 13, CentOS 5
 	"/usr/share/purple/ca-certs/Equifax_Secure_CA.pem"
 	]
@@ -331,7 +351,8 @@ def rm_pidfile():
 	Removes PID file. Calles when the agent exits.
 	"""
 	try:
-		os.remove( PIDFILE)
+		if config.pid_file:
+			os.remove( PIDFILE)
 	except OSError:
 		pass
 
@@ -344,7 +365,8 @@ def daemonize():
 	"""
 	try:
 		# Open pid file
-		file( PIDFILE, 'w').close()
+		if config.pid_file:
+			file( config.pid_file, 'w').close()
 
 		pid = os.fork()
 		if pid > 0:
@@ -365,11 +387,12 @@ def daemonize():
 		os.dup2( se.fileno(), sys.stderr.fileno())
 
 		# Write pid file
-		pid = str( os.getpid())
-		pidfile = file( PIDFILE, 'w')
-		atexit.register( rm_pidfile)
-		pidfile.write( "%s\n"%pid)
-		pidfile.close()
+		if config.pid_file:
+			pid = str( os.getpid())
+			pidfile = file( config.pid_file, 'w')
+			atexit.register( rm_pidfile)
+			pidfile.write( "%s\n"%pid)
+			pidfile.close()
 	except OSError, e:
 		rm_pidfile()
 		die( "Cannot daemonize: %s"%e.strerror)
@@ -1062,6 +1085,7 @@ class Config:
 		self.xlist = False
 		self.uuid = False
 		self.daemon = False
+		self.pid_file = PID_FILE
 
 		# Special options
 		self.yes = False
@@ -1196,6 +1220,7 @@ class Config:
 		"""
 		if self.user_key == NOT_SET:
 			log.info( "User key is required. Enter your login credentials or specify the user key with --user-key parameter.")
+			config.save()
 			self.user_key = retrieve_user_key()
 
 	def set_agent_key(self, value):
@@ -1239,7 +1264,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= debug".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err));
 		for name, value in optlist:
@@ -1263,6 +1288,11 @@ class Config:
 				self.name = value
 			elif name == "--hostname":
 				self.hostname = value
+			elif name == "--pid-file":
+				if value == '':
+					self.pid_file = None
+				else:
+					self.pid_file = value
 			elif name == "--std":
 				self.std = True
 			elif name == "--type":
@@ -1292,7 +1322,7 @@ config = Config()
 
 def find_cert_file():
 	"""
-	Finds the location of the certificate our lovely site.
+	Finds the location of the certificate of our lovely site.
 	"""
 	for f in authority_certificate_files:
 		if os.path.exists( f):
@@ -1681,7 +1711,7 @@ def cmd_register( args):
 
 def ask_cmd_register( args):
 	if not config.yes:
-		resp = raw_input( 'Host in not registered. Would you like to register it (Y/n)? ')
+		resp = raw_input( 'Host is not registered. Would you like to register it (Y/n)? ')
 		if resp not in ['', 'y', 'Y']:
 			die( "Please register the host first")
 	cmd_register( args)
