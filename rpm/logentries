@@ -34,7 +34,7 @@ start() {
     [ -x $EXECNAME ] || exit 5
     #[ -f $config ] || exit 6
     echo -n $"Starting $SERVICENAME: "
-    daemon --check $NAME $EXECNAME
+    daemon --check $SERVICENAME $EXECNAME
     retval=$?
     echo
     [ $retval -eq 0 ] && touch $lockfile
@@ -43,7 +43,7 @@ start() {
 
 stop() {
     echo -n $"Stopping $SERVICENAME: "
-    killproc $NAME
+    killproc $SERVICENAME
     retval=$?
     echo
     [ $retval -eq 0 ] && rm -f $lockfile
@@ -65,7 +65,7 @@ force_reload() {
 
 rh_status() {
     # run checks to determine if the service is running or use generic status
-    status $NAME
+    status $SERVICENAME
 }
 
 rh_status_q() {

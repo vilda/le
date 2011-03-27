@@ -27,12 +27,25 @@ A command line utility for a convenient access to logentries logging infrastruct
 %build
 
 %install
-mkdir -p $RPM_BUILD_ROOT/usr/bin
+mkdir -p $RPM_BUILD_ROOT/usr/bin $RPM_BUILD_ROOT/etc/init.d
 cp le $RPM_BUILD_ROOT/usr/bin
+cp rpm/logentries $RPM_BUILD_ROOT/etc/init.d
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-monitordaemon
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-init
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-reinit
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-register
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-monitor
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-follow
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-ls
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-rm
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-push
+ln -s le $RPM_BUILD_ROOT/usr/bin/le-pull
+
 
 %files
 %defattr(-,root,root)
-/usr/bin/le
+/usr/bin/*
+/etc/init.d/*
 
 %post
 /sbin/chkconfig --add logentries
@@ -40,7 +53,7 @@ cp le $RPM_BUILD_ROOT/usr/bin
 %preun
 if [ $1 -eq 0 ] ; then
 	/sbin/service logentries stop >/dev/null 2>&1
-	/sbin/chkconfig --del <script>
+	/sbin/chkconfig --del logentries
 fi
 
 %postun
