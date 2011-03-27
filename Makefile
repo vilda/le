@@ -2,10 +2,11 @@
 # Based on http://savetheions.com/2010/01/20/packaging-python-applicationsmodules-for-debian/
 
 BINDIR = $(DESTDIR)/usr/bin
+ETCDIR = $(DESTDIR)/etc/.le
 clean:
 	rm -f *.py[co] */*.py[co]
 install:
-	mkdir -p $(BINDIR)
+	mkdir -p $(BINDIR) $(ETCDIR)
 	cp le $(BINDIR)/
 	ln -s le $(BINDIR)/le-init
 	ln -s le $(BINDIR)/le-reinit
@@ -16,6 +17,7 @@ install:
 	ln -s le $(BINDIR)/le-rm
 	ln -s le $(BINDIR)/le-push
 	ln -s le $(BINDIR)/le-pull
+	cp ca-certs.pem $(ETCDIR)/
 uninstall:
 	rm -f $(BINDIR)/le
 	rm -f $(BINDIR)/le-init
@@ -27,4 +29,5 @@ uninstall:
 	rm -f $(BINDIR)/le-rm
 	rm -f $(BINDIR)/le-push
 	rm -f $(BINDIR)/le-pull
+	rm -f $(ETCDIR)/ca-certs.pem
 

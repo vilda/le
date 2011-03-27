@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.4.53"
+VERSION = "0.5.2"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -24,7 +24,7 @@ DEFAULT_AGENT_KEY = NOT_SET
 CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
 LE_CONFIG = 'config'
-LE_CERT_NAME = 'cert.pem'
+LE_CERT_NAME = 'ca-certs.pem'
 PID_FILE = '/var/run/logentries.pid'
 
 MAIN_SECT = 'Main'
@@ -219,7 +219,7 @@ authority_certificate_files = [
 	# Debian 5.0, Debian 6.0, Ubuntu 9.10, Ubuntu 10.4
 	"/etc/ssl/certs/ca-certificates.crt",
 	# Fedora 12, Fedora 13, CentOS 5
-	"/usr/share/purple/ca-certs/Equifax_Secure_CA.pem"
+	"/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem"
 	]
 
 
@@ -706,7 +706,7 @@ def retrieve_user_key():
 		password = getpass.getpass()
 
 		try:
-			c = httplib.HTTPSConnection( LE_SERVER)
+			c = domain_connect( api=False)
 
 			c.request( 'post', USER_KEY_API,
 				urllib.urlencode( {'username':username,'password':password}),
