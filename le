@@ -4,14 +4,14 @@
 #
 # Logentries monitoring agent
 # Copyright 2010,2011 Logentries, Jlizard
-# Author: Viliam Holub <viliam.holub@logentries.com>
+# Viliam Holub <viliam.holub@logentries.com>
 #
 
 #
 # Constants
 #
 
-VERSION = "0.5.2"
+VERSION = "0.5.4"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -36,7 +36,7 @@ ID_LOGS_API = '/agent/id-logs/'
 
 # Logentries server details
 LE_SERVER = 'logentries.com'
-LE_SERVER_API_DOMAIN = 'api.logentries.com'
+LE_SERVER_API_DOMAIN = 'api1.logentries.com'
 LE_SERVER_CONFIG = '/agent/config'
 LE_SERVER_LOGIN = '/login/'
 LE_SERVER_API = '/'
@@ -124,6 +124,7 @@ Where command is one of:
     --hostname=hname  hostname of the server
     --std register standard logs
     --std_all register all identified logs
+  whoami    Displays settings for this host
   monitor   Monitor this host
   follow <filename>  Follow the given log
     --name=name name of the log
@@ -1790,6 +1791,19 @@ def cmd_clean( args):
 		log.info( 'Configuration clean')
 
 
+def cmd_whoami( args):
+	"""
+	Displays information about this host.
+	"""
+	config.load()
+	config.agent_key_required()
+	no_more_args( args)
+
+	list_object( request( 'hosts/%s'%config.agent_key, True, True))
+	print ''
+	list_object( request( 'hosts/%s/'%config.agent_key, True, True))
+
+
 def get_all_list( what):
 	return domain_request( {"request":"list_"+what,
 		"user_key": config.user_key}, True, True)['list']
@@ -2216,6 +2230,7 @@ def main():
 		'monitordaemon': cmd_monitor_daemon,
 		'follow': cmd_follow,
 		'clean': cmd_clean,
+		'whoami': cmd_whoami,
 		# Clusters
 		'new-cluster': cmd_new_cluster,
 		'set-cluster': cmd_set_cluster,
