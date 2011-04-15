@@ -36,7 +36,7 @@ ID_LOGS_API = '/agent/id-logs/'
 
 # Logentries server details
 LE_SERVER = 'logentries.com'
-LE_SERVER_API_DOMAIN = 'api1.logentries.com'
+LE_SERVER_API_DOMAIN = 'api.logentries.com'
 LE_SERVER_CONFIG = '/agent/config'
 LE_SERVER_LOGIN = '/login/'
 LE_SERVER_API = '/'
