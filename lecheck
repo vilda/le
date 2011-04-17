@@ -1,2 +1,2 @@
 
-pychecker le.py
+pychecker --limit 20 le.py
