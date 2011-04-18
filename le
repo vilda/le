@@ -1107,8 +1107,8 @@ class WinEventFollower(Follower):
 		reg_result = regexp.search(evt_date)
 		date = reg_result.group( 1)
 		the_time = reg_result.group( 2)
-		(mon,day,yr) = map( lambda x: string.atoi(x),string.split(date,'/'))
-		(hr,mins,sec) = map( lambda x: string.atoi(x),string.split(the_time,':'))
+		(mon,day,yr) = map( lambda x: int(x),string.split(date,'/'))
+		(hr,mins,sec) = map( lambda x: int(x),string.split(the_time,':'))
 		tup = [yr,mon,day,hr,mins,sec,0,0,0]
 
 		sec = time.mktime(tup)
@@ -1124,8 +1124,8 @@ class WinEventFollower(Follower):
 		reg_result = regexp.search( evt_date)
 		date=reg_result.group( 1)
 		the_time = reg_result.group( 2)
-		(mon,day,yr) = map( lambda x: string.atoi(x),string.split(date,'/'))
-		(hr,mins,sec) = map( lambda x: string.atoi(x),string.split(the_time,':'))
+		(mon,day,yr) = map( lambda x: int(x),string.split(date,'/'))
+		(hr,mins,sec) = map( lambda x: int(x),string.split(the_time,':'))
 		tup = [yr,mon,day,hr,mins,sec,0,0,0]
 
 		return time.strftime( "%Y-%m-%d %H:%M:%S", tup)
@@ -1456,7 +1456,6 @@ if os.name != "posix":
 	# code adapted from http://code.activestate.com/recipes/551780/
 
 	from os.path import splitext, abspath
-	from sys import modules
 	import win32event
 	import win32con
 	import winerror
@@ -1515,7 +1514,7 @@ if os.name != "posix":
 	    cls._svc_name_ = name
 	    cls._svc_display_name_ = display_name or name
 	    try:
-		module_path=modules[cls.__module__].__file__
+		module_path=sys.modules[cls.__module__].__file__
 	    except AttributeError:
 		# maybe py2exe went by
 		from sys import executable
@@ -1548,7 +1547,7 @@ if os.name != "posix":
 	    cls._svc_name_ = name
 	    cls._svc_display_name_ = display_name or name
 	    try:
-		module_path=modules[cls.__module__].__file__
+		module_path=sys.modules[cls.__module__].__file__
 	    except AttributeError:
 		# maybe py2exe went by
 		from sys import executable
