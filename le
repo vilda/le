@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -1177,7 +1177,7 @@ class WinEventFollower(Follower):
 					    evt_type = "unknown"
 					else:
 					    evt_type = str(evt_dict[ev_obj.EventType])
-					eventdata = ("%s" % event_time)+ (" %s %s" % (evt_id, evt_type)) +(" #%s" % record)+(" %s" % source)+(" ")+( msg)+("\n")
+					eventdata = ("%s" % event_time)+ (" %s" % computer)+ (" %s" % cat)+ (" %s %s" % (evt_id, evt_type)) +(" #%s" % record)+(" %s" % source)+(" ")+( msg)+("\n")
 					#debug
 					#print eventdata
 					self.new_events( eventdata)
