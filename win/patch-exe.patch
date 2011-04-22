@@ -1,5 +1,5 @@
-*** le601.py	2011-04-19 09:48:35.000000000 +0100
---- le601-exe.py	2011-04-19 09:48:35.000000000 +0100
+*** le601	1913-05-09 10:12:40.000000000 -0025
+--- le601-exe.py	2011-04-22 13:24:33.000000000 +0100
 ***************
 *** 157,165 ****
   WINDOWS_USAGE="""
@@ -13,21 +13,21 @@
   
 --- 157,162 ----
 ***************
-*** 2565,2572 ****
+*** 2564,2571 ****
+  		'follow': cmd_follow,
   		'clean': cmd_clean,
   		# Windows
-  		'monitorwinservice': cmd_win_service,
+! 		'monitorwinservice': cmd_win_service,
 ! 		'installwinservice': cmd_install_win_service,
-! 		'windowsevents': cmd_follow_win_events,
+  		'windowsevents': cmd_follow_win_events,
   		# Clusters
   		'new-cluster': cmd_new_cluster,
-  		'set-cluster': cmd_set_cluster,
---- 2562,2569 ----
+--- 2561,2568 ----
+  		'follow': cmd_follow,
   		'clean': cmd_clean,
   		# Windows
-  		'monitorwinservice': cmd_win_service,
+! 		#'monitorwinservice': cmd_win_service,
 ! 		#'installwinservice': cmd_install_win_service,
-! 		#'windowsevents': cmd_follow_win_events,
+  		'windowsevents': cmd_follow_win_events,
   		# Clusters
   		'new-cluster': cmd_new_cluster,
-  		'set-cluster': cmd_set_cluster,
