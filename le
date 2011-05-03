@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -1793,35 +1793,37 @@ def push_request( ilog, data_size, where, params):
 
 
 
-def request( request, required=False, check_status=False, rtype='GET'):
+def request( request, required=False, check_status=False, rtype='GET', retry=False):
 	"""
 	Processes a list request on the logentries domain.
 	"""
-	# Obtain response
-	response,_ = get_response( rtype, '/'+config.user_key+'/'+request)
-	
-	# Check the response
-	if not response:
+	noticed = False
+	while True:
+		# Obtain response
+		response,_ = get_response( rtype, '/'+config.user_key+'/'+request)
+		
+		# Check the response
+		if response:
+			break
 		if required:
-			die( "Error: Cannot process LE request, no response")
+			die( 'Error: Cannot process LE request, no response')
+		if retry:
+			if not noticed:
+				log.info( 'Error: No response from LE, re-trying in %ss intervals'%SRV_RECON_TIMEOUT)
+				noticed = True
+			time.sleep( SRV_RECON_TIMEOUT)
 		else:
-			#Modified by TP - retry in case of network issues
-			log.info("Retrying Request: No Network Connection")
-			while not response and not shutdown:
-				response,_ = get_response( rtype, '/'+config.user_key+'/'+request)
-				time.sleep(SRV_RECON_TIMEOUT)
-			log.info("Request Received")
-
+			return None
 
 	response = response.read()
 	log.debug( 'List response: %s'%response)
 	try:
 		d_response = json_loads( response)
 	except ValueError:
-		die( "Error: Invalid response (%s)"%response)
+		die( 'Error: Invalid response (%s)'%response)
 
 	if check_status and d_response['response'] != 'ok':
-		die( "Error: %s"%d_response['reason'])
+		die( 'Error: %s'%d_response['reason'])
 
 	return d_response
 
@@ -2020,9 +2022,7 @@ def cmd_monitor( args):
 
 	stats = None
 	try:
-		# List host's logs and follow them - NOTE updated by TP - Flags set 
-		# as false in case there is no network connection available e.g. at reboot
-		logs = request( 'hosts/%s/'%config.agent_key, False, False)['list']
+		logs = request( 'hosts/%s/'%config.agent_key, False, False, retry=True)['list']
 		
 		for l in logs:
 			if l['follow'] == 'true':
@@ -2563,6 +2563,7 @@ def main():
 		'monitordaemon': cmd_monitor_daemon,
 		'follow': cmd_follow,
 		'clean': cmd_clean,
+		'whoami': cmd_whoami,
 		# Windows
 		'monitorwinservice': cmd_win_service,
 		'installwinservice': cmd_install_win_service,
