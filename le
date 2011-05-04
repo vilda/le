@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.6.2"
+VERSION = "0.6.3"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -39,7 +39,7 @@ LE_SERVER = 'logentries.com'
 LE_SERVER_API_DOMAIN = 'api.logentries.com'
 LE_SERVER_CONFIG = '/agent/config'
 LE_SERVER_LOGIN = '/login/'
-LE_SERVER_API = '/'
+LE_SERVER_API = '/api/'
 LE_SERVER_PORT = 443
 
 CONTENT_LENGTH = 'content-length';
@@ -725,7 +725,7 @@ def retrieve_user_key():
 		try:
 			c = domain_connect( api=False)
 
-			c.request( 'post', USER_KEY_API,
+			c.request( 'POST', USER_KEY_API,
 				urllib.urlencode( {'username':username,'password':password}),
 				{'Referer':'https://logentries.com/login/'})
 			response = c.getresponse()
@@ -1670,17 +1670,16 @@ def do_request( conn, operation, addr, data=None, headers={}):
 		conn.request( operation, addr, headers=headers)
 
 
-def get_response( operation, addr, data=None, headers={}, silent=False, die_on_error=True):
+def get_response( operation, addr, data=None, headers={}, silent=False, die_on_error=True, api=True):
 	"""
-	Returns response from the domain with a connection.
+	Returns response from the domain or API server.
 	"""
 	response = None
 	conn = None
 	try:
-		conn = domain_connect()
+		conn = domain_connect( api)
 		do_request( conn, operation, addr, data, headers)
 		response = conn.getresponse()
-		conn.close()
 	except socket.sslerror, msg: # Network error
 		if not silent:
 			log.info( "SSL error: %s"%msg)
@@ -1701,21 +1700,25 @@ def domain_request( request, required=False, check_status=False, silent=False, d
 	Processes a request on the logentries domain.
 	"""
 	# Obtain response
-	response,_ = get_response( "POST", LE_SERVER_API, urllib.urlencode( request), silent=silent, die_on_error=die_on_error)
+	response,conn = get_response( "POST", LE_SERVER_API, urllib.urlencode( request), silent=silent, die_on_error=die_on_error, api=False)
 
 	# Check the response
 	if not response:
 		if required:
 			die( "Error: Cannot process LE request, no response")
+		conn.close()
 		return None
 	if response.status != 200:
 		if required:
 			die( "Error: Cannot process LE request: (%s)"%response.status)
+		conn.close()
+		return None
 
-	response = response.read()
-	log.debug( 'Domain response: %s'%response)
+	xresponse = response.read()
+	conn.close()
+	log.debug( 'Domain response: "%s"'%xresponse)
 	try:
-		d_response = json_loads( response)
+		d_response = json_loads( xresponse)
 	except ValueError:
 		error = 'Error: Invalid response, parse error.'
 		if die_on_error:
@@ -1743,7 +1746,7 @@ def pull_request( what, params):
 
 	# Obtain response
 	addr = '/%s/%s/?%s'%(config.user_key,what,urllib.urlencode( params))
-	response,_ = get_response( "GET", addr)
+	response,conn = get_response( "GET", addr)
 
 	# Check the response
 	if not response:
@@ -1757,6 +1760,7 @@ def pull_request( what, params):
 		data = response.read( 65536)
 		if len(data) == 0: break
 		sys.stdout.write( data)
+	conn.close()
 
 
 def push_request( ilog, data_size, where, params):
@@ -1795,12 +1799,12 @@ def push_request( ilog, data_size, where, params):
 
 def request( request, required=False, check_status=False, rtype='GET', retry=False):
 	"""
-	Processes a list request on the logentries domain.
+	Processes a list request on the API server.
 	"""
 	noticed = False
 	while True:
 		# Obtain response
-		response,_ = get_response( rtype, '/'+config.user_key+'/'+request)
+		response,conn = get_response( rtype, '/'+config.user_key+'/'+request)
 		
 		# Check the response
 		if response:
@@ -1816,6 +1820,7 @@ def request( request, required=False, check_status=False, rtype='GET', retry=Fal
 			return None
 
 	response = response.read()
+	conn.close()
 	log.debug( 'List response: %s'%response)
 	try:
 		d_response = json_loads( response)
