@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.6.3"
+VERSION = "0.6.4"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -39,7 +39,7 @@ LE_SERVER = 'logentries.com'
 LE_SERVER_API_DOMAIN = 'api.logentries.com'
 LE_SERVER_CONFIG = '/agent/config'
 LE_SERVER_LOGIN = '/login/'
-LE_SERVER_API = '/api/'
+LE_SERVER_API = '/'
 LE_SERVER_PORT = 443
 
 CONTENT_LENGTH = 'content-length';
@@ -2026,9 +2026,22 @@ def cmd_monitor( args):
 		daemonize()
 
 	stats = None
+	noticed = False
 	try:
-		logs = request( 'hosts/%s/'%config.agent_key, False, False, retry=True)['list']
-		
+		# Load logs to follow
+		logs = None
+		while not logs:
+			resp = request( 'hosts/%s/'%config.agent_key, False, False, retry=True)
+			if resp['response'] != 'ok':
+				if not noticed:
+					log.info( 'Error retrieving list of logs: %s, retrying in %ss intervals'%(resp['reason'],SRV_RECON_TIMEOUT)) 
+					noticed = True
+				time.sleep( SRV_RECON_TIMEOUT)
+				continue
+			logs = resp['list']
+		# Register resource monitoring
+		stats = Stats()
+		# Start followers	
 		for l in logs:
 			if l['follow'] == 'true':
 				if l['type']==WINEVENT_LOGTYPE: #UUID of type windowseventlogs
@@ -2036,15 +2049,12 @@ def cmd_monitor( args):
 				else:
 					LogFollower( l['filename'], l['key'])
 
-		# Register resource monitoring
-		stats = Stats()
-
+		# Park this thread
 		while True:
-			time.sleep( 60)
+			time.sleep( 600)
 	except KeyboardInterrupt:
 		if stats: stats.cancel()
 		set_shutdown()
-	#domain.shutdown()
 
 def cmd_monitor_daemon( args):
 	"""
