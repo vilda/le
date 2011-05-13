@@ -1700,7 +1700,7 @@ def domain_request( request, required=False, check_status=False, silent=False, d
 	Processes a request on the logentries domain.
 	"""
 	# Obtain response
-	response,conn = get_response( "POST", LE_SERVER_API, urllib.urlencode( request), silent=silent, die_on_error=die_on_error, api=False)
+	response,conn = get_response( "POST", LE_SERVER_API, urllib.urlencode( request), silent=silent, die_on_error=die_on_error, api=True)
 
 	# Check the response
 	if not response:
