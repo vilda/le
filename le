@@ -45,7 +45,7 @@ LE_SERVER_PORT = 443
 CONTENT_LENGTH = 'content-length';
 
 # Windows event log type ID
-WINEVENT_LOGTYPE = 'd2d88df8-a26e-42ef-9ebd-b659f543bd36'
+WINEVENT_LOGTYPE = '9c0912b7-674b-47f1-89ac-eed5aa3affe0'
 
 # Log root directory
 LOG_ROOT = '/var/log'
