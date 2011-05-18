@@ -2,10 +2,10 @@
 # coding: utf-8
 
 #
-# Logentries monitoring agent
-# Copyright 2010,2011 Logentries, Jlizard
-# Viliam Holub <viliam.holub@logentries.com>
+# Logentries agent by JLizard <https://logentries.com/>. 
+# This work is licensed under a <http://creativecommons.org/licenses/by/3.0/> Creative Commons Attribution 3.0 Unported License
 #
+
 
 #
 # Constants
