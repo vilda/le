@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.6.6"
+VERSION = "0.6.7"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -52,7 +52,7 @@ LOG_ROOT = '/var/log'
 
 # Timeout after server connection fail. Might be a temporary network
 # failure.
-SRV_RECON_TIMEOUT=5 # in seconds
+SRV_RECON_TIMEOUT=10 # in seconds
 
 # Timeout for re-send and re-connect after slave server connection fails.
 LES_RECON_TIMEOUT=2 # Seconds
@@ -2039,6 +2039,8 @@ def cmd_monitor( args):
 				time.sleep( SRV_RECON_TIMEOUT)
 				continue
 			logs = resp['list']
+			if not logs:
+				time.sleep( SRV_RECON_TIMEOUT)
 		# Register resource monitoring
 		stats = Stats()
 		# Start followers	
