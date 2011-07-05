@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.6.7"
+VERSION = "0.6.8"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -81,6 +81,7 @@ NAME_CHECK = 4 # TAIL_RECHECK cycles
 
 # Number of read line false attemps between are-you-alive packets
 IAA_INTERVAL = 100
+IAA_TOKEN = "###LE-IAA###\n"
 
 # Maximal size of a block of events
 MAX_EVENTS = 65536
@@ -1061,6 +1062,8 @@ class Follower(object):
 	
 	def new_events( self, events):
 		""" Sends a block of new lines. """
+		if not events:
+			events = IAA_TOKEN
 		while not shutdown:
 			try:
 				if self.first_chunk:
@@ -1085,8 +1088,7 @@ class LogFollower(Follower):
 		self.open_log()
 		while not shutdown:
 			events = self.get_events()
-			if events:
-				self.new_events( events)
+			self.new_events( events)
 	
 
 # Some of the code is from 
