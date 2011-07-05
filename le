@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.6.8"
+VERSION = "0.7"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -329,6 +329,19 @@ except ImportError:
 	def wrap_socket( sock, ca_certs=None, cert_reqs=None):
 		return socket.ssl( sock)
 	CERT_REQUIRED = 0
+
+#
+# User-defined filtering code
+#
+
+def filter_events( events):
+	"""
+	User-defined filtering code. Events passed are about to be sent to
+	logentries server. Make the required modifications to the events such
+	as removing unvanted or sensitive information.
+	"""
+	# By default, this method is empty
+	return events
 	
 
 def call( command):
@@ -1062,6 +1075,8 @@ class Follower(object):
 	
 	def new_events( self, events):
 		""" Sends a block of new lines. """
+		if events:
+			events = filter_events( events)
 		if not events:
 			events = IAA_TOKEN
 		while not shutdown:
