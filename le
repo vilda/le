@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.7.2"
+VERSION = "0.7.3"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -1800,6 +1800,15 @@ def push_request( ilog, data_size, where, params):
 			if len(data) == 0: break
 			to_send -= len(data)
 			conn.send( data)
+		response = conn.getresponse()
+		if response.status != 200:
+			reason = response.read()
+			try:
+				d_response = json_loads( reason)
+				reason = d_response['reason']
+			except ValueError:
+				pass
+			die( 'Error: ' +reason);
 		conn.close()
 	except socket.sslerror, msg: # Network error
 		log.info( "SSL error: %s"%msg)
