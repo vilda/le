@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.7.1"
+VERSION = "0.7.2"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -2412,8 +2412,8 @@ def get_app_params( args):
 
 
 def is_log_fs( addr):
-	log_addrs = [ r'/?(logs|apps)/.*/',
-		r'/?host(name)?s/.*/.*/']
+	log_addrs = [ r'(logs|apps)/.*/',
+		r'host(name)?s/.*/.*/']
 	for la in log_addrs:
 		if re.match( la, addr):
 			return True
@@ -2513,6 +2513,8 @@ def cmd_pull( args):
 	params = {}
 
 	addr = args[0]
+	if addr.startswith( '/'):
+		addr = addr[1:]
 	if addr.endswith( '/'):
 		addr = addr[:-1]
 	if not is_log_fs( addr+'/'):
@@ -2543,6 +2545,8 @@ def cmd_push( args):
 	filename = args[0]
 
 	addr = args[1]
+	if addr.startswith( '/'):
+		addr = addr[1:]
 	if addr.endswith( '/'):
 		addr = addr[:-1]
 	if not is_log_fs( addr+'/'):
