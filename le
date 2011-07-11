@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.7"
+VERSION = "0.7.1"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -2412,8 +2412,8 @@ def get_app_params( args):
 
 
 def is_log_fs( addr):
-	log_addrs = [ r'(logs|apps)/.*/',
-		r'host(name)?s/.*/.*/']
+	log_addrs = [ r'/?(logs|apps)/.*/',
+		r'/?host(name)?s/.*/.*/']
 	for la in log_addrs:
 		if re.match( la, addr):
 			return True
