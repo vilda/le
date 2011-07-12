@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.7.3"
+VERSION = "0.8"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -140,10 +140,11 @@ Where command is one of:
   new-app <name> <logs...>  Register a new application
   set-app <name> <logs...>  Set application attributes
     --name  new name of the application
-  ls      List internal filesystem: <path>
-  rm      Remove entity: <path>
-  pull    Pull log file: <path> <when> <filter> <limit>
-  push    Push log file: <file> <path> <log-type>
+  ls        List internal filesystem: <path>
+  rm        Remove entity: <path>
+  pull      Pull log file: <path> <when> <filter> <limit>
+  push      Push log file: <file> <path> <log-type>
+  logtypes  List log types
 
 Where parameters are:
   --help            show usage help and exit
@@ -2219,6 +2220,11 @@ def list_object( request, hostnames=False):
 		if hostnames:
 			index_name = 'hostname'
 		pass
+	elif t == 'logtype':
+		print 'title =', request[ 'title']
+		print 'description =', request[ 'desc']
+		print 'shortcut =', request[ 'shortcut']
+		return
 	elif t == 'loglist':
 		item_name = 'log'
 		pass
@@ -2228,11 +2234,16 @@ def list_object( request, hostnames=False):
 	elif t == 'clusterlist':
 		item_name = 'cluster'
 		pass
+	elif t == 'logtypelist':
+		item_name = 'logtype'
+		index_name = 'shortcut'
+		pass
 	else:
-		die( 'Unknown object type "%s". Adapter too old?'%t)
+		die( 'Unknown object type "%s". Agent too old?'%t)
 	
-	# Standard list
+	# Standard list, print it sorted
 	ilist = request['list']
+	ilist = sorted( ilist, key=lambda item: item[index_name])
 	for item in ilist:
 		if config.uuid:
 			print item['key'],
@@ -2488,8 +2499,9 @@ def cmd_ls( args):
 	# Make sure we are not downloading log
 	if is_log_fs( addr):
 		die( 'Use pull to get log content.')
-	if addr.count('/') > 2:
-		die( 'Path not found')
+	
+	#if addr.count('/') > 2:
+	#	die( 'Path not found')
 	list_object( request( addr, True, True), hostnames=addr.startswith('hostnames'))
 
 def cmd_rm( args):
