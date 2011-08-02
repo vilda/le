@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.2"
+VERSION = "0.8.3"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -930,7 +930,6 @@ class Follower(object):
 		self.name = name
 		self.log_key = log_key
 		self.log_addr = '/%s/hosts/%s/%s/?realtime=1'%(config.user_key, config.agent_key, log_key)
-		self.first_chunk = True
 		self.flush = True
 		log.info("Following %s"%name)
 		monitoring_thread = threading.Thread( target=self.monitorlogs, name=self.name)
@@ -1063,8 +1062,7 @@ class Follower(object):
 			retry += 1
 			try:
 				self.conn = domain_connect()
-				do_request( self.conn, "PUT", self.log_addr, headers={'transfer-encoding':'chunked'})
-				self.first_chunk = True
+				do_request( self.conn, "PUT", self.log_addr)
 				break
 			except socket.error, err_no:
 				if shutdown: return
@@ -1077,11 +1075,6 @@ class Follower(object):
 			events = IAA_TOKEN
 		while not shutdown:
 			try:
-				if self.first_chunk:
-					self.conn.send( "%x\r\n"%len( events))
-					self.first_chunk = False
-				else:
-					self.conn.send( "\r\n%x\r\n"%len( events))
 				self.conn.send( events)
 				break
 			except socket.error, (err_no, err_str):
