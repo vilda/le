@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8"
+VERSION = "0.8.2"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -54,18 +54,9 @@ LOG_ROOT = '/var/log'
 # failure.
 SRV_RECON_TIMEOUT=10 # in seconds
 
-# Timeout for re-send and re-connect after slave server connection fails.
-LES_RECON_TIMEOUT=2 # Seconds
-
 # Timeout after invalid server response. Might be a version mishmash or
 # temporary server/network failure
 INV_SRV_RESP_TIMEOUT=30 # Seconds
-
-# Time interval between attempts to connect LE server.
-LE_RECON_TIMEOUT=5 # in seconds
-
-# Time interval between config reloads.
-CONFIG_RELOAD_INTERVAL=30 # Multiply of LE_RECON_TIMEOUT
 
 # Time interval between re-trying to open log file
 REOPEN_TRY_INTERVAL=1 # Seconds
@@ -789,7 +780,8 @@ class Stats:
 		self.prev_disk_stats = [ 0, 0];
 		self.prev_net_stats = [ 0, 0];
 
-		self.send_stats()
+		if not config.debug_nostats:
+			self.send_stats()
 
 
 	def cpu_stats(self,data):
@@ -897,7 +889,9 @@ class Stats:
 
 	def new_request(self, rq):
 		try:
-			domain_request( rq, silent=not config.debug, die_on_error=False)
+			response = domain_request( rq, silent=not config.debug, die_on_error=False)
+			if config.debug_stats:
+				log.info( response)
 		except socket.error, (err_no, err_str):
 			pass
 
@@ -919,6 +913,7 @@ class Stats:
 		next_step = (ethalon-time.time()) % EPOCH
 		if not self.to_remove:
 			self.timer = threading.Timer( next_step, self.send_stats, ())
+			self.timer.daemon = True
 			self.timer.start()
 
 	def cancel(self):
@@ -1074,7 +1069,7 @@ class Follower(object):
 			except socket.error, err_no:
 				if shutdown: return
 	
-	def new_events( self, events):
+	def send_events( self, events):
 		""" Sends a block of new lines. """
 		if events:
 			events = filter_events( events)
@@ -1093,7 +1088,7 @@ class Follower(object):
 				self.open_connection()
 
 		if config.debug_events:
-			print events
+			print >>sys.stderr, events,
 
 	
 class LogFollower(Follower):
@@ -1104,7 +1099,7 @@ class LogFollower(Follower):
 		self.open_log()
 		while not shutdown:
 			events = self.get_events()
-			self.new_events( events)
+			self.send_events( events)
 	
 
 # Some of the code is from 
@@ -1198,7 +1193,7 @@ class WinEventFollower(Follower):
 					eventdata = ("%s" % event_time)+ (" %s" % computer)+ (" %s" % cat)+ (" %s %s" % (evt_id, evt_type)) +(" #%s" % record)+(" %s" % source)+(" ")+( msg)+("\n")
 					#debug
 					#print eventdata
-					self.new_events( eventdata)
+					self.send_events( eventdata)
 
 		except:
 			print traceback.print_exc(sys.exc_info())
@@ -1239,8 +1234,12 @@ class Config:
 		self.debug_events = False
 		# Adapter connects to locahost
 		self.debug_local = False
+		# Do not collect statistics
+		self.debug_nostats = False
 		# Collected statistics are logged
 		self.debug_stats = False
+		# Collect statistics only
+		self.debug_stats_only = False
 		# Commands passed to server are logged
 		self.debug_requests = False
 		# Display system information and exit
@@ -1409,7 +1408,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err));
 		for name, value in optlist:
@@ -1454,6 +1453,10 @@ class Config:
 				self.debug_local = True
 			elif name == "--debug-stats":
 				self.debug_stats = True
+			elif name == "--debug-nostats":
+				self.debug_nostats = True
+			elif name == "--debug-stats-only":
+				self.debug_stats_only = True
 			elif name == "--debug-loglist":
 				self.debug_loglist = True
 			elif name == "--debug-requests":
@@ -1655,6 +1658,7 @@ class ServerHTTPSConnection(httplib.HTTPSConnection):
 		server = LE_SERVER
 		if api:
 			server = LE_SERVER_API_DOMAIN
+		log.debug( 'Connecting to %s'%server)
 		if no_ssl:
 			httplib.HTTPSConnection.__init__( self, server)
 		else:
@@ -1674,7 +1678,9 @@ class ServerHTTPSConnection(httplib.HTTPSConnection):
 
 def domain_connect(api=True):
 	if config.debug_local:
-		conn = httplib.HTTPConnection( 'localhost:8081')
+		server = 'localhost:8081'
+		log.debug( 'Connecting to %s'%server)
+		conn = httplib.HTTPConnection( server)
 	else:
 		conn = ServerHTTPSConnection(api)
 	return conn
@@ -2036,6 +2042,31 @@ def ask_cmd_register( args):
 			die( "Please register the host first")
 	cmd_register( args)
 
+def load_logs():
+	"""
+	Loads logs from the server and initializes followers.
+	"""
+	noticed = False
+	logs = None
+	while not logs:
+		resp = request( 'hosts/%s/'%config.agent_key, False, False, retry=True)
+		if resp['response'] != 'ok':
+			if not noticed:
+				log.info( 'Error retrieving list of logs: %s, retrying in %ss intervals'%(resp['reason'],SRV_RECON_TIMEOUT)) 
+				noticed = True
+			time.sleep( SRV_RECON_TIMEOUT)
+			continue
+		logs = resp['list']
+		if not logs:
+			time.sleep( SRV_RECON_TIMEOUT)
+	# Start followers	
+	for l in logs:
+		if l['follow'] == 'true':
+			if l['type']==WINEVENT_LOGTYPE: #UUID of type windowseventlogs
+				WinEventFollower(l['filename'], l['key'])
+			else:
+				LogFollower( l['filename'], l['key'])
+
 
 def cmd_monitor( args):
 	"""
@@ -2052,31 +2083,13 @@ def cmd_monitor( args):
 	if config.daemon:
 		daemonize()
 
-	stats = None
-	noticed = False
+	# Register resource monitoring
+	stats = Stats()
+
 	try:
 		# Load logs to follow
-		logs = None
-		while not logs:
-			resp = request( 'hosts/%s/'%config.agent_key, False, False, retry=True)
-			if resp['response'] != 'ok':
-				if not noticed:
-					log.info( 'Error retrieving list of logs: %s, retrying in %ss intervals'%(resp['reason'],SRV_RECON_TIMEOUT)) 
-					noticed = True
-				time.sleep( SRV_RECON_TIMEOUT)
-				continue
-			logs = resp['list']
-			if not logs:
-				time.sleep( SRV_RECON_TIMEOUT)
-		# Register resource monitoring
-		stats = Stats()
-		# Start followers	
-		for l in logs:
-			if l['follow'] == 'true':
-				if l['type']==WINEVENT_LOGTYPE: #UUID of type windowseventlogs
-					WinEventFollower(l['filename'], l['key'])
-				else:
-					LogFollower( l['filename'], l['key'])
+		if not config.debug_stats_only:
+			load_logs()
 
 		# Park this thread
 		while True:
