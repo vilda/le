@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.3"
+VERSION = "0.8.4"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -131,11 +131,10 @@ Where command is one of:
   new-app <name> <logs...>  Register a new application
   set-app <name> <logs...>  Set application attributes
     --name  new name of the application
-  ls        List internal filesystem: <path>
+  ls        List internal filesystem and settings: <path>
   rm        Remove entity: <path>
   pull      Pull log file: <path> <when> <filter> <limit>
   push      Push log file: <file> <path> <log-type>
-  logtypes  List log types
 
 Where parameters are:
   --help            show usage help and exit
