@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.4"
+VERSION = "0.8.5"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -932,7 +932,7 @@ class Follower(object):
 		self.flush = True
 		log.info("Following %s"%name)
 		monitoring_thread = threading.Thread( target=self.monitorlogs, name=self.name)
-		monitoring_thread.daemon = False
+		monitoring_thread.daemon = True
 		monitoring_thread.start()
 
 	def file_candidate( self):
