@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.6"
+VERSION = "0.8.8"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -115,22 +115,20 @@ Where command is one of:
   init      Write local configuration file
   reinit    As init but does not reset undefined parameters
   register  Register this host
-    --name=name name of the host
-    --hostname=hname  hostname of the server
-    --std register standard logs
-    --std_all register all identified logs
+    --name=  name of the host
+    --hostname=  hostname of the host
   whoami    Displays settings for this host
   monitor   Monitor this host
   follow <filename>  Follow the given log
-    --name=name name of the log
-    --type=type type of the log
+    --name=  name of the log
+    --type=  type of the log
   clean     Removes configuration file
   new-cluster <name> <hosts...>  Register a new cluster
   set-cluster <cluster-name> <hosts...>  Set cluster attributes
-    --name  new name of the cluster
+    --name=  new name of the cluster
   new-app <name> <logs...>  Register a new application
   set-app <name> <logs...>  Set application attributes
-    --name  new name of the application
+    --name=  new name of the application
   ls        List internal filesystem and settings: <path>
   rm        Remove entity: <path>
   pull      Pull log file: <path> <when> <filter> <limit>
@@ -139,8 +137,8 @@ Where command is one of:
 Where parameters are:
   --help            show usage help and exit
   --version         display version number and exit
-  --user-key key    set user key and exit
-  --agent-key key   set local agent key and exit, generate key if key is empty
+  --user-key=       set user key and exit
+  --agent-key=      set local agent key and exit, generate key if key is empty
   --no-timestamps   no timestamps in agent reportings
   --force           force given operation
   --yes	            always respond yes
@@ -1160,20 +1158,21 @@ class WinEventFollower(Follower):
 					cat = ev_obj.EventCategory
 					record = ev_obj.RecordNumber
 					msg = win32evtlogutil.SafeFormatMessage(ev_obj, self.name)
+	
+					msg = msg.replace('\r\n','\r')
+					msg = msg.encode('utf-8')
+					
 			 		source = str(ev_obj.SourceName)
 
+					
 					if not ev_obj.EventType in evt_dict.keys():
-					    evt_type = "unknown"
+						evt_type = "unknown"
 					else:
-					    evt_type = str(evt_dict[ev_obj.EventType])
-					eventdata = ("%s" % event_time)+ (" %s" % computer)+ (" %s" % cat)+ (" %s %s" % (evt_id, evt_type)) +(" #%s" % record)+(" %s" % source)+(" ")+( msg)+("\n")
-					#debug
-					#print eventdata
+						evt_type = str(evt_dict[ev_obj.EventType])
+					eventdata = "%s %s %s %s %s #%s %s\n"%(event_time, computer, cat, evt_id, evt_type, record, source, msg)
 					self.send_events( eventdata)
-
 		except:
 			print traceback.print_exc(sys.exc_info())
- 
 
 class Config:
 	def __init__(self):
