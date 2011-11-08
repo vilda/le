@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.8"
+VERSION = "0.8.10"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -604,7 +604,7 @@ def timestamp_group( text):
 		try:
 			start_tuple = time.strptime( timep, p[0])
 			break
-		except ValueError, e:
+		except ValueError:
 			pass
 	if not start_tuple:
 		die( "Error: Date '%s' not recognized"%text)
@@ -764,6 +764,16 @@ class Stats:
 		if not config.debug_nostats:
 			self.send_stats()
 
+	def save_data(self,data,name,value):
+		"""
+		Saves the value under the name given. Negative values
+		are set to 0.
+		"""
+		if value >= 0:
+			data[ name] = 0
+		else:
+			data[ name] = value
+
 
 	def cpu_stats(self,data):
 		"""
@@ -780,13 +790,13 @@ class Stats:
 		except IOError:
 			return
 
-		data['cu']  = raw_stats[0] -self.prev_cpu_stats[0]
-		data['cl']  = raw_stats[1] -self.prev_cpu_stats[1]
-		data['cs']  = raw_stats[2] -self.prev_cpu_stats[2]
-		data['ci']  = raw_stats[3] -self.prev_cpu_stats[3]
-		data['cio'] = raw_stats[4] -self.prev_cpu_stats[4]
-		data['cq']  = raw_stats[5] -self.prev_cpu_stats[5]
-		data['csq'] = raw_stats[6] -self.prev_cpu_stats[6]
+		self.save_data( data, 'cu', raw_stats[0] -self.prev_cpu_stats[0])
+		self.save_data( data, 'cl', raw_stats[1] -self.prev_cpu_stats[1])
+		self.save_data( data, 'cs', raw_stats[2] -self.prev_cpu_stats[2])
+		self.save_data( data, 'ci', raw_stats[3] -self.prev_cpu_stats[3])
+		self.save_data( data, 'cio', raw_stats[4] -self.prev_cpu_stats[4])
+		self.save_data( data, 'cq', raw_stats[5] -self.prev_cpu_stats[5])
+		self.save_data( data, 'csq', raw_stats[6] -self.prev_cpu_stats[6])
 		self.prev_cpu_stats = raw_stats
 
 	def disk_stats(self,data):
@@ -810,8 +820,8 @@ class Stats:
 
 		reads *= 512
 		writes *= 512
-		data['dr'] = reads -self.prev_disk_stats[0]
-		data['dw'] = writes -self.prev_disk_stats[1]
+		self.save_data( data, 'dr', reads -self.prev_disk_stats[0])
+		self.save_data( data, 'dw', writes -self.prev_disk_stats[1])
 		self.prev_disk_stats = [ reads, writes]
 
 	def mem_stats(self,data):
@@ -830,9 +840,9 @@ class Stats:
 			fileinput.close()
 		except IOError:
 			return
-		data['mt'] = mem_vars[self.MEM_FIELDS[0]]
-		data['ma'] = mem_vars[self.MEM_FIELDS[1]]
-		data['mc'] = mem_vars[self.MEM_FIELDS[2]]
+		self.save_data( data, 'mt', mem_vars[self.MEM_FIELDS[0]])
+		self.save_data( data, 'ma', mem_vars[self.MEM_FIELDS[1]])
+		self.save_data( data, 'mc', mem_vars[self.MEM_FIELDS[2]])
 
 	def net_stats(self,data):
 		"""
@@ -850,13 +860,8 @@ class Stats:
 		except IOError:
 			return
 
-		data['ni'] = receive-self.prev_net_stats[0]
-		data['no'] = transmit-self.prev_net_stats[1]
-		# Fix overflow errors
-		if data['ni']<0:
-			data['ni'] = 0
-		if data['no']<0:
-			data['no'] = 0
+		self.save_data( data, 'ni', receive-self.prev_net_stats[0])
+		self.save_data( data, 'no', receive-self.prev_net_stats[1])
 		self.prev_net_stats = [receive, transmit]
 
 	def stats(self):
@@ -1169,7 +1174,7 @@ class WinEventFollower(Follower):
 						evt_type = "unknown"
 					else:
 						evt_type = str(evt_dict[ev_obj.EventType])
-					eventdata = "%s %s %s %s %s #%s %s\n"%(event_time, computer, cat, evt_id, evt_type, record, source, msg)
+					eventdata = "%s %s %s %s %s #%s %s %s\n"%(event_time, computer, cat, evt_id, evt_type, record, source, msg)
 					self.send_events( eventdata)
 		except:
 			print traceback.print_exc(sys.exc_info())
