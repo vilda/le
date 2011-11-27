@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.11"
+VERSION = "0.8.12"
 API_VERSION = "1"
 
 NOT_SET = None
@@ -2042,7 +2042,7 @@ def load_logs():
 	# Start followers	
 	for l in logs:
 		if l['follow'] == 'true':
-			if l['type']==WINEVENT_LOGTYPE: #UUID of type windowseventlogs
+			if l['logtype']==WINEVENT_LOGTYPE: #UUID of type windowseventlogs
 				WinEventFollower(l['filename'], l['key'])
 			else:
 				LogFollower( l['filename'], l['key'])
@@ -2098,16 +2098,28 @@ def cmd_follow_win_events( args):
 	"""
 	Follow the windows event logs: Application, Security, System
 	"""
-	if len(args) != 0:
+	if len(args) == 1:
+		follow_given_win_event( args[0] )
+	elif len(args) != 0:
 		die( "Error: Too many arguments.")
+	else:
+		config.load()
+		config.agent_key_required()
 
+		type_opt = "windowseventlogs"
+		request_follow( "Application", "Application", type_opt)
+		request_follow( "System", "System", type_opt)
+		request_follow( "Security", "Security", type_opt)
+
+def follow_given_win_event( event_name ):
+	"""
+	Follow a specific windows event
+	"""
 	config.load()
 	config.agent_key_required()
-
+	
 	type_opt = "windowseventlogs"
-	request_follow( "Application", "Application", type_opt)
-	request_follow( "System", "System", type_opt)
-	request_follow( "Security", "Security", type_opt)
+	request_follow( event_name, event_name, type_opt)
 
 
 def cmd_install_win_service( args):
