@@ -860,7 +860,7 @@ class Stats:
 			return
 
 		self.save_data( data, 'ni', receive-self.prev_net_stats[0])
-		self.save_data( data, 'no', receive-self.prev_net_stats[1])
+		self.save_data( data, 'no', transmit-self.prev_net_stats[1])
 		self.prev_net_stats = [receive, transmit]
 
 	def stats(self):
