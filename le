@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.14"
+VERSION = "0.8.15"
 
 NOT_SET = None
 
@@ -99,6 +99,9 @@ CONF_OK = 'ok'
 
 # Server requests
 RQ_WORKLOAD = 'push_wl'
+
+# Release information on LSB systems
+LSB_RELEASE = '/etc/lsb-release'
 
 
 #
@@ -473,6 +476,22 @@ def collect_log_names( system_info):
 	
 	return log_data
 
+def lsb_release( system_info):
+	# General LSB system
+	if os.path.isfile( LSB_RELEASE):
+		try:
+			fields = dict( (a.split('=') for a in rfile( LSB_RELEASE).split('\n') if len(a.split('='))==2))
+			system_info[ 'distname'] = fields[ 'DISTRIB_ID']
+			system_info[ 'distver'] = fields[ 'DISTRIB_RELEASE']
+			return True
+		except ValueError:
+			pass
+		except KeyError:
+			pass
+	
+	# Information not found
+	return False
+
 def release_test( filename, distname, system_info):
 	if os.path.isfile( filename):
 		system_info[ 'distname'] = distname
@@ -539,12 +558,22 @@ def system_detect( details):
 			['/etc/ultrapenguin-release', 'UltraPenguin'],
 			['/etc/va-release', 'VA-Linux/RH-VALE'],
 			['/etc/yellowdog-release', 'Yellow Dog'],
-			# Most general
-			['/etc/lsb-release', 'Ubuntu/LSB'],
 			]
+		
+		# Check for known system IDs
 		for release in releases:
 			if release_test( release[0], release[1], system_info):
 				break
+		# Check for general LSB system
+		if os.path.isfile( LSB_RELEASE):
+			try:
+				fields = dict( (a.split('=') for a in rfile( LSB_RELEASE).split('\n') if len(a.split('='))==2))
+				system_info[ 'distname'] = fields[ 'DISTRIB_ID']
+				system_info[ 'distver'] = fields[ 'DISTRIB_RELEASE']
+			except ValueError:
+				pass
+			except KeyError:
+				pass
 	return system_info
 
 
