@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.15"
+VERSION = "0.8.16"
 
 NOT_SET = None
 
@@ -1860,7 +1860,7 @@ def request( request, required=False, check_status=False, rtype='GET', retry=Fal
 	noticed = False
 	while True:
 		# Obtain response
-		response,conn = get_response( rtype, '/'+config.user_key+'/'+request)
+		response,conn = get_response( rtype, urllib.quote('/'+config.user_key+'/'+request))
 		
 		# Check the response
 		if response:
