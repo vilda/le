@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.16"
+VERSION = "0.8.17"
 
 NOT_SET = None
 
@@ -1727,6 +1727,7 @@ def get_response( operation, addr, data=None, headers={}, silent=False, die_on_e
 		conn = domain_connect( api)
 		do_request( conn, operation, addr, data, headers)
 		response = conn.getresponse()
+		return response, conn
 	except socket.sslerror, msg: # Network error
 		if not silent:
 			log.info( "SSL error: %s"%msg)
@@ -1739,7 +1740,8 @@ def get_response( operation, addr, data=None, headers={}, silent=False, die_on_e
 			die( error)
 		else:
 			log.info( error)
-	return response, conn
+		
+	return None, None
 
 
 def domain_request( request, required=False, check_status=False, silent=False, die_on_error=True):
@@ -1753,7 +1755,8 @@ def domain_request( request, required=False, check_status=False, silent=False, d
 	if not response:
 		if required:
 			die( "Error: Cannot process LE request, no response")
-		conn.close()
+		if conn:
+			conn.close()
 		return None
 	if response.status != 200:
 		if required:
