@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.17"
+VERSION = "0.8.18"
 
 NOT_SET = None
 
@@ -1795,7 +1795,8 @@ def pull_request( what, params):
 	response = None
 
 	# Obtain response
-	addr = '/%s/%s/?%s'%(config.user_key,what,urllib.urlencode( params))
+	addr = '/%s/%s/?%s'%(config.user_key,urllib.quote( what),urllib.urlencode( params))
+	print params, addr
 	response,conn = get_response( "GET", addr)
 
 	# Check the response
