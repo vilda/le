@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.19"
+VERSION = "0.8.20"
 
 NOT_SET = None
 
@@ -919,6 +919,7 @@ class Stats:
 	def new_request(self, rq):
 		try:
 			response = domain_request( rq, silent=not config.debug, die_on_error=False)
+			#if config.debug_stats and response: XXX
 			if config.debug_stats:
 				log.info( response)
 		except socket.error, (err_no, err_str):
@@ -1863,7 +1864,7 @@ def request( request, required=False, check_status=False, rtype='GET', retry=Fal
 	noticed = False
 	while True:
 		# Obtain response
-		response,conn = get_response( rtype, urllib.quote('/'+config.user_key+'/'+request))
+		response,conn = get_response( rtype, urllib.quote('/'+config.user_key+'/'+request), die_on_error=not retry)
 		
 		# Check the response
 		if response:
