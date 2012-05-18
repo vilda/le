@@ -2,7 +2,7 @@
 # coding: utf-8
 
 #
-# Logentries agent by JLizard <https://logentries.com/>. 
+# Logentries agent <https://logentries.com/>.
 # This work is licensed under a <http://creativecommons.org/licenses/by/3.0/> Creative Commons Attribution 3.0 Unported License
 #
 
@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.20"
+VERSION = "0.8.23"
 
 NOT_SET = None
 
@@ -125,12 +125,6 @@ Where command is one of:
     --name=  name of the log
     --type=  type of the log
   clean     Removes configuration file
-  new-cluster <name> <hosts...>  Register a new cluster
-  set-cluster <cluster-name> <hosts...>  Set cluster attributes
-    --name=  new name of the cluster
-  new-app <name> <logs...>  Register a new application
-  set-app <name> <logs...>  Set application attributes
-    --name=  new name of the application
   ls        List internal filesystem and settings: <path>
   rm        Remove entity: <path>
   pull      Pull log file: <path> <when> <filter> <limit>
@@ -1903,6 +1897,9 @@ def no_more_args( args):
 
 
 def request_follow( filename, name, type_opt):
+	"""
+	Creates a new log to follow the file given.
+	"""
 	config.agent_key_required()
 	request = {"request":"new_log",
 		"user_key": config.user_key,
@@ -2205,6 +2202,15 @@ def cmd_follow( args):
 	type_opt = config.type_opt
 	if type_opt == NOT_SET:
 		type_opt = ""
+	
+	# Check that we don't follow that file already
+	if not config.force:
+		# Load list of files we follow
+		host = request( 'hosts/%s/'%config.agent_key, True, True)
+		logs = host['list']
+		for ilog in logs:
+			if ilog['follow'] == 'true' and filename == ilog['filename']:
+				die( 'Already following %s'%filename)
 	
 	request_follow( filename, name, type_opt)
 
@@ -2690,21 +2696,21 @@ def main():
 		'installwinservice': cmd_install_win_service,
 		'windowsevents': cmd_follow_win_events,
 		# Clusters
-		'new-cluster': cmd_new_cluster,
-		'set-cluster': cmd_set_cluster,
+		#'new-cluster': cmd_new_cluster,
+		#'set-cluster': cmd_set_cluster,
 		# Apps
-		'new-app': cmd_new_app,
-		'set-app': cmd_set_app,
+		#'new-app': cmd_new_app,
+		#'set-app': cmd_set_app,
 		# Filesystem operations
 		'ls': cmd_ls,
 		'rm': cmd_rm,
 		'pull': cmd_pull,
 		'push': cmd_push,
 		# Shortcuts
-		'nc': cmd_new_cluster,
-		'sc': cmd_set_cluster,
-		'na': cmd_new_app,
-		'sa': cmd_set_app,
+		#'nc': cmd_new_cluster,
+		#'sc': cmd_set_cluster,
+		#'na': cmd_new_app,
+		#'sa': cmd_set_app,
 	}
 	for cmd, func in commands.items():
 		if cmd == args[0]:
