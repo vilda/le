@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.23"
+VERSION = "0.8.24"
 
 NOT_SET = None
 
@@ -103,6 +103,12 @@ RQ_WORKLOAD = 'push_wl'
 # Release information on LSB systems
 LSB_RELEASE = '/etc/lsb-release'
 
+# Return codes
+EXIT_OK = 0
+EXIT_NO = 1
+EXIT_ERR = 3
+EXIT_HELP = 4
+
 
 #
 # Usage help
@@ -124,6 +130,7 @@ Where command is one of:
   follow <filename>  Follow the given log
     --name=  name of the log
     --type=  type of the log
+  followed <filename>  Check if the file is followed
   clean     Removes configuration file
   ls        List internal filesystem and settings: <path>
   rm        Remove entity: <path>
@@ -169,7 +176,7 @@ def print_usage( version_only=False):
 		if os.name != "posix":
 			report( WINDOWS_USAGE)
 		
-	sys.exit( 1)
+	sys.exit( EXIT_HELP)
 
 
 #
@@ -258,7 +265,7 @@ import atexit
 log = logging.getLogger( LE_SERVER)
 if not log:
 	report( "Cannot open log output")
-	sys.exit( 4)
+	sys.exit( EXIT_ERR)
 
 stream_handler = None
 
@@ -271,7 +278,7 @@ log.addHandler( stream_handler)
 
 
 
-def die(cause, exit_code=0):
+def die(cause, exit_code=EXIT_ERR):
 	log.critical( cause)
 	sys.exit( exit_code)
 
@@ -385,13 +392,13 @@ def daemonize():
 
 		pid = os.fork()
 		if pid > 0:
-			sys.exit( 0)
+			sys.exit( EXIT_OK)
 		os.chdir( "/")
 		os.setsid()
 		os.umask( 0)
 		pid = os.fork()
 		if pid > 0:
-			sys.exit( 0)
+			sys.exit( EXIT_OK)
 		sys.stdout.flush()
 		sys.stderr.flush()
 		si = file( '/dev/null', 'r')
@@ -949,14 +956,14 @@ class Follower(object):
 	""" The follower keeps an eye on the file specified and sends new
 	events to the logentries infrastructure.  """
 
-	def __init__(self, name, log_key):
+	def __init__(self, name, log_key, monitorlogs):
 		""" Initializes the follower. """
 		self.name = name
 		self.log_key = log_key
 		self.log_addr = '/%s/hosts/%s/%s/?realtime=1'%(config.user_key, config.agent_key, log_key)
 		self.flush = True
 		log.info("Following %s"%name)
-		monitoring_thread = threading.Thread( target=self.monitorlogs, name=self.name)
+		monitoring_thread = threading.Thread( monitorlogs, name=self.name)
 		monitoring_thread.daemon = True
 		monitoring_thread.start()
 
@@ -1088,7 +1095,7 @@ class Follower(object):
 				self.conn = domain_connect()
 				do_request( self.conn, "PUT", self.log_addr)
 				break
-			except socket.error, err_no:
+			except socket.error:
 				if shutdown: return
 	
 	def send_events( self, events):
@@ -1109,6 +1116,9 @@ class Follower(object):
 
 	
 class LogFollower(Follower):
+
+	def __init__(self, name, log_key):
+		super(Follower, self).__init__( name, log_key, self.monitorlogs)
 	
 	def monitorlogs(self):
 		""" Opens the log file and starts to collect new events. """
@@ -1122,6 +1132,9 @@ class LogFollower(Follower):
 # Some of the code is from 
 # http://docs.activestate.com/activepython/2.4/pywin32/Windows_NT_Eventlog.html
 class WinEventFollower(Follower):
+
+	def __init__(self, name, log_key):
+		super(Follower, self).__init__( name, log_key, self.monitorlogs)
 		
 	def monitorlogs(self):
 		""" Opens the windows event log file and starts to collect new events. """
@@ -2091,6 +2104,17 @@ def load_logs():
 			else:
 				LogFollower( l['filename'], l['key'])
 
+def is_followed( filename):
+	"""
+	Checks if the file given is followed.
+	"""
+	host = request( 'hosts/%s/'%config.agent_key, True, True)
+	logs = host['list']
+	for ilog in logs:
+		if ilog['follow'] == 'true' and filename == ilog['filename']:
+			return True
+	return False
+
 
 def cmd_monitor( args):
 	"""
@@ -2186,7 +2210,7 @@ def cmd_install_win_service( args):
 
 def cmd_follow( args):
 	"""
-	Follow the log given.
+	Follow the log file given.
 	"""
 	if len(args) == 0:
 		die( "Error: Specify the file name of the log to follow.")
@@ -2204,15 +2228,33 @@ def cmd_follow( args):
 		type_opt = ""
 	
 	# Check that we don't follow that file already
-	if not config.force:
-		# Load list of files we follow
-		host = request( 'hosts/%s/'%config.agent_key, True, True)
-		logs = host['list']
-		for ilog in logs:
-			if ilog['follow'] == 'true' and filename == ilog['filename']:
-				die( 'Already following %s'%filename)
+	if not config.force and is_followed( filename):
+		die( 'Already following %s'%filename)
 	
 	request_follow( filename, name, type_opt)
+
+
+
+def cmd_followed( args):
+	"""
+	Check if the log file given is followed.
+	"""
+	if len(args) == 0:
+		die( "Error: Specify the file name of the log to test.")
+	if len(args) != 1:
+		die( "Error: Too many arguments. Only file name needed.")
+	config.load()
+	config.agent_key_required()
+
+	filename = os.path.abspath( args[0])
+	
+	# Check that we don't follow that file already
+	if is_followed( filename):
+		print 'Following %s'%filename
+		sys.exit( EXIT_OK)
+	else:
+		print 'NOT following %s'%filename
+		sys.exit( EXIT_NO)
 
 
 def cmd_clean( args):
@@ -2680,7 +2722,7 @@ def main():
 		report( USAGE)
 		if os.name != "posix":
 			report( WINDOWS_USAGE)
-		sys.exit(1)
+		sys.exit( EXIT_HELP)
 
 	commands = {
 		'init': cmd_init,
@@ -2689,6 +2731,7 @@ def main():
 		'monitor': cmd_monitor,
 		'monitordaemon': cmd_monitor_daemon,
 		'follow': cmd_follow,
+		'followed': cmd_followed,
 		'clean': cmd_clean,
 		'whoami': cmd_whoami,
 		# Windows
