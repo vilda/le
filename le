@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.24"
+VERSION = "0.8.25"
 
 NOT_SET = None
 
@@ -920,13 +920,15 @@ class Stats:
 	def new_request(self, rq):
 		try:
 			response = domain_request( rq, silent=not config.debug, die_on_error=False)
-			#if config.debug_stats and response: XXX
 			if config.debug_stats:
 				log.info( response)
 		except socket.error, (err_no, err_str):
 			pass
 
 	def send_stats(self):
+		"""
+		Collects all statistics and sends them to Logentries.
+		"""
 		ethalon = time.time()
 
 		results = self.stats()
@@ -1757,7 +1759,8 @@ def domain_request( request, required=False, check_status=False, silent=False, d
 	Processes a request on the logentries domain.
 	"""
 	# Obtain response
-	response,conn = get_response( "POST", LE_SERVER_API, urllib.urlencode( request), silent=silent, die_on_error=die_on_error, api=True)
+	response,conn = get_response( "POST", LE_SERVER_API, urllib.urlencode( request),
+			silent=silent, die_on_error=die_on_error, api=True)
 
 	# Check the response
 	if not response:
@@ -2048,13 +2051,13 @@ def cmd_register( args):
 
 	si = system_detect( True)
 
-	request = {"request":"register",
-		'user_key':config.user_key,
-		'name':config.name,
-		'hostname':config.hostname,
-		'system':si['system'],
-		'distname':si['distname'],
-		'distver':si['distver']
+	request = {"request": "register",
+		'user_key': config.user_key,
+		'name': config.name,
+		'hostname': config.hostname,
+		'system': si['system'],
+		'distname': si['distname'],
+		'distver': si['distver']
 		}
 	response = domain_request( request, True, True)
 
