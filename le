@@ -958,14 +958,14 @@ class Follower(object):
 	""" The follower keeps an eye on the file specified and sends new
 	events to the logentries infrastructure.  """
 
-	def __init__(self, name, log_key, monitorlogs):
+	def __init__( self, name, log_key, monitorlogs):
 		""" Initializes the follower. """
 		self.name = name
 		self.log_key = log_key
 		self.log_addr = '/%s/hosts/%s/%s/?realtime=1'%(config.user_key, config.agent_key, log_key)
 		self.flush = True
 		log.info("Following %s"%name)
-		monitoring_thread = threading.Thread( monitorlogs, name=self.name)
+		monitoring_thread = threading.Thread( target=monitorlogs, name=self.name)
 		monitoring_thread.daemon = True
 		monitoring_thread.start()
 
@@ -1120,7 +1120,7 @@ class Follower(object):
 class LogFollower(Follower):
 
 	def __init__(self, name, log_key):
-		super(Follower, self).__init__( name, log_key, self.monitorlogs)
+		super(LogFollower, self).__init__( name, log_key, self.monitorlogs)
 	
 	def monitorlogs(self):
 		""" Opens the log file and starts to collect new events. """
@@ -1136,7 +1136,7 @@ class LogFollower(Follower):
 class WinEventFollower(Follower):
 
 	def __init__(self, name, log_key):
-		super(Follower, self).__init__( name, log_key, self.monitorlogs)
+		super(WinEventFollower, self).__init__( name, log_key, self.monitorlogs)
 		
 	def monitorlogs(self):
 		""" Opens the windows event log file and starts to collect new events. """
