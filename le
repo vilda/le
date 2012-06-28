@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "0.8.26"
+VERSION = "0.8.27"
 
 NOT_SET = None
 
@@ -150,7 +150,8 @@ Where parameters are:
 
 WINDOWS_USAGE="""
 Windows specific commands:
-  windowsevents 	follow the standard windows event logs 
+  windowsevents     follow the Application, System and Security win event logs 
+  windowsevents <eventlog>  follow the windows event log specified 
   installwinservice	installs the agent as a windows service 
 	--no-defaults   do not follow standard windows logs automatically
   monitorwinservice	starts monitoring as a windows service
