@@ -923,7 +923,7 @@ class Stats:
 
 	def new_request(self, rq):
 		try:
-			response = domain_request( rq, silent=not config.debug, die_on_error=False)
+			response = api_request( rq, silent=not config.debug, die_on_error=False)
 			if config.debug_stats:
 				log.info( response)
 		except socket.error, (err_no, err_str):
@@ -1777,7 +1777,7 @@ def get_response( operation, addr, data=None, headers={}, silent=False, die_on_e
 	return None, None
 
 
-def domain_request( request, required=False, check_status=False, silent=False, die_on_error=True):
+def api_request( request, required=False, check_status=False, silent=False, die_on_error=True):
 	"""
 	Processes a request on the logentries domain.
 	"""
@@ -1947,7 +1947,7 @@ def request_follow( filename, name, type_opt):
 		"filename": filename,
 		"type": type_opt,
 		"follow": "true"}
-	domain_request( request, True, True)
+	api_request( request, True, True)
 	log.info( "Will follow %s as %s"%(filename, name))
 
 
@@ -1958,7 +1958,7 @@ def request_hosts( logs=False):
 	load_logs = 'false'
 	if logs:
 		load_logs = 'true'
-	response = domain_request( {
+	response = api_request( {
 		'request': 'get_user',
 		'load_hosts': 'true',
 		'load_logs': load_logs,
@@ -2082,7 +2082,7 @@ def cmd_register( args):
 		'distname': si['distname'],
 		'distver': si['distver']
 		}
-	response = domain_request( request, True, True)
+	response = api_request( request, True, True)
 
 	config.agent_key = response['host_key']
 	config.save()
@@ -2331,7 +2331,7 @@ def cmd_whoami( args):
 
 
 def get_all_list( what):
-	return domain_request( {"request":"list_"+what,
+	return api_request( {"request":"list_"+what,
 		"user_key": config.user_key}, True, True)['list']
 
 
@@ -2482,13 +2482,13 @@ def cmd_new_cluster( args):
 	Creates a new cluster.
 	"""
 	argv = get_cluster_params( args)
-	response = domain_request( {
+	response = api_request( {
 		'request': 'new_clusters',
 		'user_key': config.user_key,
 		'names': argv[0]}, True, True)
 	cluster_key = response['clusters'][0]['key']
 	if len(argv) > 1:
-		domain_request( {
+		api_request( {
 			'request': 'set_cluster',
 			'cluster_key': cluster_key,
 			'list': ' '.join(argv[1:])}, True, True)
@@ -2516,7 +2516,7 @@ def cmd_set_cluster( args):
 		name = request['name'] = config.name
 	if len(argv) > 1:
 		request['list'] = ' '.join(argv[1:]);
-	domain_request( request, True, True)
+	api_request( request, True, True)
 
 	report( "%s cluster set"%name)
 
@@ -2606,13 +2606,13 @@ def cmd_new_app( args):
 	Creates a new application.
 	"""
 	argv = get_app_params( args)
-	response = domain_request( {
+	response = api_request( {
 		'request': 'new_apps',
 		'user_key': config.user_key,
 		'names': argv[0]}, True, True)
 	app_key = response['apps'][0]['key']
 	if len(argv) > 1:
-		domain_request( {
+		api_request( {
 			'request': 'set_app',
 			'app_key': app_key,
 			'list': ' '.join(argv[1:])}, True, True)
@@ -2640,7 +2640,7 @@ def cmd_set_app( args):
 		name = request['name'] = config.name
 	if len(argv) > 1:
 		request['list'] = ' '.join(argv[1:]);
-	domain_request( request, True, True)
+	api_request( request, True, True)
 
 	report( "%s app set"%name)
 
