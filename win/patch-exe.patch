@@ -1,33 +1,42 @@
-*** le601	1913-05-09 10:12:40.000000000 -0025
---- le601-exe.py	2011-04-22 13:24:33.000000000 +0100
+*** le	2012-06-28 11:46:58.000000000 +0100
+--- le-exe2.py	2012-06-28 13:25:59.000000000 +0100
 ***************
-*** 157,165 ****
+*** 150,159 ****
+  
   WINDOWS_USAGE="""
   Windows specific commands:
-    windowsevents 	follow the standard windows event logs 
--   installwinservice	installs the agent as a windows service 
-- 	--no-defaults   do not follow standard windows logs automatically
--   monitorwinservice	starts monitoring as a windows service
+!   windowsevents 	follow the standard windows event logs 
+!   installwinservice	installs the agent as a windows service 
+! 	--no-defaults   do not follow standard windows logs automatically
+!   monitorwinservice	starts monitoring as a windows service
   """
   
   
---- 157,162 ----
+--- 150,157 ----
+  
+  WINDOWS_USAGE="""
+  Windows specific commands:
+!   windowsevents     follow the Application, System and Security win event logs 
+!   windowsevents <eventlog>  follow the windows event log specified
+  """
+  
+  
 ***************
-*** 2564,2571 ****
-  		'follow': cmd_follow,
+*** 2771,2778 ****
   		'clean': cmd_clean,
+  		'whoami': cmd_whoami,
   		# Windows
 ! 		'monitorwinservice': cmd_win_service,
 ! 		'installwinservice': cmd_install_win_service,
   		'windowsevents': cmd_follow_win_events,
   		# Clusters
-  		'new-cluster': cmd_new_cluster,
---- 2561,2568 ----
-  		'follow': cmd_follow,
+  		#'new-cluster': cmd_new_cluster,
+--- 2769,2776 ----
   		'clean': cmd_clean,
+  		'whoami': cmd_whoami,
   		# Windows
 ! 		#'monitorwinservice': cmd_win_service,
 ! 		#'installwinservice': cmd_install_win_service,
   		'windowsevents': cmd_follow_win_events,
   		# Clusters
-  		'new-cluster': cmd_new_cluster,
+  		#'new-cluster': cmd_new_cluster,

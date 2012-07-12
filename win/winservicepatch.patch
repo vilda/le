@@ -1,8 +1,25 @@
-*** le.py	2011-04-19 11:07:19.000000000 +0100
---- leservice.py	2011-04-19 11:07:19.000000000 +0100
+*** le	2012-06-28 14:33:35.000000000 +0100
+--- lewinservice.py	2012-06-28 15:19:01.000000000 +0100
 ***************
-*** 265,270 ****
---- 265,281 ----
+*** 11,17 ****
+  # Constants
+  #
+  
+! VERSION = "0.8.26"
+  
+  NOT_SET = None
+  
+--- 11,17 ----
+  # Constants
+  #
+  
+! VERSION = "0.8.27"
+  
+  NOT_SET = None
+  
+***************
+*** 259,264 ****
+--- 259,275 ----
   import getpass
   import atexit
   
@@ -21,7 +38,7 @@
   #
   # Start logging
 ***************
-*** 1449,1604 ****
+*** 1515,1664 ****
   
   config = Config()
   
@@ -113,7 +130,6 @@
 - 	def stwinservice(cls, name, display_name, stay_alive=True):
 - 	    '''
 - 		Start Service
-- 		    
 - 		    cls : the class (derived from Service) that implement the Service
 - 		    name : Service name
 - 		    display_name : the name displayed in the service manager
@@ -157,7 +173,6 @@
 - 		self.log("I'm done")
 - 
 - 	def installwinservice( args):
-- 	    
 - 	    no_more_args( args)
 - 	    config.load()
 - 	    config.agent_key_required()
@@ -166,16 +181,12 @@
 - 
 - 
 - 	def startwinservice( args):
-- 	    
 - 	    no_more_args( args)
 - 	    config.load()
 - 	    config.agent_key_required()
 - 	    config.user_key_required()
 - 	    stwinservice(WinStart, 'Logentries', 'Logentries')
-- 
-- 	
-- 
-  def find_cert_file():
-  	"""
-  	Finds the location of the certificate of our lovely site.
---- 1460,1465 ----
+  
+  	
+  
+--- 1526,1531 ----
