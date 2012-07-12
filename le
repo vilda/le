@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 NOT_SET = None
 
@@ -50,6 +50,10 @@ CONTENT_LENGTH = 'content-length';
 
 # Windows event log type ID
 WINEVENT_LOGTYPE = '9c0912b7-674b-47f1-89ac-eed5aa3affe0'
+
+# URL to detect EC2 availability zone
+EC2_AVZ_URL = 'http://169.254.169.254/latest/meta-data/placement/availability-zone'
+EC2_AVZ_EU_PREFIX = 'eu-west-1'
 
 # Log root directory
 LOG_ROOT = '/var/log'
@@ -260,6 +264,7 @@ import threading
 import time
 import datetime
 import urllib
+import urllib2
 import httplib
 import getpass
 import atexit
@@ -1467,6 +1472,24 @@ class Config:
 			self.name = self.hostname_required().split('.')[0]
 		return self.name
 
+	def detect_ec2eu(self):
+		"""
+		Detects if this machine is within EC2 EU region. If it is,
+		the flag ec2eu is set.
+		"""
+		# No need to detection if the flag ec2eu is set already
+		if self.ec2eu:
+			return
+		try:
+			response = urllib2.urlopen(EC2_AVZ_URL, timeout=1)
+			avz = response.read( 16)
+			response.close()
+		except urllib2.URLError:
+			# Looks like outside EC2
+			return
+
+		self.ec2eu = avz.startswith( EC2_AVZ_EU_PREFIX)
+
 	def process_params(self, params):
 		"""
 		Parses command line parameters and updates config parameters
@@ -2052,10 +2075,11 @@ def cmd_init( args):
 	"""
 	Saves variables given to the configuration file. Variables not
 	specified are not saved and thus are overwritten with default value.
-	The configuration directory is created if does not exits.
+	The configuration directory is created if it does not exit.
 	"""
 	no_more_args( args)
 	config.user_key_required()
+	config.detect_ec2eu()
 	config.save()
 	log.info( "Initialized")
 
@@ -2063,10 +2087,11 @@ def cmd_init( args):
 def cmd_reinit( args):
 	"""
 	Saves variables given to the configuration file. The configuration
-	directory is created if does not exits.
+	directory is created if it does not exit.
 	"""
 	no_more_args( args)
 	config.load()
+	config.detect_ec2eu()
 	config.save()
 	log.info( "Reinitialized")
 
@@ -2083,6 +2108,7 @@ def cmd_register( args):
 	config.user_key_required()
 	config.hostname_required()
 	config.name_required()
+	config.detect_ec2eu()
 
 	si = system_detect( True)
 
