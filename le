@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 NOT_SET = None
 
@@ -1766,11 +1766,17 @@ def domain_connect(api=True):
 	# Find the correct server address
 	s = LE_SERVER
 	if api:
-		s = LE_SERVER_EC2EU_API_DOMAIN if config.ec2eu else LE_SERVER_API_DOMAIN
+		if config.ec2eu:
+			s = LE_SERVER_EC2EU_API_DOMAIN
+		else:
+			s = LE_SERVER_API_DOMAIN
 
 	# Special case for local debugging
 	if config.debug_local:
-		s = LE_SERVER_API_DOMAIN_L if api else LE_SERVER_L
+		if api:
+			s = LE_SERVER_API_DOMAIN_L
+		else:
+			s = LE_SERVER_L
 
 	# Connect to server with SSL in untrusted network
 	log.debug( 'Connecting to %s', s)
