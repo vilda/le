@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 
 NOT_SET = None
 
@@ -31,6 +31,7 @@ USER_KEY_PARAM = 'user-key'
 AGENT_KEY_PARAM = 'agent-key'
 FILTERS_PARAM = 'filters'
 EC2EU_PARAM = 'ec2eu'
+SUPPRESS_SSL_PARAM = 'suppress_ssl'
 KEY_LEN = 36
 USER_KEY_API = '/agent/user-key/'
 ID_LOGS_API = '/agent/id-logs/'
@@ -154,6 +155,7 @@ Where parameters are:
   --no-timestamps   no timestamps in agent reportings
   --force           force given operation
   --ec2eu           assume the host is in EC2 EU region
+  --suppress-ssl    do not use SSL with API server
   --yes	            always respond yes
 """
 
@@ -1281,6 +1283,7 @@ class Config:
 		self.yes = False
 		self.force = False
 		self.ec2eu = False
+		self.suppress_ssl = False
 
 		# Debug options
 
@@ -1368,6 +1371,7 @@ class Config:
 				AGENT_KEY_PARAM: '',
 				FILTERS_PARAM: '',
 				EC2EU_PARAM: '',
+				SUPPRESS_SSL_PARAM: '',
 			})
 			conf.read( self.config_filename)
 
@@ -1387,6 +1391,9 @@ class Config:
 			new_ec2eu = conf.get( MAIN_SECT, EC2EU_PARAM)
 			if new_ec2eu == 'True':
 				self.ec2eu = new_ec2eu
+			new_suppress_ssl = conf.get( MAIN_SECT, SUPPRESS_SSL_PARAM)
+			if new_suppress_ssl == 'True':
+				self.suppress_ssl = new_suppress_ssl
 		except ConfigParser.NoSectionError:
 			return False
 		except ConfigParser.NoOptionError:
@@ -1411,6 +1418,8 @@ class Config:
 				conf.set( MAIN_SECT, FILTERS_PARAM, self.filters)
 			if self.ec2eu:
 				conf.set( MAIN_SECT, EC2EU_PARAM, 'True')
+			if self.suppress_ssl:
+				conf.set( MAIN_SECT, SUPPRESS_SSL_PARAM, 'True')
 			conf.write( conf_file)
 
 			cert_filename = self.config_dir_name +LE_CERT_NAME;
@@ -1477,9 +1486,9 @@ class Config:
 	def detect_ec2eu(self):
 		"""
 		Detects if this machine is within EC2 EU region. If it is,
-		the flag ec2eu is set.
+		the flag ec2eu is set as well as SSL is suppress.
 		"""
-		# No need to detection if the flag ec2eu is set already
+		# No need to detect if the flag ec2eu is set already
 		if self.ec2eu:
 			return
 
@@ -1494,6 +1503,7 @@ class Config:
 		socket.setdefaulttimeout( None)
 
 		self.ec2eu = avz.startswith( EC2_AVZ_EU_PREFIX)
+		self.suppress_ssl = avz != ''
 
 	def process_params(self, params):
 		"""
@@ -1501,7 +1511,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err));
 		for name, value in optlist:
@@ -1560,6 +1570,8 @@ class Config:
 				self.no_defaults = True
 			elif name == "--ec2eu":
 				self.ec2eu = True
+			elif name == "--suppress-ssl":
+				self.suppress_ssl = True
 		return args
 
 
@@ -1768,6 +1780,7 @@ def domain_connect(api=True):
 	# Find the correct server address
 	s = LE_SERVER
 	if api:
+		# If on EC2 EU, use shorter path
 		if config.ec2eu:
 			s = LE_SERVER_EC2EU_API_DOMAIN
 		else:
@@ -1782,10 +1795,20 @@ def domain_connect(api=True):
 
 	# Connect to server with SSL in untrusted network
 	log.debug( 'Connecting to %s', s)
-	if config.debug_local or (not api and config.ec2eu):
-		return httplib.HTTPConnection( s)
-	else:
+
+	# Determine if to use SSL for connection
+	# Never use SSL for debugging, always use SSL with main server
+	use_ssl = True
+	if config.debug_local:
+		use_ssl = False
+	elif api:
+		use_ssl = not config.suppress_ssl
+
+	# Pass the connection
+	if use_ssl:
 		return ServerHTTPSConnection( s)
+	else:
+		return httplib.HTTPConnection( s)
 
 
 def do_request( conn, operation, addr, data=None, headers={}):
