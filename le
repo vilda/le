@@ -239,7 +239,9 @@ authority_certificate_files = [
 	# Debian 5.0, Debian 6.0, Ubuntu 9.10, Ubuntu 10.4
 	"/etc/ssl/certs/ca-certificates.crt",
 	# Fedora 12, Fedora 13, CentOS 5
-	"/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem"
+	"/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem",
+	# Amazon
+	"/usr/share/purple/ca-certs/ca-bundle.crt"
 	]
 
 
