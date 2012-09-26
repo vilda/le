@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 
 NOT_SET = None
 
@@ -150,8 +150,8 @@ Where command is one of:
 Where parameters are:
   --help            show usage help and exit
   --version         display version number and exit
-  --user-key=       set user key and exit
-  --agent-key=      set local agent key and exit, generate key if key is empty
+  --account-key=    set account key and exit
+  --host-key=       set local host key and exit, generate key if key is empty
   --no-timestamps   no timestamps in agent reportings
   --force           force given operation
   --ec2eu           assume the host is in EC2 EU region
@@ -1475,7 +1475,7 @@ class Config:
 		Exits with error message if the user key is not defined.
 		"""
 		if self.user_key == NOT_SET:
-			log.info( "User key is required. Enter your login credentials or specify the user key with --user-key parameter.")
+			log.info( "User key is required. Enter your login credentials or specify the user key with --account-key parameter.")
 			self.user_key = retrieve_user_key()
 			config.save()
 
@@ -1489,7 +1489,7 @@ class Config:
 		Exits with error message if the agent key is not defined.
 		"""
 		if self.agent_key == NOT_SET:
-			die( "Agent key is required. Register the host or specify an agent key with the --agent-key parameter.")
+			die( "Agent key is required. Register the host or specify an agent key with the --host-key parameter.")
 
 	def have_agent_key(self):
 		"""Tests if the agent key has been assigned to this instance."""
@@ -1542,7 +1542,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= agent-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err));
 		for name, value in optlist:
@@ -1554,7 +1554,11 @@ class Config:
 				self.yes = True
 			elif name == "--user-key":
 				self.set_user_key( value)
+			elif name == "--account-key":
+				self.set_user_key( value)
 			elif name == "--agent-key":
+				self.set_agent_key( value)
+			elif name == "--host-key":
 				self.set_agent_key( value)
 			elif name == "--force":
 				self.force = True
