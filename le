@@ -2369,7 +2369,7 @@ def load_logs():
 		except:
 			log.exception( 'Cannot load event filters from %s', config.filters)
 
-	# Start followers	
+	# Start followers
 	for l in logs:
 		if l['follow'] == 'true':
 			log_name = l['name']
@@ -2516,7 +2516,11 @@ def cmd_follow( args):
 	# Check that we don't follow that file already
 	if not config.force and is_followed( filename):
 		die( 'Already following %s'%filename)
-	
+
+	if len(glob.glob(filename)) == 0:
+		log.warning('\nWARNING: File %s does not exist'%filename)
+
+
 	request_follow( filename, name, type_opt)
 
 
