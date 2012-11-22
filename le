@@ -2000,7 +2000,7 @@ def get_response( operation, addr, data=None, headers={}, silent=False, die_on_e
 		if not silent:
 			log.debug( "Network error: %s"%msg)
 	except httplib.BadStatusLine:
-		error = "Internal error, bad satus line"
+		error = "Internal error, bad status line"
 		if die_on_error:
 			die( error)
 		else:
