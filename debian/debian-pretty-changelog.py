@@ -83,7 +83,7 @@ def main():
                 print '    [%s]' % k
                 for m in v:
                     print '    * %s' % m
-            print '\n -- %s <%s> %s\n\n' % (x['author'], x['email'], x['date'])
+            print '\n -- %s <%s>  %s\n\n' % (x['author'], x['email'], x['date'])
             h_msgs = dict()
 
 
