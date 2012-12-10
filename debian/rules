@@ -1,8 +1,8 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
 
-BINDIR = $(CURDIR)/usr/bin
-ETCDIR = $(CURDIR)/etc/.le
+BINDIR = $(CURDIR)/debian/logentries/usr/bin
+ETCDIR = $(CURDIR)/debian/logentries/etc/.le
 
 configure: configure-stamp
 configure-stamp:
