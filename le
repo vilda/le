@@ -438,6 +438,17 @@ except ImportError:
 	CERT_REQUIRED = 0
 
 #
+# Custom proctitle
+#
+
+def set_proc_title(title):
+	try:
+		import setproctitle
+		setproctitle.setproctitle(title)
+	except ImportError: pass
+
+
+#
 # User-defined filtering code
 #
 
@@ -534,6 +545,9 @@ def daemonize():
 	except OSError, e:
 		rm_pidfile()
 		die( "Cannot daemonize: %s"%e.strerror)
+
+	# Setting the proctitle
+	set_proc_title('logentries-daemon')
 
 	# Logging for daemon mode
 	log.removeHandler( stream_handler)

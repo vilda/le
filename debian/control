@@ -3,7 +3,7 @@ Section: admin
 Priority: extra
 Maintainer: Viliam Holub <vilda@logentries.com>
 Standards-Version: 3.9.1
-Build-Depends: debhelper (>= 7), python-support, python (>= 2.6)
+Build-Depends: debhelper (>= 7), python-support, python (>= 2.6), python-setproctitle
 Homepage: https://logentries.com/
 
 Package: logentries
