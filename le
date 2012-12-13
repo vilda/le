@@ -2348,8 +2348,14 @@ def cmd_register( args):
 
 
 def ask_cmd_register( args):
+	try:
+		import readline
+	except ImportError: pass
 	if not config.yes:
-		resp = raw_input( '\nHost is not registered. Would you like to register it (Y/n)? ')
+		resp = None
+		try:
+			resp = raw_input( '\nHost is not registered. Would you like to register it (Y/n)? ')
+		except EOFError: pass
 		if resp not in ['', 'y', 'Y']:
 			die( "Please register the host first")
 	cmd_register( args)
@@ -2424,7 +2430,8 @@ def cmd_monitor( args):
 	no_more_args( args)
 	config.load()
 	if config.agent_key == NOT_SET:
-		ask_cmd_register( args)
+#		ask_cmd_register( args)
+		die("Please register the host first with command `le register'")
 	config.agent_key_required()
 	config.user_key_required()
 
