@@ -14,7 +14,7 @@ Release: 		%{release}
 Source: 		%{name}-%{version}.tar.gz
 Prefix: 		/usr
 Group: 			Administration/Tools
-requires:		python-setproctitle
+#Requires:		python-setproctitle
 
 %description
 A command line utility for a convenient access to logentries logging infrastructure.
