@@ -8,7 +8,8 @@ Homepage: https://logentries.com/
 
 Package: logentries
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}, python-simplejson, ca-certificates, python-setproctitle
+Depends: ${misc:Depends}, ${python:Depends}, python-simplejson, ca-certificates
+Suggests: python-setproctitle
 Description: Agent for logentries.com
  Logentries is a log management and analysis service (https://logentries.com/).
  This package provides a command line utility for a convenient access to
