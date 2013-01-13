@@ -157,6 +157,7 @@ Where parameters are:
   --ec2eu           assume the host is in EC2 EU region
   --suppress-ssl    do not use SSL with API server
   --yes	            always respond yes
+  --force-api-host  use particular host as an api server
 """
 
 WINDOWS_USAGE="""
@@ -1419,6 +1420,8 @@ class Config:
 		self.debug_system = False
 		# Display list of logs in the system
 		self.debug_loglist = False
+		# Force host for api
+		self.force_api_host = None
 
 	def get_config_dir(self):
 		"""
@@ -1612,7 +1615,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl force-api-host=".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err));
 		for name, value in optlist:
@@ -1677,6 +1680,9 @@ class Config:
 				self.ec2eu = True
 			elif name == "--suppress-ssl":
 				self.suppress_ssl = True
+			elif name == "--force-api-host":
+                                if value and value != '': self.force_api_host = value
+		if self.debug_local and self.force_api_host: die("Please do not specify --local and --force-api-host at the same time.")
 		return args
 
 
@@ -1957,8 +1963,10 @@ def domain_connect(api=True):
 	# Find the correct server address
 	s = LE_SERVER
 	if api:
-		# If on EC2 EU, use shorter path
-		if config.ec2eu:
+		if config.force_api_host:
+			s = config.force_api_host
+		elif config.ec2eu:
+			# If on EC2 EU, use shorter path
 			s = LE_SERVER_EC2EU_API_DOMAIN
 		else:
 			s = LE_SERVER_API_DOMAIN
