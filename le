@@ -431,7 +431,7 @@ except ImportError:
 	except AttributeError:
 		die( 'NOTE: Please install Python "ssl" module.')
 
-	log.warning( '\nWARNING: The "ssl" module is not present. Using unreliable workaround, host identity cannot be verified. Please install "ssl" module or newer version of Python (2.6) if possible.')
+	log.warning( '\nWarning: Not verifying cetrificates since the "ssl" module is not present. Install "ssl" module or newer Python (>=2.6) to avoid this message.')
 
 	def wrap_socket( sock, ca_certs=None, cert_reqs=None):
 		return socket.ssl( sock)
