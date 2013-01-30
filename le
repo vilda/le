@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.3"
+VERSION = "1.2.4"
 
 NOT_SET = None
 
@@ -89,14 +89,17 @@ MAX_EVENTS = 65536
 # Interval between attampts to open a file
 REOPEN_INT = 1 # Seconds
 
+# Linux block devices
+SYS_BLOCK_DEV = '/sys/block/'
 # Linux CPU stat file
 CPUSTATS_FILE = '/proc/stat'
-# Linux disk stat file
-DISKSTATS_FILE = '/proc/diskstats'
 # Linux mmeory stat file
 MEMSTATS_FILE = '/proc/meminfo'
 # Linux network stat file
 NETSTATS_FILE = '/proc/net/dev'
+
+# List of accepted network devices
+NET_DEVICES = [ '  eth', ' wlan', 'venet', ' veth']
 
 EPOCH = 5 # in seconds
 
@@ -928,7 +931,7 @@ class Stats:
 		# Memory fields we are looking for in /proc/meminfo
 		self.MEM_FIELDS = [ 'MemTotal:', 'Active:', 'Cached:']
 		# Block devices in the system
-		all_devices = [os.path.basename(filename) for filename in glob.glob('/sys/block/*')]
+		all_devices = [os.path.basename(filename) for filename in glob.glob( SYS_BLOCK_DEV+ '/*')]
 		# Monitored devices (all devices except loop)
 		self.our_devices = frozenset( [device_name for device_name in all_devices if not device_name.startswith("loop") and not device_name.startswith("ram") and not device_name.startswith("md")])
 
@@ -980,18 +983,22 @@ class Stats:
 		"""
 		reads = 0L
 		writes = 0L
-		try:
-			for line in fileinput.input([DISKSTATS_FILE]):
-				if len(line) < 13:
-					continue
-				parts = line.split()
-				if not parts[2] in self.our_devices:
-					continue
-				reads += long( parts[5])
-				writes += long( parts[7])
-			fileinput.close()
-		except IOError:
-			return
+		# For all block devices
+		for device in self.our_devices:
+			try:
+				# Read device stats
+				f = open( SYS_BLOCK_DEV +device +'/stat', 'r')
+				line = f.read()
+				f.close()
+			except IOError:
+				continue
+
+			# Parse device stats
+			parts = line.split()
+			if len( parts) < 4:
+				continue
+			reads += long( parts[ 2])
+			writes += long( parts[ 4])
 
 		reads *= 512
 		writes *= 512
@@ -1021,13 +1028,13 @@ class Stats:
 
 	def net_stats(self,data):
 		"""
-		Collects network statistics. Collecting only eth and wlan.
+		Collects network statistics. Collecting only selected interfaces.
 		"""
 		receive=0L
 		transmit=0L
 		try:
-			for line in fileinput.input([NETSTATS_FILE]):
-				if line.startswith( '  eth') or line.startswith( ' wlan'):
+			for line in fileinput.input( [NETSTATS_FILE]):
+				if line[:5] in NET_DEVICES:
 					parts = line.replace( ':', ' ').split()
 					receive += long( parts[1])
 					transmit += long( parts[9])
