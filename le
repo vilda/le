@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.4"
+VERSION = "1.2.5"
 
 NOT_SET = None
 
@@ -995,10 +995,10 @@ class Stats:
 
 			# Parse device stats
 			parts = line.split()
-			if len( parts) < 4:
+			if len( parts) < 7:
 				continue
 			reads += long( parts[ 2])
-			writes += long( parts[ 4])
+			writes += long( parts[ 6])
 
 		reads *= 512
 		writes *= 512
