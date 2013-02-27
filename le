@@ -2646,7 +2646,7 @@ def list_object( request, hostnames=False):
 		print 'type =', request[ 'type']
 		print 'follow =', request[ 'follow']
 		if 'token' in request:
-			print 'token =', request[' token']
+			print 'token =', request[ 'token']
 		if 'logtype' in request:
 			print 'logtype =', logtype_name( request[ 'logtype'])
 		return
