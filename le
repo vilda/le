@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.5"
+VERSION = "1.2.6"
 
 NOT_SET = None
 
