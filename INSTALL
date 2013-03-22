@@ -1,4 +1,3 @@
-
 Common packaging and distribution
 ---------------------------------
 
@@ -67,6 +66,21 @@ name=Logentries repo
 enabled=1
 metadata_expire=1d
 baseurl=http://rep.logentries.com/fedora\$releasever/\$basearch
+gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
+EOF
+yum update
+yum install logentries
+exit
+
+Amazon Linux AMI
+-------------
+su -
+tee /etc/yum.repos.d/logentries.repo <<EOF
+[logentries]
+name=Logentries repo
+enabled=1
+metadata_expire=1d
+baseurl=http://rep.logentries.com/amazon\$releasever/\$basearch
 gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
 EOF
 yum update
