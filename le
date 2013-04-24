@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.6"
+VERSION = "1.2.7"
 
 NOT_SET = None
 
@@ -33,7 +33,7 @@ FILTERS_PARAM = 'filters'
 EC2EU_PARAM = 'ec2eu'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
 KEY_LEN = 36
-USER_KEY_API = '/agent/user-key/'
+ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
 
 # Logentries server details
@@ -148,7 +148,6 @@ Where command is one of:
   ls        List internal filesystem and settings: <path>
   rm        Remove entity: <path>
   pull      Pull log file: <path> <when> <filter> <limit>
-  push      Push log file: <file> <path> <log-type>
 
 Where parameters are:
   --help            show usage help and exit
@@ -879,18 +878,38 @@ def parse_timestamp_range( text):
 	return [start,end]
 
 
-def retrieve_user_key():
+def choose_account_key( accounts):
+	"""Allows user to select the right account.
 	"""
-	Retrieves user key from the web server.
+	if len(accounts) == 0:
+		die( 'No account is associated with your profile. Log in to Logentries to create a new account.')
+	if len(accounts) == 1:
+		return accounts[0][ 'account_key']
+	
+	for i in range(0, len(accounts)):
+		account = accounts[ i]
+		print >>sys.stderr, '[%s] %s %s'%(i, account[ 'account_key'][:8], account[ 'name'])
+
+	while True:
+		try: 
+			selection = int( raw_input( 'Pick account you would like to use: '))
+			if selection in range(0, len(accounts)):
+				return accounts[ selection][ 'account_key']
+		except ValueError:
+			pass
+		print >>sys.stderr, 'Invalid choice. Please try again or break with Ctrl+C.'
+
+
+def retrieve_account_key():
+	"""Retrieves account keys from the web server.
 	"""
 	while True:
-		username = raw_input( 'Username: ')
+		username = raw_input( 'Email: ')
 		password = getpass.getpass()
 
 		try:
 			c = domain_connect( api=False)
-
-			c.request( 'POST', USER_KEY_API,
+			c.request( 'POST', ACCOUNT_KEYS_API,
 				urllib.urlencode( {'username':username,'password':password}),
 				{'Referer':'https://logentries.com/login/'})
 			response = c.getresponse()
@@ -904,10 +923,7 @@ def retrieve_user_key():
 					print >>sys.stderr, 'Error: Unexpected login response from logentries (%s).'%resp_val
 			else:
 				data = json_loads( response.read())
-				if data['user_key'] == 'invalid':
-					print >>sys.stderr, 'Error: Invalid user key.'
-				else:
-					return data['user_key']
+				return choose_account_key( data[ 'accounts'])
 		except socket.error, msg:
 			print >>sys.stderr, 'Error: Cannot contact server, %s'%msg
 		except ValueError, msg:
@@ -915,7 +931,7 @@ def retrieve_user_key():
 		except KeyError:
 			print >>sys.stderr, 'Error: Invalid response from the server, user key not present.'
 
-		print >>sys.stderr, 'Try to login again, or press Ctrl+C to break'
+		print >>sys.stderr, 'Try to log in again, or press Ctrl+C to break'
 
 
 class Stats:
@@ -1555,8 +1571,8 @@ class Config:
 		Exits with error message if the user key is not defined.
 		"""
 		if self.user_key == NOT_SET:
-			log.info( "User key is required. Enter your login credentials or specify the user key with --account-key parameter.")
-			self.user_key = retrieve_user_key()
+			log.info( "Account key is required. Enter your login credentials or specify the account key with --account-key parameter.")
+			self.user_key = retrieve_account_key()
 			config.save()
 
 	def set_agent_key(self, value):
@@ -1603,8 +1619,9 @@ class Config:
 		if self.ec2eu:
 			return
 
+		# Try to get information about this instance
 		avz = ''
-		socket.setdefaulttimeout( 1)
+		socket.setdefaulttimeout( 2)
 		try:
 			response = urllib2.urlopen( EC2_AVZ_URL)
 			avz = response.read( 16)
@@ -1613,8 +1630,27 @@ class Config:
 			pass
 		socket.setdefaulttimeout( None)
 
+		# If the response is in EU, set the flag
 		self.ec2eu = avz.startswith( EC2_AVZ_EU_PREFIX)
+		# Disable SSL in EC2
 		self.suppress_ssl = avz != ''
+
+		if not self.ec2eu:
+			return
+
+		# Secodary test if we are inside EC2 VPN
+		test_resp = ''
+		socket.setdefaulttimeout( 3)
+		try:
+			response = urllib2.urlopen( 'http://%s/'%LE_SERVER_EC2EU_API_DOMAIN)
+			test_resp = response.read( 1024)
+			response.close()
+		except:
+			pass
+		socket.setdefaulttimeout( None)
+
+		# Use EC2 EU region if we got the result correctly
+		self.ec2eu = test_resp.find( 'Logentries') != -1
 
 	def process_params(self, params):
 		"""
@@ -2362,19 +2398,6 @@ def cmd_register( args):
 			request_follow( logx['filename'], logx['name'], logx['type'])
 
 
-def ask_cmd_register( args):
-	try:
-		import readline
-	except ImportError: pass
-	if not config.yes:
-		resp = None
-		try:
-			resp = raw_input( '\nHost is not registered. Would you like to register it (Y/n)? ')
-		except EOFError: pass
-		if resp not in ['', 'y', 'Y']:
-			die( "Please register the host first")
-	cmd_register( args)
-
 def load_logs():
 	"""
 	Loads logs from the server and initializes followers.
@@ -2445,8 +2468,7 @@ def cmd_monitor( args):
 	no_more_args( args)
 	config.load()
 	if config.agent_key == NOT_SET:
-#		ask_cmd_register( args)
-		die("Please register the host first with command `le register'")
+		die( 'Please register the host first with command `le register\'')
 	config.agent_key_required()
 	config.user_key_required()
 
@@ -3076,7 +3098,6 @@ def main():
 		'ls': cmd_ls,
 		'rm': cmd_rm,
 		'pull': cmd_pull,
-		'push': cmd_push,
 		# Shortcuts
 		#'nc': cmd_new_cluster,
 		#'sc': cmd_set_cluster,
