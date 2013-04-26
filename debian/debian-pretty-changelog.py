@@ -55,7 +55,7 @@ def load_log():
         if h:
             l.append(h)
         return l
-    fin = os.popen('git log --summary --no-merges --date=rfc')
+    fin = os.popen('git log --summary --date=rfc')
     l = xxx(fin)
     fin.close()
     return l
