@@ -558,7 +558,7 @@ def _try_daemonize():
 		pid = None
 	if pid:
 		if not os.path.exists( '/proc') or os.path.exists( "/proc/%d/status" % pid):
-			return "Pidfile %s already exist. Daemon already running?", config.pid_file
+			return "Pidfile %s already exist. Daemon already running?" % config.pid_file
 
 	try:
 		# Open pid file
@@ -592,7 +592,7 @@ def _try_daemonize():
 			pidfile.close()
 	except OSError, e:
 		rm_pidfile()
-		return "Cannot daemonize: %s"%e.strerror
+		return "Cannot daemonize: %s" % e.strerror
 	return None
 
 
@@ -609,7 +609,7 @@ def daemonize():
 	err = _try_daemonize()
 	_unlock_pid()
 	if err:
-		die( "%s"%err)
+		die( "%s" % err)
 
 	# Setting the proctitle
 	set_proc_title('logentries-daemon')
