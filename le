@@ -74,8 +74,7 @@ REOPEN_TRY_INTERVAL=1 # Seconds
 MAX_LINES_SENT=10
 
 # Time in seconds spend between log re-checks
-#TAIL_RECHECK = 0.2 # Seconds
-TAIL_RECHECK = 10 # Seconds
+TAIL_RECHECK = 0.2 # Seconds
 
 # Number of attemps to read a file, until the name is recheck
 NAME_CHECK = 4 # TAIL_RECHECK cycles
@@ -88,8 +87,7 @@ IAA_TOKEN = "###LE-IAA###\n"
 MAX_EVENTS = 65536
 
 # Interval between attampts to open a file
-#REOPEN_INT = 1 # Seconds
-REOPEN_INT = 10 # Seconds
+REOPEN_INT = 1 # Seconds
 
 # Linux block devices
 SYS_BLOCK_DEV = '/sys/block/'
@@ -103,8 +101,7 @@ NETSTATS_FILE = '/proc/net/dev'
 # List of accepted network devices
 NET_DEVICES = [ '  eth', ' wlan', 'venet', ' veth']
 
-#EPOCH = 5 # in seconds
-EPOCH = 20 # in seconds
+EPOCH = 5 # in seconds
 
 # Config response parameters
 CONF_RESPONSE = 'response'
@@ -1031,8 +1028,6 @@ class Stats:
 		    # in an alternate manner
 		    self.procfilesystem = False
 		    self.uname = platform.uname()
-		    log.debug( 'uname: ')
-		    log.debug( self.uname)
 		    self.sys = self.uname[0]
 		    log.debug( 'sys: %s'%(self.sys))
 
@@ -1157,60 +1152,61 @@ class Stats:
 		(vs. iostat, which shows CPU less granularly; it shows more
 		 detail about per-disk IO, but does not split IO into reads and
 		 writes)
+		
+		Frustratingly, the level of per-disk statistics from top is
+		incredibly un-granular
 
-		netstat -s shows more comprehensive detail about the network,
-		and vm_stat probably shows more comprehensive detail about
-		memory -- but for now, we'll pull those fields from top(1) too
+		We'll get physical memory details from here too
 	    """
-	    #raw_stats = [ long(part) for part in line.split()[1:8]]
-	    # turns
-	    # cpu  1926426192 38292706 4726560155 14170253968 332888038 109735 24922150 0 0 0
-	    # into 8 longs
-	    log.info( 'running top_stats')
-	    # cpu result:  None  line:  CPU usage: 6.23% user, 5.77% sys,
-	    # 87.99% idle
 	    cpure = re.compile('CPU usage:\s+([\d.]+)\% user, ([\d.]+)\% sys, '
 			       '([\d.]+)\% idle')
 	    memre = re.compile('PhysMem:\s+(\d+\w+) wired, '
 			       '(\d+\w+) active, (\d+\w+) inactive, '
 			       '(\d+\w+) used, (\d+\w+) free.')
+	    diskre = re.compile('Disks: (\d+)/(\d+\w+) read, '
+				'(\d+)/(\d+\w+) written.')
 
+	    # scaling routine for use in map() later
 	    def scaletokb(value):
 		# take a value like 1209M or 10G and return an integer
 		# representing the value in kilobytes
-		print "scaletokb value: ", value
-		#print re.split('([A-z]+)',value)[:2]
 
 		(size, scale)=re.split('([A-z]+)',value)[:2]
 		size = int(size)
-		print "size, scale: ", size, scale
 		if scale:
 		    if self.scale2kb.has_key(scale):
-			print "size ", size, " * ", self.scale2kb[scale]
 			size *= self.scale2kb[scale]
 		    else:
-			log.warning( "Error: value in %s "+
-			    "expressed in dimension I can't "+
-			    "translate to kb: %s %s"%
+			log.warning( "Error: value in %s expressed in "
+			    "dimension I can't translate to kb: %s %s"%
 			    (line, size, scale))
-		print "return size ", size
 		return size
 
-	    proc = subprocess.Popen(['/usr/bin/top',
-				     '-i','2','-l','2','-n','0'],
-				    stdout=subprocess.PIPE)
+	    # the first set of 'top' headers display average values over
+	    # system uptime.  so we only want to read the second set that we
+	    # see.
 	    toppass = 0
+
+	    # we should really do this first, so that we don't waste any time
+	    # if top fails to work.  however, it 'reads' better at this point
+	    try:
+		proc = subprocess.Popen(['top',
+					 '-i','2','-l','2','-n','0'],
+					stdout=subprocess.PIPE)
+	    except:
+		return
+
 	    for line in proc.stdout:
 		# skip the first output
 		if line.startswith('Processes: '):
 		    toppass += 1
-		    print "toppass: ", toppass
 		elif line.startswith('CPU usage: ') and toppass == 2:
 		    cpuresult = cpure.match(line)
-		    # the data we send to logentries is expected to be in
-		    # terms of centiseconds of (user/system/idle/etc) time
-		    # as all we have is %, multiply that % by the EPOCH
-		    # and 100.
+		    """
+		    the data we send to logentries is expected to be in terms
+		    of centiseconds of (user/system/idle/etc) time as all we
+		    have is %, multiply that % by the EPOCH and 100.
+		    """
 		    if cpuresult:
 			(cu, cs, ci) = map( lambda x: int(float(x)*100*EPOCH),
 					    cpuresult.group(1,2,3) )
@@ -1225,7 +1221,7 @@ class Stats:
 		    else:
 			log.warning( "Error: could not parse CPU stats "
 			    "in top output line %s"%(line))
-			print "cpu result: ", cpuresult, " line: ", line
+
 		elif line.startswith('PhysMem: ') and toppass == 2:
 		    """
 		    OS-X has no fixed cache size -- cached pages are stored in
@@ -1240,23 +1236,76 @@ class Stats:
 		    http://reviews.cnet.com/8301-13727_7-57372267-263/purge-the-os-x-disk-cache-to-analyze-memory-usage/
 		    """
 		    memresult = memre.match(line)
-		    # the data we send to logentries is expected to be in kB
-		    (wired, active, inactive, used, free) = map (
-			scaletokb, memresult.group(1,2,3,4,5))
-		    print("in kb: wired, active, inactive, used, free: ",
-			wired, active, inactive, used, free)
-		    self.save_data( data, 'mt', used + free)
-		    self.save_data( data, 'ma', active)
-		    self.save_data( data, 'mc', 0)
+		    if memresult:
+			# logentries is expecting values in kilobytes
+			(wired, active, inactive, used, free) = map (
+			    scaletokb, memresult.group(1,2,3,4,5))
+			self.save_data( data, 'mt', used + free)
+			self.save_data( data, 'ma', active)
+			self.save_data( data, 'mc', 0)
+		    else:
+			log.warning( "Error: could not parse memory stats "
+			    "in top output line %s"%(line))
 
-		#the real code does filtering here
-		# disk reads and writes
-		#self.save_data( data, 'dr', reads -self.prev_disk_stats[0])
-		#self.save_data( data, 'dw', writes -self.prev_disk_stats[1])
-		# network receive, transmit
-		#self.save_data( data, 'ni', receive-self.prev_net_stats[0])
-		#self.save_data( data, 'no', transmit-self.prev_net_stats[1])
-		print "test:", line.rstrip()
+		elif line.startswith('Disks: ') and toppass == 2:
+		    diskresult = diskre.match(line)
+		    """
+		    the data we send to logentries is expected to be in bytes
+		    """
+		    if diskresult:
+			(reads, writes) = map ( scaletokb,
+						diskresult.group(2,4))
+			reads *= 1024
+			writes *= 1024
+
+			self.save_data( data, 'dr',
+					reads -self.prev_disk_stats[0])
+			self.save_data( data, 'dw',
+					writes -self.prev_disk_stats[1])
+			self.prev_disk_stats = [ reads, writes]
+		    else:
+			log.warning( "Error: could not parse disk stats "
+			    "in top output line %s"%(line))
+
+	def netstats_stats(self, data):
+	    """
+	    Read network bytes in/out from the output of "netstat -s"
+	    Not exact, as on OS-X it doesn't display bytes for every protocol,
+	    but more exact than using 'top' or 'netstat <interval>'
+	    """
+	    try:
+		proc = subprocess.Popen(['netstat', '-bi'],
+					stdout=subprocess.PIPE)
+	    except:
+		return
+
+	    # if we see 11 non-blank fields,
+	    # #7 is input bytes, and #10 is output bytes, but avoid duplicate
+	    # device lines
+
+	    receive=0L
+	    transmit=0L
+	    netseen = {}
+
+	    for line in proc.stdout:
+		if line.startswith('Name'):
+		    continue
+
+		parts = line.split()
+		if len(parts) != 11:
+		    continue
+		if netseen.has_key(parts[1]):
+		    continue
+		if not parts[6].isdigit():
+		    continue
+
+		receive += long(parts[6])
+		transmit += long(parts[9])
+		netseen[parts[0]] = 1
+
+	    self.save_data( data, 'ni', receive-self.prev_net_stats[0])
+	    self.save_data( data, 'no', transmit-self.prev_net_stats[1])
+	    self.prev_net_stats = [receive, transmit]
 
 	def stats(self):
 		"""Collects statistics."""
@@ -1270,6 +1319,7 @@ class Stats:
 		else:
 		    if self.sys == "Darwin":
 			self.osx_top_stats(data)
+			self.netstats_stats(data)
 		return data
 
 	def new_request(self, rq):
@@ -1290,7 +1340,6 @@ class Stats:
 		results['request'] = RQ_WORKLOAD
 		results['host_key'] = config.agent_key
 		if config.debug_stats:
-			log.info( "send_stats->results:")
 			log.info( results)
 		if not self.first:
 			# Send data
@@ -1301,7 +1350,6 @@ class Stats:
 		ethalon += EPOCH
 		next_step = (ethalon-time.time()) % EPOCH
 		if not self.to_remove:
-			log.info ("next stats send %s"%(next_step))
 			self.timer = threading.Timer( next_step, self.send_stats, ())
 			self.timer.daemon = True
 			self.timer.start()
