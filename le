@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.7"
+VERSION = "1.2.8"
 
 NOT_SET = None
 
@@ -911,7 +911,10 @@ def retrieve_account_key():
 			c = domain_connect( api=False)
 			c.request( 'POST', ACCOUNT_KEYS_API,
 				urllib.urlencode( {'username':username,'password':password}),
-				{'Referer':'https://logentries.com/login/'})
+				{
+					'Referer':'https://logentries.com/login/',
+					'Content-type': 'application/x-www-form-urlencoded',
+				})
 			response = c.getresponse()
 			if not response or response.status != 200:
 				resp_val = 'err'
@@ -2246,6 +2249,7 @@ def request_follow( filename, name, type_opt):
 		"follow": "true"}
 	api_request( request, True, True)
 	log.info( "Will follow %s as %s"%(filename, name))
+	log.info( "Don't forget to restart the daemon")
 
 
 def request_hosts( logs=False):
