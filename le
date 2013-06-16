@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.8"
+VERSION = "1.2.12"
 
 NOT_SET = None
 
@@ -363,6 +363,7 @@ import getopt
 import glob
 import logging
 import os
+import os.path
 import platform
 import socket
 import subprocess
@@ -509,12 +510,56 @@ def rm_pidfile():
 		pass
 
 
-def daemonize():
+def _lock_pid_file_name():
+	"""
+	Returns path to a file for protecting critical section
+	for daemonizing (see daemonize() )
+	"""
+	return config.pid_file + '.lock'
+
+def _lock_pid():
+	"""
+	Tries to exclusively open file for protecting of critical section
+	for daemonizing.
+	"""
+	#FIXME: Does exclusive file creation work in Windows ?
+	file_name = _lock_pid_file_name()
+	try:
+		fd = os.open( file_name, os.O_WRONLY|os.O_CREAT|os.O_EXCL)
+	except OSError:
+		return None
+	if -1 == fd:
+		return None
+	os.close( fd)
+	return True
+
+def _unlock_pid():
+	"""
+	Releases file for protecting of critical section for daemonizing.
+	"""
+	try:
+		file_name = _lock_pid_file_name()
+		os.remove( file_name)
+	except OSError:
+		pass
+
+def _try_daemonize():
 	"""
 	Creates a daemon from the current process.
 	http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
 	Alternative: python-daemon
 	"""
+
+	try:
+		pidfile = file( config.pid_file, 'r')
+		pid = int( pidfile.read().strip())
+		pidfile.close()
+	except IOError:
+		pid = None
+	if pid:
+		if not os.path.exists( '/proc') or os.path.exists( "/proc/%d/status" % pid):
+			return "Pidfile %s already exist. Daemon already running?" % config.pid_file
+
 	try:
 		# Open pid file
 		if config.pid_file:
@@ -547,7 +592,24 @@ def daemonize():
 			pidfile.close()
 	except OSError, e:
 		rm_pidfile()
-		die( "Cannot daemonize: %s"%e.strerror)
+		return "Cannot daemonize: %s" % e.strerror
+	return None
+
+
+def daemonize():
+	"""
+	Creates a daemon from the current process.
+
+	It uses helper file as a lock and then checks inside critical section 
+	whether pid file contains pid of a valid process .
+	If not then it daemonizes itself, otherwise it dies.
+	"""
+	if not _lock_pid():
+		die( "Daemon already running. If you are sure it isn't please remove %s" % _lock_pid_file_name())
+	err = _try_daemonize()
+	_unlock_pid()
+	if err:
+		die( "%s" % err)
 
 	# Setting the proctitle
 	set_proc_title('logentries-daemon')
