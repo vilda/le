@@ -2597,6 +2597,11 @@ def follow_given_win_event( event_name ):
 	config.agent_key_required()
 	
 	type_opt = "windowseventlogs"
+
+	# Check that we don't follow that event log already
+	if not config.force and is_followed( event_name):
+		die( 'Already following %s Event Log'%event_name)
+  
 	request_follow( event_name, event_name, type_opt)
 
 
