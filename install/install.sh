@@ -13,7 +13,7 @@
 #											
 #############################################
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 # Need root to run this script
 if [ "$(id -u)" != "0" ] 
@@ -23,7 +23,11 @@ then
 	exit 1
 fi
 
-KEY_CMD="gpg --homedir /root/.gnupg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -"
+KEY_CMD_MIT="gpg --homedir /root/.gnupg --keyserver pgp.mit.edu --recv-keys C43C79AD"
+KEY_CMD_UBUNTU="gpg --homedir /root/.gnupg --keyserver keyserver.ubuntu.com --recv-keys C43C79AD"
+KEY_CMD_EXPORT="gpg --homedir /root/.gnupg -a --export C43C79AD"
+KEY_CMD_COMPLETE="apt-key add /tmp/le.key"
+KEY_CMD_CLEAN="rm /tmp/le.key"
 
 DEBIAN_REPO_CONF="/etc/apt/sources.list.d/logentries.list"
 DEBIAN_UPDATE="apt-get update -qq -y"
@@ -37,13 +41,9 @@ REDHAT_AGENT_INSTALL="yum install logentries -q -y"
 REDHAT_PROCTITLE_INSTALL="yum install python-setproctitle -q -y"
 REDHAT_DAEMON_INSTALL="yum install logentries-daemon -q -y"
 
-if hash lsb_release 2>/dev/null; then
-	CODENAME=$(lsb_release -c | sed 's/Codename://' | tr -d '[:space:]')
-	RELEASE=$(lsb_release -r | sed 's/Release://' | tr -d '[:space:]')
-fi
-
 REGISTER_CMD="le register"
 FOUND=0
+AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
 
 if [ -f /etc/issue ] && grep "Amazon Linux AMI" /etc/issue -q; then
 	# Amazon Linux AMI
@@ -65,6 +65,12 @@ EOL
 	# try and install python-setproctitle
 	$REDHAT_PROCTITLE_INSTALL >/tmp/logentriesDebug 2>&1
 
+	# Check for agent executable
+	if [ ! -f /usr/bin/le ];then
+		echo $AGENT_NOT_FOUND
+		exit 1
+	fi
+
 	# Prompt the user for their Logentries credentials and register the agent
 	$REGISTER_CMD
 
@@ -74,10 +80,44 @@ EOL
 	FOUND=1
 
 elif [ -f /etc/debian_version ]; then
+
+	if hash lsb_release 2>/dev/null; then
+		CODENAME=$(lsb_release -c | sed 's/Codename://' | tr -d '[:space:]')
+	else
+		release=$(cat /etc/debian_version)
+		IFS='.' read -a array <<< "$release"
+
+		case "${array[0]}" in
+		# Debian
+		7) CODENAME="wheezy"
+		   ;;
+		6) CODENAME="squeeze"
+		   ;;
+		5) CODENAME="lenny"
+		   ;;
+		*) CODENAME="UNKNOWN"
+		   ;;
+		esac
+	fi
+
+	if [ "$CODENAME" == "UNKNOWN" ]; then
+		printf "Unknown distribution, please contact support@logentries.com\n"
+		exit 1
+	fi
+
 	# Debian/Ubuntu
 	echo "deb http://rep.logentries.com/ ${CODENAME} main" > $DEBIAN_REPO_CONF
 
-	$KEY_CMD >/tmp/logentriesDebug 2>&1
+	$KEY_CMD_MIT >/tmp/logentriesDebug 2>&1
+
+	if [ "$?" != "0" ]; then
+		# Try different keyserver
+		$KEY_CMD_UBUNTU >/tmp/logentriesDebug 2>&1
+	fi
+
+	$KEY_CMD_EXPORT >/tmp/le.key
+	$KEY_CMD_COMPLETE
+	$KEY_CMD_CLEAN
 
 	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
 	$DEBIAN_UPDATE >/tmp/logentriesDebug 2>&1
@@ -86,6 +126,12 @@ elif [ -f /etc/debian_version ]; then
 	$DEBIAN_AGENT_INSTALL 
 	# Try and install the python-setproctitle package on certain distro's
 	$DEBIAN_PROCTITLE_INSTALL >/tmp/logentriesDebug 2>&1
+
+	# Check if agent executable exists before trying to register
+	if [ ! -f /usr/bin/le ];then
+		echo $AGENT_NO_FOUND
+		exit 1
+	fi
 	# Prompt the user for their Logentries credentials and register the agent
 	$REGISTER_CMD
 
@@ -123,6 +169,11 @@ EOL
 	# try and install python-setproctitle
 	$REDHAT_PROCTITLE_INSTALL >/tmp/logentriesDebug 2>&1
 
+	# Check that agent executable exists before trying to register
+	if [ ! -f /usr/bin/le ];then
+		echo $AGENT_NOT_FOUND
+	fi
+
 	# Prompt the user for their Logentries credentials and register the agent
 	$REGISTER_CMD
 	
@@ -134,8 +185,8 @@ fi
 
 if [ $FOUND == "1" ]; then 
 	printf "Install Complete!\n"
-	printf "Tell the agent to follow files with the 'le follow' command, e.g.  'le follow /var/log/syslog'\n"
-	printf "After you tell the agent to follow new files, you must restart the logentries service: service logentries restart\n"
+	printf "Tell the agent to follow files with the 'le follow' command,\n e.g.  'le follow /var/log/syslog'\n"
+	printf "After you tell the agent to follow new files,\n you must restart the logentries service: service logentries restart\n"
 else
 	printf "Unknown distribution. Please contact support@logentries.com with your system details\n"
 fi
