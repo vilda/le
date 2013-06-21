@@ -184,9 +184,10 @@ EOL
 fi
 
 if [ $FOUND == "1" ]; then 
-	printf "Install Complete!\n"
-	printf "Tell the agent to follow files with the 'le follow' command,\n e.g.  'le follow /var/log/syslog'\n"
+	printf "Install Complete!\n\n"
+	printf "Tell the agent to follow files with the 'le follow' command,\n e.g.  'le follow /var/log/syslog', this must be run as root\n\n"
 	printf "After you tell the agent to follow new files,\n you must restart the logentries service: service logentries restart\n"
+	printf "On some systems, the command is: /etc/init.d/logentries restart\n\n"
 else
-	printf "Unknown distribution. Please contact support@logentries.com with your system details\n"
+	printf "Unknown distribution. Please contact support@logentries.com with your system details\n\n"
 fi
