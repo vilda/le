@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.12"
+VERSION = "1.2.13"
 
 NOT_SET = None
 
@@ -39,6 +39,9 @@ ID_LOGS_API = '/agent/id-logs/'
 # Logentries server details
 LE_SERVER = 'logentries.com'
 LE_SERVER_L = 'localhost:8000'
+LE_SERVER_DATA_DOMAIN = 'data.logentries.com'
+LE_SERVER_EC2EU_DATA_DOMAIN = 'ec2eu.data.logentries.com'
+LE_SERVER_LOCAL_DATA_DOMAIN = 'localhost:8000'
 LE_SERVER_API_DOMAIN = 'api.logentries.com'
 LE_SERVER_EC2EU_API_DOMAIN = 'ec2eu.api.logentries.com'
 LE_SERVER_API_DOMAIN_L = 'localhost:8081'
@@ -1316,7 +1319,7 @@ class Follower(object):
 				time.sleep( SRV_RECON_TIMEOUT)
 			retry += 1
 			try:
-				self.conn = domain_connect()
+				self.conn = data_connect()
 				do_request( self.conn, "PUT", self.log_addr)
 				break
 			except socket.error:
@@ -1510,6 +1513,8 @@ class Config:
 		self.debug_loglist = False
 		# Force host for api
 		self.force_api_host = None
+		# Force host for data
+		self.force_data_host = None
 
 	def get_config_dir(self):
 		"""
@@ -1790,7 +1795,10 @@ class Config:
 				self.suppress_ssl = True
 			elif name == "--force-api-host":
                                 if value and value != '': self.force_api_host = value
-		if self.debug_local and self.force_api_host: die("Please do not specify --local and --force-api-host at the same time.")
+			elif name == "--force-data-host":
+                                if value and value != '': self.force_data_host = value
+		if self.debug_local and self.force_api_host: die( "Do not specify --local and --force-api-host at the same time.")
+		if self.debug_local and self.force_data_host: die( "Do not specify --local and --force-data-host at the same time.")
 		return args
 
 
@@ -2067,6 +2075,34 @@ def make_https_connection( s):
 	# Pass the exception
 
 
+def data_connect():
+	# Choose server address
+	if config.force_data_host:
+		s = config.force_data_host
+	elif config.ec2eu:
+		# If on EC2 EU, use shorter path
+		s = LE_SERVER_EC2EU_DATA_DOMAIN
+	else:
+		s = LE_SERVER_DATA_DOMAIN
+
+	# Special case for local debugging
+	if config.debug_local:
+		s = LE_SERVER_LOCAL_DATA_DOMAIN
+
+	# Connect to server with SSL in untrusted network
+	log.debug( 'Connecting to %s', s)
+
+	# Determine if to use SSL for connection
+	# Never use SSL for debugging, always use SSL with main server
+	use_ssl = not config.suppress_ssl and not config.debug_local
+
+	# Pass the connection
+	if use_ssl:
+		return make_https_connection( s)
+	else:
+		return httplib.HTTPConnection( s)
+
+
 def domain_connect(api=True):
 	# Find the correct server address
 	s = LE_SERVER
@@ -2216,7 +2252,7 @@ def push_request( ilog, data_size, where, params):
 	# Obtain response
 	addr = '/%s/%s/?%s'%(config.user_key,urllib.quote(where),urllib.urlencode( params))
 	try:
-		conn = domain_connect()
+		conn = data_connect()
 		do_request( conn, "PUT", addr, headers={CONTENT_LENGTH:'%s'%data_size})
 
 		# Push the file
