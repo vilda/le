@@ -27,7 +27,6 @@ Where COMMAND is one of:
   ls        List internal filesystem and settings: <path>
   rm        Remove entity: <path>
   pull      Pull log file: <path> <when> <filter> <limit>
-  push      Push log file: <file> <path> <log-type>
 
 Where ARGS are:
   --help            show usage help and exit
