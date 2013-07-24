@@ -344,7 +344,7 @@ IIi0tWeUz12OYjf+xLQ=
 -----END CERTIFICATE-----
 """
 authority_certificate_files = [
-	# Debian 5.0, Debian 6.0, Ubuntu 9.10, Ubuntu 10.4
+	# Debian 5.x, 6.x, 7.x, Ubuntu 9.10, 10.4, 13.0
 	"/etc/ssl/certs/ca-certificates.crt",
 	# Fedora 12, Fedora 13, CentOS 5
 	"/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem",
