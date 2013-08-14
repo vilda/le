@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.13"
+VERSION = "1.2.14"
 
 NOT_SET = None
 
@@ -467,6 +467,11 @@ def filter_events( events):
 	"""
 	# By default, this method is empty
 	return events
+
+def default_filter_filenames( filename):
+	""" By default we allow to follow any files specified in the condifuration.
+	"""
+	return True
 	
 
 def call( command):
@@ -2519,23 +2524,27 @@ def load_logs():
 			time.sleep( SRV_RECON_TIMEOUT)
 
 	available_filters = {}
+	filter_filenames = default_filter_filenames
 	if config.filters != NOT_SET:
 		sys.path.append( config.filters)
 		try:
 			import filters
-			available_filters = filters.filters
+			available_filters = getattr( filters, 'filters', {})
+			filter_filenames = getattr( filters, 'filter_filenames', default_filter_filenames)
 		except ImportError:
 			log.error( 'Cannot import event filters from %s', config.filters)
-		except:
-			log.exception( 'Cannot load event filters from %s', config.filters)
 
 	# Start followers
 	for l in logs:
 		if l['follow'] == 'true':
 			log_name = l['name']
+			log_filename = l['filename']
 			log_key = l['key']
 
 			# Check filters
+			if not filter_filenames( log_filename):
+				log.info( 'Not following %s, blocked by filter_filenames', log_name)
+				continue
 			event_filter = available_filters.get( log_name)
 			if not event_filter:
 				event_filter = available_filters.get( log_key)
@@ -2546,9 +2555,9 @@ def load_logs():
 
 			# Instantiate the follower
 			if 'logtype' in l and l['logtype'] == WINEVENT_LOGTYPE: # UUID of type windowseventlogs
-				WinEventFollower( l['filename'], l['key'], event_filter)
+				WinEventFollower( log_filename, log_key, event_filter)
 			else:
-				LogFollower( l['filename'], log_key, event_filter)
+				LogFollower( log_filename, log_key, event_filter)
 
 def is_followed( filename):
 	"""
