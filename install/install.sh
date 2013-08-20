@@ -42,6 +42,9 @@ REDHAT_PROCTITLE_INSTALL="yum install python-setproctitle -q -y"
 REDHAT_DAEMON_INSTALL="yum install logentries-daemon -q -y"
 
 REGISTER_CMD="le register"
+FOLLOW_CMD="le follow /var/log/syslog"
+LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
+DAEMON_RESTART_CMD="service logentries restart"
 FOUND=0
 AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
 
@@ -184,10 +187,25 @@ EOL
 fi
 
 if [ $FOUND == "1" ]; then 
+	if [ -f /var/log/syslog ]; then
+		$FOLLOW_CMD >/tmp/logentriesDebug 2>&1
+	fi
+
+	$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
+
 	printf "Install Complete!\n\n"
-	printf "Tell the agent to follow files with the 'le follow' command,\n e.g.  'le follow /var/log/syslog', this must be run as root\n\n"
-	printf "After you tell the agent to follow new files,\n you must restart the logentries service: service logentries restart\n"
-	printf "On some systems, the command is: /etc/init.d/logentries restart\n\n"
+	printf "The Logentries agent is now monitoring /var/log/syslog by default\n"
+	printf "If you would like to monitor more files, simply run this command as root 'le follow filepath', e.g. 'le follow /var/log/auth.log'\n\n"
+	printf "And be sure to restart the agent service for new files to take effect, you can do this with 'sudo service logentries restart'\n"
+	printf "On some older systems, the command is: sudo /etc/init.d/logentries restart\n\n"
+
+	sleep 1
+
+	if hash logger 2>/dev/null; then
+		$LOGGER_CMD
+	else	
+		echo "Logentries Agent Test Event" >> /var/log/syslog
+	fi
 else
 	printf "Unknown distribution. Please contact support@logentries.com with your system details\n\n"
 fi
