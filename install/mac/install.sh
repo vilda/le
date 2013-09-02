@@ -72,17 +72,17 @@ $LE_FOLLOW /var/log/appfirewall.log
 fi
 printf "\n"
 
+printf "Restarting agent..\n"
+launchctl load $AGENT_DAEMON_DIR$AGENT_DAEMON
+sleep 1
 logger "Logentries Test Event 1"
 logger "Logentries Test Event 2"
 logger "Logentries Test Event 3"
 logger "Logentries Test Event 4"
 logger "Logentries Test Event 5"
 
-printf "Restarting agent..\n"
-launchctl load /Library/LaunchDaemons/$AGENT_DAEMON
 printf "Install Complete!\n\n"
 printf "Will now monitor logs from terminal"
 
 exit 0
-
 
