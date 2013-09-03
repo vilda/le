@@ -13,7 +13,7 @@
 #											
 #############################################
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 
 # Need root to run this script
 if [ "$(id -u)" != "0" ] 
@@ -193,18 +193,33 @@ if [ $FOUND == "1" ]; then
 
 	$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
 
-	printf "Install Complete!\n\n"
+	sleep 1
+
+	printf "**** Install Complete! ****\n\n"
 	printf "The Logentries agent is now monitoring /var/log/syslog by default\n"
 	printf "If you would like to monitor more files, simply run this command as root 'le follow filepath', e.g. 'le follow /var/log/auth.log'\n\n"
 	printf "And be sure to restart the agent service for new files to take effect, you can do this with 'sudo service logentries restart'\n"
 	printf "On some older systems, the command is: sudo /etc/init.d/logentries restart\n\n"
+	printf "For a full list of commands, run 'le --help' in the terminal.\n\n"
+	printf "********************************\n\n"
 
-	sleep 1
-
+	printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds\n\n"
 	if hash logger 2>/dev/null; then
-		$LOGGER_CMD
+		x=1
+		while [ $x -le 100 ]
+		do
+			$LOGGER_CMD $x
+			sleep 0.3
+			x=$(( $x + 1 ))
+		done
 	else	
-		echo "Logentries Agent Test Event" >> /var/log/syslog
+		x=1
+		while [ $x -le 100 ]
+		do
+			echo "Logentries Agent Test Event $x" >> /var/log/syslog
+			sleep 0.3
+			x=$(( $x + 1 ))
+		done
 	fi
 else
 	printf "Unknown distribution. Please contact support@logentries.com with your system details\n\n"
