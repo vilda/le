@@ -42,34 +42,19 @@ mv le $INSTALL_PATH
 mv $DAEMON $DAEMON_PATH
 
 $REGISTER_CMD
+$LE_FOLLOW "/var/log/system.log"
 
-LOGS=("/var/log/system.log" "/var/log/install.log" "/var/log/fsck_hfs.log" "/var/log/opendirectoryd.log" "/var/log/appfirewall.log")
-
-for log in "${LOGS[@]}"
-do
-    if [ -f "${log}" ];  then
-        $LE_FOLLOW "${LOG}"
-    fi
-done
-
-printf "*** Install Complete! ****\n\n"
-printf "The Logentries Agent is now monitoring the following files by default:\n"
-for log in "${LOGS[@]}"
-do
-    if [ -f "${log}" ]; then
-        printf "${LOG}\n"
-    fi
-done
+printf "\n**** Install Complete! ****\n\n"
 printf "If you would like to monitor more files, simply run this command as root, 'le follow filepath', e.g. 'le follow /var/log/mylog.log'\n\n"
 printf "And be sure to restart the agent service for new files to take effect, you can do this with the following two commands.\n"
 printf "launchctl unload ${DAEMON_PATH}\n"
 printf "launchctl load ${DAEMON_PATH}\n"
 printf "For a full list of commands, run 'le --help' in the terminal.\n\n"
-printf "************************************\n\n"
 
 launchctl unload $DAEMON_PATH
 launchctl load $DAEMON_PATH
 
+printf "Starting agent"
 i="0"
 while [ $i -lt 40 ]
 do
@@ -78,15 +63,16 @@ do
     i=$[$i+1]
 done
 
-printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds.\n\n"
+printf "DONE\n\nWe will now send some sample events to your new Logentries account. This will take about 10 seconds.\n\n"
 
 l=1
-while [ $l -le 100 ]
+while [ $l -le 2 ]
 do
 	logger "Logentries Test Event ${l}"
         printf "."
 	sleep 0.1
 	l=$(( $l + 1 ))
 done
+printf "DONE\n"
 
 exit 0
