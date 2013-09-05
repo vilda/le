@@ -50,7 +50,7 @@ LE_SERVER_LOGIN = '/login/'
 LE_SERVER_API = '/'
 LE_SERVER_PORT = 443
 
-CONTENT_LENGTH = 'content-length';
+CONTENT_LENGTH = 'content-length'
 
 # Windows event log type ID
 WINEVENT_LOGTYPE = '9c0912b7-674b-47f1-89ac-eed5aa3affe0'
@@ -1024,9 +1024,9 @@ class Stats:
 		# Monitored devices (all devices except loop)
 		self.our_devices = frozenset( [device_name for device_name in all_devices if not device_name.startswith("loop") and not device_name.startswith("ram") and not device_name.startswith("md")])
 
-		self.prev_cpu_stats = [ 0, 0, 0, 0, 0, 0, 0];
-		self.prev_disk_stats = [ 0, 0];
-		self.prev_net_stats = [ 0, 0];
+		self.prev_cpu_stats = [ 0, 0, 0, 0, 0, 0, 0]
+		self.prev_disk_stats = [ 0, 0]
+		self.prev_net_stats = [ 0, 0]
 
 		if not config.debug_nostats:
 			self.send_stats()
@@ -1735,7 +1735,7 @@ class Config:
 		try:
 			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl force-api-host=".split())
 		except getopt.GetoptError, err:
-			die( "Parameter error: " +str( err));
+			die( "Parameter error: " +str( err))
 		for name, value in optlist:
 			if name == "--help":
 				print_usage()
@@ -2278,7 +2278,7 @@ def push_request( ilog, data_size, where, params):
 				reason = d_response['reason']
 			except ValueError:
 				pass
-			die( 'Error: ' +reason);
+			die( 'Error: ' +reason)
 		conn.close()
 	except socket.sslerror, msg: # Network error
 		log.info( "SSL error: %s"%msg)
@@ -2366,7 +2366,7 @@ def request_hosts( logs=False):
 		'request': 'get_user',
 		'load_hosts': 'true',
 		'load_logs': load_logs,
-		'user_key': config.user_key}, True, True);
+		'user_key': config.user_key}, True, True)
 	return response['hosts']
 
 
@@ -2389,7 +2389,7 @@ def uuid_match( uuid, text):
 	"""
 	Returns True if the uuid given is uuid and it matches to the text.
 	"""
-	return is_uuid( uuid) and uuid == text;
+	return is_uuid( uuid) and uuid == text
 
 
 def find_hosts( expr, hosts):
@@ -2930,7 +2930,7 @@ def cmd_set_cluster( args):
 	if config.name:
 		name = request['name'] = config.name
 	if len(argv) > 1:
-		request['list'] = ' '.join(argv[1:]);
+		request['list'] = ' '.join(argv[1:])
 	api_request( request, True, True)
 
 	report( "%s cluster set"%name)
@@ -3054,7 +3054,7 @@ def cmd_set_app( args):
 	if config.name:
 		name = request['name'] = config.name
 	if len(argv) > 1:
-		request['list'] = ' '.join(argv[1:]);
+		request['list'] = ' '.join(argv[1:])
 	api_request( request, True, True)
 
 	report( "%s app set"%name)
