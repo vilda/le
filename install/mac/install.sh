@@ -28,7 +28,7 @@ INSTALL_PATH="/usr/local/bin/le"
 REGISTER_CMD="$INSTALL_PATH register"
 LE_FOLLOW="$INSTALL_PATH follow"
 
-printf "Welcome to the Logentries Install Script for "; hostname;
+printf "Welcome to the Logentries Install Script\n"
 
 printf "Downloading dependencies...\n"
 $CURL $LE_LOCATION
@@ -41,22 +41,32 @@ chown root:wheel $DAEMON
 mv le $INSTALL_PATH
 mv $DAEMON $DAEMON_PATH
 
-printf "We will now register your machine.\n"
 $REGISTER_CMD
-printf "This script will guide you through following your first set of logs.\n\n"
-printf "I have automatically followed these files of interest for you:\n"
 
 LOGS=("/var/log/system.log" "/var/log/install.log" "/var/log/fsck_hfs.log" "/var/log/opendirectoryd.log" "/var/log/appfirewall.log")
 
 for log in "${LOGS[@]}"
 do
     if [ -f "${log}" ];  then
-        printf "Attempting to follow ${log}... "
         $LE_FOLLOW "${LOG}"
     fi
 done
 
-printf "\nRestarting agent..."
+printf "*** Install Complete! ****\n\n"
+printf "The Logentries Agent is now monitoring the following files by default:\n"
+for log in "${LOGS[@]}"
+do
+    if [ -f "${log}" ]; then
+        printf "${LOG}\n"
+    fi
+done
+printf "If you would like to monitor more files, simply run this command as root, 'le follow filepath', e.g. 'le follow /var/log/mylog.log'\n\n"
+printf "And be sure to restart the agent service for new files to take effect, you can do this with the following two commands.\n"
+printf "launchctl unload ${DAEMON_PATH}\n"
+printf "launchctl load ${DAEMON_PATH}\n"
+printf "For a full list of commands, run 'le --help' in the terminal.\n\n"
+printf "************************************\n\n"
+
 launchctl unload $DAEMON_PATH
 launchctl load $DAEMON_PATH
 
@@ -68,12 +78,14 @@ do
     i=$[$i+1]
 done
 
-logger "Logentries Test Event 1"
-logger "Logentries Test Event 2"
-logger "Logentries Test Event 3"
-logger "Logentries Test Event 4"
-logger "Logentries Test Event 5"
+printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds.\n\n"
 
-printf "\n\nInstall Complete!\n"
+x=1
+while [ $x -le 100 ]
+do
+	logger "Logentries Test Event ${x}"
+	sleep 0.3
+	x = $(( $x + 1 ))
+done
 
 exit 0
