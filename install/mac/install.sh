@@ -80,12 +80,13 @@ done
 
 printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds.\n\n"
 
-x=1
-while [ $x -le 100 ]
+l=1
+while [ $l -le 100 ]
 do
-	logger "Logentries Test Event ${x}"
-	sleep 0.3
-	x = $(( $x + 1 ))
+	logger "Logentries Test Event ${l}"
+        printf "."
+	sleep 0.1
+	l=$(( $l + 1 ))
 done
 
 exit 0
