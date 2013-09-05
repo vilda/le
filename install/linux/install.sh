@@ -197,7 +197,7 @@ if [ $FOUND == "1" ]; then
 
 	printf "**** Install Complete! ****\n\n"
 	printf "The Logentries agent is now monitoring /var/log/syslog by default\n"
-	printf "If you would like to monitor more files, simply run this command as root 'le follow filepath', e.g. 'le follow /var/log/auth.log'\n\n"
+	printf "If you would like to monitor more files, simply run this command as root, 'le follow filepath', e.g. 'le follow /var/log/auth.log'\n\n"
 	printf "And be sure to restart the agent service for new files to take effect, you can do this with 'sudo service logentries restart'\n"
 	printf "On some older systems, the command is: sudo /etc/init.d/logentries restart\n\n"
 	printf "For a full list of commands, run 'le --help' in the terminal.\n\n"
@@ -205,20 +205,20 @@ if [ $FOUND == "1" ]; then
 
 	printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds\n\n"
 	if hash logger 2>/dev/null; then
-		x=1
-		while [ $x -le 100 ]
-		do
-			$LOGGER_CMD $x
+		i=1
+		while [ $i -le 100 
+		o
+			$LOGGER_CMD $i
 			sleep 0.3
-			x=$(( $x + 1 ))
+			i=$(( $i + 1 ))
 		done
 	else	
-		x=1
-		while [ $x -le 100 ]
+		i=1
+		while [ $i -le 100 ]
 		do
-			echo "Logentries Agent Test Event $x" >> /var/log/syslog
+			echo "Logentries Agent Test Event $i" >> /var/log/syslog
 			sleep 0.3
-			x=$(( $x + 1 ))
+			i=$(( $i + 1 ))
 		done
 	fi
 else
