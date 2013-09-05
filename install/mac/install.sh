@@ -6,83 +6,74 @@
 #       Author: Stephen Hynes
 #       Version: 1.0
 #
-#
-#
 #############################################
 
 # Need root to run this script
-if [ "$(id -u)" != "0" ] 
-then
-echo "Please run this  script as root."
-echo "Usage: sudo bash quickstart.sh"
-exit 1
-fi   
+if [ "$(id -u)" != "0" ]; then
+    echo "Please run this  script as root."
+    echo "Usage: sudo bash install.sh"
+    exit 1
+fi
 
-REGISTER_CMD="./le register"
 LE_LOCATION="https://raw.github.com/logentries/le/master/le"
-CURL="/usr/bin/curl"
-CURL_TAGS="-O"
+
+CURL="/usr/bin/env curl -O"
+
 LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
-AGENT_DAEMON_DL_LOC="https://raw.github.com/logentries/le/master/install/mac/com.logentries.agent.plist"
-AGENT_DAEMON_DIR="/Library/LaunchDaemons/"
-AGENT_DAEMON="com.logentries.agent.plist"
-LE_AGENT_INSTAL_DIR="/Usr/local/bin"
-LE_FOLLOW="./le follow"
-LE_MONITOR="./le monitor"
-USER=whoami
+DAEMON="com.logentries.agent.plist"
+DAEMON_DL_LOC="https://raw.github.com/logentries/le/master/install/mac/$DAEMON"
+DAEMON_PATH="/Library/LaunchDaemons/$DAEMON"
+
+INSTALL_PATH="/usr/local/bin/le"
+REGISTER_CMD="$INSTALL_PATH register"
+LE_FOLLOW="$INSTALL_PATH follow"
 
 printf "Welcome to the Logentries Install Script for "; hostname;
-$CURL $CURL_TAGS $LE_LOCATION
-$CURL $CURL_TAGS $AGENT_DAEMON_DL_LOC
+
+printf "Downloading dependencies...\n"
+$CURL $LE_LOCATION
+$CURL $DAEMON_DL_LOC
+
+printf "Copying files...\n"
 chmod +x le
-mv le $LE_AGENT_INSTAL_DIR
-mv $AGENT_DAEMON $AGENT_DAEMON_DIR
-cd $LE_AGENT_INSTAL_DIR
+chown root:wheel le
+chown root:wheel $DAEMON
+mv le $INSTALL_PATH
+mv $DAEMON $DAEMON_PATH
+
 printf "We will now register your machine.\n"
-printf "\n"
 $REGISTER_CMD
-printf "\n"
-printf "This script will guide you through following your first set of logs. \n"
-printf "I have automatically followed these files of interest for you.\n"
+printf "This script will guide you through following your first set of logs.\n\n"
+printf "I have automatically followed these files of interest for you:\n"
 
+LOGS=("/var/log/system.log" "/var/log/install.log" "/var/log/fsck_hfs.log" "/var/log/opendirectoryd.log" "/var/log/appfirewall.log")
 
-if [ -f /var/log/system.log ];  then
-printf "/var/log/system.log - System logs.\n"
-$LE_FOLLOW /var/log/system.log
-fi
-printf "\n"
-if [ -f /var/log/install.log ]; then
-printf "/var/log/install.log - Install logs.\n"
-$LE_FOLLOW /var/log/install.log
-fi
-printf "\n"
-if [ -f /var/log/fsck_hfs.log ]; then
-printf "/var/log/fsck_hfs.log - FSCK log file.\n"
-$LE_FOLLOW /var/log/fsck_hfs.log
-fi
-printf "\n"
-if [ -f /var/log/opendirectoryd.log ]; then
-printf "/var/log/opendirectoryd.log - Open Directoryd log.\n"
-$LE_FOLLOW /var/log/opendirectoryd.log
-fi
-printf "\n"
-if [ -f /var/log/appfirewall.log ]; then
-printf "/var/log/appfirewall.log - App firewall log.\n"
-$LE_FOLLOW /var/log/appfirewall.log
-fi
-printf "\n"
+for log in "${LOGS[@]}"
+do
+    if [ -f "${log}" ];  then
+        printf "Attempting to follow ${log}... "
+        $LE_FOLLOW "${LOG}"
+    fi
+done
 
-printf "Restarting agent..\n"
-launchctl load $AGENT_DAEMON_DIR$AGENT_DAEMON
-sleep 1
+printf "\nRestarting agent..."
+launchctl unload $DAEMON_PATH
+launchctl load $DAEMON_PATH
+
+i="0"
+while [ $i -lt 40 ]
+do
+    sleep 0.05
+    printf "."
+    i=$[$i+1]
+done
+
 logger "Logentries Test Event 1"
 logger "Logentries Test Event 2"
 logger "Logentries Test Event 3"
 logger "Logentries Test Event 4"
 logger "Logentries Test Event 5"
 
-printf "Install Complete!\n\n"
-printf "Will now monitor logs from terminal"
+printf "\n\nInstall Complete!\n"
 
 exit 0
-
