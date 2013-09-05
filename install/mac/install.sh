@@ -11,7 +11,7 @@
 # Need root to run this script
 if [ "$(id -u)" != "0" ]; then
     echo "Please run this  script as root."
-    echo "Usage: sudo bash install.sh"
+    echo "Usage: sudo ./install.sh"
     exit 1
 fi
 
