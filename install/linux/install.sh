@@ -206,8 +206,8 @@ if [ $FOUND == "1" ]; then
 	printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds\n\n"
 	if hash logger 2>/dev/null; then
 		i=1
-		while [ $i -le 100 
-		o
+		while [ $i -le 100 ]
+		do
 			$LOGGER_CMD $i
 			sleep 0.3
 			i=$(( $i + 1 ))
