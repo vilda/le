@@ -47,6 +47,7 @@ LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
 DAEMON_RESTART_CMD="service logentries restart"
 FOUND=0
 AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
+SET_ACCOUNT_KEY="--account-key="
 
 if [ -f /etc/issue ] && grep "Amazon Linux AMI" /etc/issue -q; then
 	# Amazon Linux AMI
@@ -75,7 +76,11 @@ EOL
 	fi
 
 	# Prompt the user for their Logentries credentials and register the agent
-	$REGISTER_CMD
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
+		$REGISTER_CMD
+	else
+		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
+	fi
 
 	printf "Installing logentries daemon package...\n"
 	$REDHAT_DAEMON_INSTALL
@@ -136,7 +141,11 @@ elif [ -f /etc/debian_version ]; then
 		exit 1
 	fi
 	# Prompt the user for their Logentries credentials and register the agent
-	$REGISTER_CMD
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
+		$REGISTER_CMD
+	else
+		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
+	fi
 
 	printf "Installing logentries daemon package...\n"
 	$DEBIAN_DAEMON_INSTALL
@@ -178,7 +187,11 @@ EOL
 	fi
 
 	# Prompt the user for their Logentries credentials and register the agent
-	$REGISTER_CMD
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
+		$REGISTER_CMD
+	else
+		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
+	fi
 	
 	printf "Installing logentries daemon package...\n"
 	$REDHAT_DAEMON_INSTALL
