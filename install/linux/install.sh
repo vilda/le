@@ -43,12 +43,33 @@ REDHAT_DAEMON_INSTALL="yum install logentries-daemon -q -y"
 
 CONFIG_DELETE_CMD="rm /etc/le/config"
 REGISTER_CMD="le register"
-FOLLOW_CMD="le follow /var/log/syslog"
+FOLLOW_CMD="le follow"
 LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
 DAEMON_RESTART_CMD="service logentries restart"
 FOUND=0
 AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
 SET_ACCOUNT_KEY="--account-key="
+
+declare -a LOGS_TO_FOLLOW=(
+/var/log/messages
+/var/log/dmesg
+/var/log/auth.log
+/var/log/boot.log
+/var/log/daemon.log
+/var/log/dkpg.log
+/var/log/kern.log
+/var/log/lastlog
+/var/log/mail.log
+/var/log/user.log
+/var/log/Xorg.x.log
+/var/log/alternatives.log
+/var/log/btmp
+/var/log/cups
+/var/log/anaconda.log
+/var/log/cron
+/var/log/secure
+/var/log/wtmp
+/var/log/faillog); 
 
 if [ -f /etc/le/config ]; then
 	printf "It looks like you already have the Logentries agent registered on this machine\n"
@@ -214,7 +235,7 @@ fi
 
 if [ $FOUND == "1" ]; then 
 	if [ -f /var/log/syslog ]; then
-		$FOLLOW_CMD >/tmp/logentriesDebug 2>&1
+		$FOLLOW_CMD /var/log/syslog >/tmp/logentriesDebug 2>&1
 	fi
 
 	$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
@@ -223,6 +244,23 @@ if [ $FOUND == "1" ]; then
 
 	printf "**** Install Complete! ****\n\n"
 	printf "The Logentries agent is now monitoring /var/log/syslog by default\n"
+	printf "This install script can also monitor the following files by default..\n"
+
+	for x in "${LOGS_TO_FOLLOW[@]}"
+	do
+		echo $x
+	done
+	read -p "Would you like to monitor these also?..(y) or (n): "
+	if [[ $REPLY =~ ^[Yy]$ ]];then
+		for y in "${LOGS_TO_FOLLOW[@]}"
+		do
+			if [ -f $y ]; then
+				$FOLLOW_CMD	$y >/tmp/LogentriesDebug 2>&1
+				printf "Will monitor $y\n"
+			fi
+		done	
+	fi
+	echo ""	
 	printf "If you would like to monitor more files, simply run this command as root, 'le follow filepath', e.g. 'le follow /var/log/auth.log'\n\n"
 	printf "And be sure to restart the agent service for new files to take effect, you can do this with 'sudo service logentries restart'\n"
 	printf "On some older systems, the command is: sudo /etc/init.d/logentries restart\n\n"
@@ -235,7 +273,8 @@ if [ $FOUND == "1" ]; then
 		while [ $i -le 100 ]
 		do
 			$LOGGER_CMD $i of 100
-			sleep 0.3
+			printf "."
+			sleep 0.1
 			i=$(( $i + 1 ))
 		done
 	else	
@@ -243,10 +282,12 @@ if [ $FOUND == "1" ]; then
 		while [ $i -le 100 ]
 		do
 			echo "Logentries Agent Test Event $i of 100" >> /var/log/syslog
-			sleep 0.3
+			printf "."
+			sleep 0.1
 			i=$(( $i + 1 ))
 		done
 	fi
+	printf "\n"
 else
 	printf "Unknown distribution. Please contact support@logentries.com with your system details\n\n"
 fi
