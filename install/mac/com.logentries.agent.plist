@@ -6,7 +6,7 @@
         <string>com.logentries.agent</string>
         <key>ProgramArguments</key>
             <array>
-                <string>/usr/local/bin/le</string>
+                <string>/usr/bin/le</string>
                 <string>monitor</string>
             </array>
         <key>KeepAlive</key>
