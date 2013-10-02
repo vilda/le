@@ -24,7 +24,7 @@ DAEMON="com.logentries.agent.plist"
 DAEMON_DL_LOC="https://raw.github.com/logentries/le/master/install/mac/$DAEMON"
 DAEMON_PATH="/Library/LaunchDaemons/"
 
-INSTALL_PATH="/usr/bin/"
+INSTALL_PATH="/usr/bin/le"
 REGISTER_CMD="$INSTALL_PATH register"
 LE_FOLLOW="$INSTALL_PATH follow"
 
