@@ -259,7 +259,8 @@ if [ $FOUND == "1" ]; then
 				$FOLLOW_CMD	$y >/tmp/LogentriesDebug 2>&1
 				printf "Will monitor $y\n"
 			fi
-		done	
+		done
+		$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
 	fi
 	echo ""	
 	printf "If you would like to monitor more files, simply run this command as root, 'le follow filepath', e.g. 'le follow /var/log/auth.log'\n\n"
