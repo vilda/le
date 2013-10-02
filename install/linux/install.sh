@@ -13,7 +13,7 @@
 #											
 #############################################
 
-VERSION="1.0.3"
+VERSION="1.0.4"
 
 # Need root to run this script
 if [ "$(id -u)" != "0" ] 
@@ -41,6 +41,7 @@ REDHAT_AGENT_INSTALL="yum install logentries -q -y"
 REDHAT_PROCTITLE_INSTALL="yum install python-setproctitle -q -y"
 REDHAT_DAEMON_INSTALL="yum install logentries-daemon -q -y"
 
+CONFIG_DELETE_CMD="rm /etc/le/config"
 REGISTER_CMD="le register"
 FOLLOW_CMD="le follow /var/log/syslog"
 LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
@@ -48,6 +49,18 @@ DAEMON_RESTART_CMD="service logentries restart"
 FOUND=0
 AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
 SET_ACCOUNT_KEY="--account-key="
+
+if [ -f /etc/le/config ]; then
+	printf "It looks like you already have the Logentries agent registered on this machine\n"
+	read -p "Are you sure you want to continue with the installation? (y) or (n): "
+	if [[ $REPLY =~ ^[Yy]$ ]]; then
+		$CONFIG_DELETE_CMD
+	else
+		echo ""
+		printf "Exiting install script\n"
+		exit 0
+	fi
+fi
 
 if [ -f /etc/issue ] && grep "Amazon Linux AMI" /etc/issue -q; then
 	# Amazon Linux AMI
@@ -221,7 +234,7 @@ if [ $FOUND == "1" ]; then
 		i=1
 		while [ $i -le 100 ]
 		do
-			$LOGGER_CMD $i
+			$LOGGER_CMD $i of 100
 			sleep 0.3
 			i=$(( $i + 1 ))
 		done
@@ -229,7 +242,7 @@ if [ $FOUND == "1" ]; then
 		i=1
 		while [ $i -le 100 ]
 		do
-			echo "Logentries Agent Test Event $i" >> /var/log/syslog
+			echo "Logentries Agent Test Event $i of 100" >> /var/log/syslog
 			sleep 0.3
 			i=$(( $i + 1 ))
 		done
