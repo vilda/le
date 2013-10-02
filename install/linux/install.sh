@@ -72,8 +72,9 @@ declare -a LOGS_TO_FOLLOW=(
 /var/log/faillog); 
 
 if [ -f /etc/le/config ]; then
+	printf "******WARNING******\n"
 	printf "It looks like you already have the Logentries agent registered on this machine\n"
-	read -p "Are you sure you want to continue with the installation? (y) or (n): "
+	read -p "Are you sure you want to wipe your existing settings and continue with the installation? (y) or (n): "
 	if [[ $REPLY =~ ^[Yy]$ ]]; then
 		$CONFIG_DELETE_CMD
 	else
