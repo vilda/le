@@ -25,5 +25,5 @@ $ sudo rm /Library/LaunchDaemons/com.logentries.agent.plist
 Then remove the executable:
 
 ```shell
-$ sudo rm /usr/local/bin/le
+$ sudo rm /usr/bin/le
 ```
