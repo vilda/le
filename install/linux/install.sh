@@ -13,7 +13,7 @@
 #											
 #############################################
 
-VERSION="1.0.4"
+VERSION="1.0.5"
 
 # Need root to run this script
 if [ "$(id -u)" != "0" ] 
@@ -83,6 +83,8 @@ if [ -f /etc/le/config ]; then
 		exit 0
 	fi
 fi
+
+printf "*****Beginning Logentries Installation*****\n"
 
 if [ -f /etc/issue ] && grep "Amazon Linux AMI" /etc/issue -q; then
 	# Amazon Linux AMI
@@ -239,10 +241,6 @@ if [ $FOUND == "1" ]; then
 		$FOLLOW_CMD /var/log/syslog >/tmp/logentriesDebug 2>&1
 	fi
 
-	$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
-
-	sleep 1
-
 	printf "**** Install Complete! ****\n\n"
 	printf "The Logentries agent is now monitoring /var/log/syslog by default\n"
 	printf "This install script can also monitor the following files by default..\n"
@@ -251,18 +249,44 @@ if [ $FOUND == "1" ]; then
 	do
 		echo $x
 	done
-	read -p "Would you like to monitor these also?..(y) or (n): "
+	read -p "Would you like to monitor these also, you can choose certain logs?..(y) or (n): "
+	printf "\n"
 	if [[ $REPLY =~ ^[Yy]$ ]];then
-		for y in "${LOGS_TO_FOLLOW[@]}"
+		for j in "${LOGS_TO_FOLLOW[@]}"
 		do
-			if [ -f $y ]; then
-				$FOLLOW_CMD	$y >/tmp/LogentriesDebug 2>&1
-				printf "Will monitor $y\n"
+			if [ -f $j ]; then
+				read -p "Would you like to follow $j?..(y) or (n): "
+				if [[ $REPLY =~ ^[Yy]$ ]]; then
+					$FOLLOW_CMD $j >/tmp/LogentriesDebug 2>&1
+					printf "Will monitor $j\n"
+				fi
 			fi
 		done
 		$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
 	fi
-	echo ""	
+	echo ""
+	CUSTOM_LOOP=0
+	while [ $CUSTOM_LOOP -lt 1 ]
+	do
+		read -p "Would you like to monitor another log by entering the filepath?..(y) or (n): "
+		if [[ $REPLY =~ ^[Yy]$ ]];then
+			read -p "Enter the full filepath for the log: "
+			if [ ! -f $REPLY ];then
+				printf "The filepath: $REPLY does not exist\n"
+				continue
+			fi
+			$FOLLOW_CMD $REPLY >/tmp/logentriesDebug 2>&1
+			printf "Will monitor: $REPLY\n" 
+		else
+			CUSTOM_LOOP=1
+			printf "\n"
+		fi
+	done
+
+	$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
+
+	sleep 1
+
 	printf "If you would like to monitor more files, simply run this command as root, 'le follow filepath', e.g. 'le follow /var/log/auth.log'\n\n"
 	printf "And be sure to restart the agent service for new files to take effect, you can do this with 'sudo service logentries restart'\n"
 	printf "On some older systems, the command is: sudo /etc/init.d/logentries restart\n\n"
