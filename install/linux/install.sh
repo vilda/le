@@ -255,7 +255,7 @@ if [ $FOUND == "1" ]; then
 		for j in "${LOGS_TO_FOLLOW[@]}"
 		do
 			if [ -f $j ]; then
-				read -p "Would you like to follow $j?..(y) or (n): "
+				read -p "Would you like to follow $j ?..(y) or (n): "
 				if [[ $REPLY =~ ^[Yy]$ ]]; then
 					$FOLLOW_CMD $j >/tmp/LogentriesDebug 2>&1
 					printf "Will monitor $j\n"
