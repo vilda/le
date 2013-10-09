@@ -156,6 +156,7 @@ elif [ -f /etc/debian_version ]; then
 	$KEY_CMD_MIT >/tmp/logentriesDebug 2>&1
 
 	if [ "$?" != "0" ]; then
+		echo "MIT keyserver not working, fall back to ubuntu keyserver" >>/tmp/logentriesDebug
 		# Try different keyserver
 		$KEY_CMD_UBUNTU >/tmp/logentriesDebug 2>&1
 	fi
