@@ -13,7 +13,7 @@
 #											
 #############################################
 
-VERSION="1.0.5"
+VERSION="1.0.6"
 
 # Need root to run this script
 if [ "$(id -u)" != "0" ] 
@@ -36,7 +36,6 @@ DEBIAN_PROCTITLE_INSTALL="apt-get install python-setproctitle -qq -y"
 DEBIAN_DAEMON_INSTALL="apt-get install logentries-daemon -qq -y"
 DEBIAN_CURL_INSTALL="yum apt-get install curl -y"
 
-
 REDHAT_REPO_CONF="/etc/yum.repos.d/logentries.repo"
 REDHAT_UPDATE="yum update -y"
 REDHAT_AGENT_INSTALL="yum install logentries -q -y"
@@ -46,24 +45,22 @@ REDHAT_CURL_INSTALL="yum install curl curl-devel -y"
 
 CONFIG_DELETE_CMD="rm /etc/le/config"
 REGISTER_CMD="le register"
-FOLLOW_CMD="le follow /var/log/syslog"
-LOGGER_CMD="logger -t Logentries Test Event"
-
+FOLLOW_CMD="le follow"
+LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
 DAEMON_RESTART_CMD="service logentries restart"
 FOUND=0
 AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
 SET_ACCOUNT_KEY="--account-key="
 
 TAG_NAMES=("Kernel - Process Terminated" "Kernel - Process Killed" "Kernel - Process Started" "Kernel - Process Stopped" "User Logged In" "Invalid User Login attempt" "POSSIBLE BREAK-IN ATTEMPT" "Error")
-TAG_PATTERNS=("/terminated with status 100/" "/Killed process/" "/\/proc\/kmsg started/" "/Kernel logging (proc) stopped/" "/Accepted publickey for/" "/Invalid user/" "/POSSIBLE BREAK-IN ATTEMPT/" "/probe of rtc_cmos failed/")
+TAG_PATTERNS=("/terminated with status 100/" "/Killed process/" "/\/proc\/kmsg started/" "/Kernel logging (proc) stopped/" "/Accepted publickey for/" "/Invalid user/" "/POSSIBLE BREAK-IN ATTEMPT/" "/Invalid user admin/")
 EVENT_COLOR=("66ff00" "6699ff" "009900" "ff6633" "ff0066" "9999ff" "000099" "999966")
-TAG_SHORT_NAMES=("Terminated" "Killed" "Started" "Stopped" "Logged" "Invalid" "ATTEMPT" "Error")
 
 CURL="curl"
 CONTENT_HEADER="\"Content-Type: application/json\""
 HEADER="-H"
 DATA="--data"
-API="http://api.logentries.com"
+API="api.logentries.com"
 
 declare -a LOGS_TO_FOLLOW=(
 /var/log/messages
@@ -101,8 +98,6 @@ fi
 
 printf "*****Beginning Logentries Installation*****\n"
 
-
-
 if [ -f /etc/issue ] && grep "Amazon Linux AMI" /etc/issue -q; then
 	# Amazon Linux AMI
 cat << EOL >> $REDHAT_REPO_CONF
@@ -123,6 +118,12 @@ EOL
 	# try and install python-setproctitle
 	$REDHAT_PROCTITLE_INSTALL >/tmp/logentriesDebug 2>&1
 
+	# Check for agent executable
+	if [ ! -f /usr/bin/le ];then
+		echo $AGENT_NOT_FOUND
+		exit 1
+	fi
+
 	# Check if curl is installed, if not install it
 	if  hash curl 2>/dev/null;then
        echo "curl already installed"
@@ -130,23 +131,15 @@ EOL
 	    REDHAT_CURL_INSTALL
 	fi
 
-	# Check for agent executable
-	if [ ! -f /usr/bin/le ];then
-		echo $AGENT_NOT_FOUND
-		exit 1
-	fi
-
 	# Prompt the user for their Logentries credentials and register the agent
 	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
 		$REGISTER_CMD
-		
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
 
 	USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
 	USER_KEY=${USER_KEY_LINE#*= }
-
 	printf "Installing logentries daemon package...\n"
 	$REDHAT_DAEMON_INSTALL
 
@@ -206,6 +199,7 @@ elif [ -f /etc/debian_version ]; then
 		echo $AGENT_NO_FOUND
 		exit 1
 	fi
+
 	# Check if curl is installed, if not install it
 	if  hash curl 2>/dev/null;then
        echo "curl already installed"
@@ -214,15 +208,13 @@ elif [ -f /etc/debian_version ]; then
 	fi
 
 	# Prompt the user for their Logentries credentials and register the agent
-	if [[ -z "$LE_ACCOUNT_KEY" ]];then
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
 		$REGISTER_CMD
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
-
 	USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
 	USER_KEY=${USER_KEY_LINE#*= }
-
 	printf "Installing logentries daemon package...\n"
 	$DEBIAN_DAEMON_INSTALL
 
@@ -263,15 +255,13 @@ EOL
 	fi
 
 	# Prompt the user for their Logentries credentials and register the agent
-	if [[ -z "$LE_ACCOUNT_KEY" ]];then
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
 		$REGISTER_CMD
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
-	
 	USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
 	USER_KEY=${USER_KEY_LINE#*= }
-
 	printf "Installing logentries daemon package...\n"
 	$REDHAT_DAEMON_INSTALL
 
@@ -336,16 +326,14 @@ if [ $FOUND == "1" ]; then
 	printf "********************************\n\n"
 
 	printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds\n\n"
-	printf "Creating Tags and Alerts.\n\n"
-
 	LE_COMMAND=$(le ls /hosts/`python -c "import socket; print socket.getfqdn().split('.')[0]"`/syslog | grep key)
 	LOG_KEY=${LE_COMMAND#key = }
 
 	echo "Creating Events & Tags \n"
 
-	TAG_ID=$(python seeding.py $USER_KEY $LOG_KEY)
+	TAG_ID=$(python seeding.py createEvent $USER_KEY $LOG_KEY)
 
-	echo "Seeding data, this can take up to 20 seconds"
+	echo "Seeding data, this can take up to 15 seconds"
 	if hash logger 2>/dev/null; then
 
 		i=1
@@ -422,14 +410,10 @@ if [ $FOUND == "1" ]; then
 	fi
 
 	printf "Creating Graphs.\n\n"
-	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Kernel+Processes%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
-	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Kernel+Processes%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars-summary%22%2C%22options%22%3A%7B%22title%22%3A%22Kernel+Processes%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
-	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Kernel+Processes%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars-summary%22%2C%22options%22%3A%7B%22title%22%3A%22Kernel+Processes%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22Login+Errors%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22POSSIBLE+BREAK-IN+ATTEMPT%22%5D%2C%22style%22%3A%5B%22Show+Tooltip%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%223%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
-	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Kernel+Processes%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars-summary%22%2C%22options%22%3A%7B%22title%22%3A%22Kernel+Processes%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22Login+Errors%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22POSSIBLE+BREAK-IN+ATTEMPT%22%5D%2C%22style%22%3A%5B%22Show+Tooltip%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-radial-gauge%22%2C%22options%22%3A%7B%22title%22%3A%22Error%22%2C%22event%22%3A%22Error%22%2C%22high_threshold%22%3A%22100%22%2C%22high_threshold_rate%22%3A%22Per+Hour%22%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%224%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
-	echo "Finished creating Graphs"
-
+	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API 
+	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
+	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failled+login+attempts%22%2C%22event%22%3A%22Warning%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Events+Per+Day%22%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%223%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
 	printf "Finished creating default data.\n\n"
-
 else
 	printf "Unknown distribution. Please contact support@logentries.com with your system details\n\n"
 fi
