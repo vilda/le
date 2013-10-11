@@ -2,21 +2,21 @@
 
 #############################################
 #
-#	Logentries Agent Installer			
-#											
-#	Supported Distro's:						
-#		Debian 5 and newer					
+#	Logentries Agent Installer
+#
+#	Supported Distro's:
+#		Debian 5 and newer
 #		Ubuntu 9.10 and newer
-#		Fedora 14 and newer					
-#		CentOS 5/6  (RedHat 6)					
-#		Amazon AMI					
-#											
+#		Fedora 14 and newer
+#		CentOS 5/6  (RedHat 6)
+#		Amazon AMI
+#
 #############################################
 
 VERSION="1.0.6"
 
 # Need root to run this script
-if [ "$(id -u)" != "0" ] 
+if [ "$(id -u)" != "0" ]
 then
 	echo "Please run this install script as root."
 	echo "Usage: sudo bash install.sh"
@@ -81,7 +81,7 @@ declare -a LOGS_TO_FOLLOW=(
 /var/log/cron
 /var/log/secure
 /var/log/wtmp
-/var/log/faillog); 
+/var/log/faillog);
 
 if [ -f /etc/le/config ]; then
 	printf "******WARNING******\n"
@@ -109,7 +109,7 @@ baseurl=http://rep.logentries.com/rh/\$basearch
 gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
 EOL
 
-	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$REDHAT_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
@@ -132,7 +132,7 @@ EOL
 	fi
 
 	# Prompt the user for their Logentries credentials and register the agent
-	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then
 		$REGISTER_CMD
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
@@ -185,11 +185,11 @@ elif [ -f /etc/debian_version ]; then
 	$KEY_CMD_COMPLETE
 	$KEY_CMD_CLEAN
 
-	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$DEBIAN_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
-	$DEBIAN_AGENT_INSTALL 
+	$DEBIAN_AGENT_INSTALL
 	# Try and install the python-setproctitle package on certain distro's
 	$DEBIAN_PROCTITLE_INSTALL >/tmp/logentriesDebug 2>&1
 
@@ -207,7 +207,7 @@ elif [ -f /etc/debian_version ]; then
 	fi
 
 	# Prompt the user for their Logentries credentials and register the agent
-	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then
 		$REGISTER_CMD
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
@@ -238,7 +238,7 @@ baseurl=http://rep.logentries.com/$DIST/\$basearch
 $GPG
 EOL
 
-	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$REDHAT_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
@@ -253,7 +253,7 @@ EOL
 	fi
 
 	# Prompt the user for their Logentries credentials and register the agent
-	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then
 		$REGISTER_CMD
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
@@ -265,7 +265,7 @@ EOL
 	FOUND=1
 fi
 
-if [ $FOUND == "1" ]; then 
+if [ $FOUND == "1" ]; then
 	if [ -f /var/log/syslog ]; then
 		$FOLLOW_CMD /var/log/syslog >/tmp/logentriesDebug 2>&1
 	fi
@@ -305,7 +305,7 @@ if [ $FOUND == "1" ]; then
 				continue
 			fi
 			$FOLLOW_CMD $REPLY >/tmp/logentriesDebug 2>&1
-			printf "Will monitor: $REPLY\n" 
+			printf "Will monitor: $REPLY\n"
 		else
 			CUSTOM_LOOP=1
 			printf "\n"
@@ -375,7 +375,7 @@ if [ $FOUND == "1" ]; then
 				sleep 0.1
 				i=$(( $i + 1 ))
 			done
-		else	
+		else
 			i=1
 			while [ $i -le 2 ]
 			do
@@ -391,7 +391,7 @@ if [ $FOUND == "1" ]; then
 				echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
 				echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
 				echo "Logentries Test Event: kernel: imklog 5.8.6, log source = /proc/kmsg started." >> /var/log/syslog
- 
+
 				echo "Logentries Test Event: kernel: Kernel logging (proc) stopped." >> /var/log/syslog
 				echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
 				echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
@@ -414,7 +414,7 @@ if [ $FOUND == "1" ]; then
 		fi
 
 		printf "Creating Graphs.\n\n"
-		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API 
+		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
 		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
 		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%223%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
 		printf "\n"
