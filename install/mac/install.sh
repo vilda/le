@@ -51,8 +51,8 @@ printf "launchctl unload ${DAEMON_PATH}\n"
 printf "launchctl load ${DAEMON_PATH}\n"
 printf "For a full list of commands, run 'le --help' in the terminal.\n\n"
 
-launchctl unload $DAEMON_PATH
-launchctl load $DAEMON_PATH
+launchctl unload $DAEMON_PATH$DAEMON
+launchctl load $DAEMON_PATH$DAEMON
 
 printf "Starting agent"
 i="0"
