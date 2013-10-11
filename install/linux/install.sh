@@ -13,7 +13,7 @@
 #											
 #############################################
 
-VERSION="1.0.5"
+VERSION="1.0.6"
 
 # Need root to run this script
 if [ "$(id -u)" != "0" ] 
@@ -34,12 +34,14 @@ DEBIAN_UPDATE="apt-get update -y"
 DEBIAN_AGENT_INSTALL="apt-get install logentries -qq -y"
 DEBIAN_PROCTITLE_INSTALL="apt-get install python-setproctitle -qq -y"
 DEBIAN_DAEMON_INSTALL="apt-get install logentries-daemon -qq -y"
+DEBIAN_CURL_INSTALL="apt-get install curl -y"
 
 REDHAT_REPO_CONF="/etc/yum.repos.d/logentries.repo"
 REDHAT_UPDATE="yum update -y"
 REDHAT_AGENT_INSTALL="yum install logentries -q -y"
 REDHAT_PROCTITLE_INSTALL="yum install python-setproctitle -q -y"
 REDHAT_DAEMON_INSTALL="yum install logentries-daemon -q -y"
+REDHAT_CURL_INSTALL="yum install curl curl-devel -y"
 
 CONFIG_DELETE_CMD="rm /etc/le/config"
 REGISTER_CMD="le register"
@@ -49,6 +51,16 @@ DAEMON_RESTART_CMD="service logentries restart"
 FOUND=0
 AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
 SET_ACCOUNT_KEY="--account-key="
+
+TAG_NAMES=("Kernel - Process Terminated" "Kernel - Process Killed" "Kernel - Process Started" "Kernel - Process Stopped" "User Logged In" "Invalid User Login attempt" "POSSIBLE BREAK-IN ATTEMPT" "Error")
+TAG_PATTERNS=("/terminated with status 100/" "/Killed process/" "/\/proc\/kmsg started/" "/Kernel logging (proc) stopped/" "/Accepted publickey for/" "/Invalid user/" "/POSSIBLE BREAK-IN ATTEMPT/" "/Invalid user admin/")
+EVENT_COLOR=("66ff00" "6699ff" "009900" "ff6633" "ff0066" "9999ff" "000099" "999966")
+
+CURL="curl"
+CONTENT_HEADER="\"Content-Type: application/json\""
+HEADER="-H"
+DATA="--data"
+API="api.logentries.com"
 
 declare -a LOGS_TO_FOLLOW=(
 /var/log/messages
@@ -112,12 +124,20 @@ EOL
 		exit 1
 	fi
 
+	# Check if curl is installed, if not install it
+	if  hash curl 2>/dev/null;then
+       echo "curl already installed"
+	else
+	    REDHAT_CURL_INSTALL
+	fi
+
 	# Prompt the user for their Logentries credentials and register the agent
 	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
 		$REGISTER_CMD
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
+
 
 	printf "Installing logentries daemon package...\n"
 	$REDHAT_DAEMON_INSTALL
@@ -178,6 +198,14 @@ elif [ -f /etc/debian_version ]; then
 		echo $AGENT_NO_FOUND
 		exit 1
 	fi
+
+	# Check if curl is installed, if not install it
+	if  hash curl 2>/dev/null;then
+       echo "curl already installed"
+	else
+	    DEBIAN_CURL_INSTALL
+	fi
+
 	# Prompt the user for their Logentries credentials and register the agent
 	if [[ -z "$LE_ACCOUNT_KEY" ]];then 
 		$REGISTER_CMD
@@ -230,7 +258,7 @@ EOL
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
-	
+
 	printf "Installing logentries daemon package...\n"
 	$REDHAT_DAEMON_INSTALL
 
@@ -295,26 +323,98 @@ if [ $FOUND == "1" ]; then
 	printf "********************************\n\n"
 
 	printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds\n\n"
+	USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
+	USER_KEY=${USER_KEY_LINE#*= }
+	LE_COMMAND=$(le ls /hosts/`python -c "import socket; print socket.getfqdn().split('.')[0]"`/syslog | grep key)
+	LOG_KEY=${LE_COMMAND#key = }
+
+	echo "Creating Events & Tags \n"
+	$CURL -O "https://raw.github.com/StephenHynes7/le/master/install/linux/seeding.py"
+	chmod +x seeding.py
+	TAG_ID=$(python seeding.py createEvent $USER_KEY $LOG_KEY)
+
+	echo "Seeding data, this can take up to 15 seconds"
 	if hash logger 2>/dev/null; then
+
 		i=1
-		while [ $i -le 100 ]
+		while [ $i -le 2 ]
 		do
-			$LOGGER_CMD $i of 100
-			printf "."
+
+			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."
+			$LOGGER_CMD "mongodb main process (127x) terminated with status 100)"
+			$LOGGER_CMD "Out of Memory: Killed process 2592 (oracle)"
+			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "kernel: imklog 5.8.6, log source = /proc/kmsg started."
+
+			$LOGGER_CMD "kernel: Kernel logging (proc) stopped."
+			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x "
+			$LOGGER_CMD "sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x"
+			$LOGGER_CMD "sshd[562x]: Invalid user root from 5x.x.x.5x"
+			$LOGGER_CMD "sshd[562x]: Invalid user admin from 5x.x.x.5x"
+			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2"
+			$LOGGER_CMD "kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38"
+
 			sleep 0.1
 			i=$(( $i + 1 ))
 		done
 	else	
 		i=1
-		while [ $i -le 100 ]
+		while [ $i -le 2 ]
 		do
-			echo "Logentries Agent Test Event $i of 100" >> /var/log/syslog
-			printf "."
+
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."  >> /var/log/syslog
+			echo "Logentries Test Event: mongodb main process (127x) terminated with status 100)" >> /var/log/syslog
+			echo "Logentries Test Event: Out of Memory: Killed process 2592 (oracle)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: kernel: imklog 5.8.6, log source = /proc/kmsg started." >> /var/log/syslog
+
+			echo "Logentries Test Event: kernel: Kernel logging (proc) stopped." >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x " >> /var/log/syslog
+			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x" >> /var/log/syslog
+			echo "Logentries Test Event: sshd[562x]: Invalid user root from 5x.x.x.5x" >> /var/log/syslog
+			echo "Logentries Test Event: sshd[562x]: Invalid user admin from 5x.x.x.5x" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2" >> /var/log/syslog
+			echo "Logentries Test Event: kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38" >> /var/log/syslog
+
 			sleep 0.1
 			i=$(( $i + 1 ))
 		done
 	fi
-	printf "\n"
+
+	printf "Creating Graphs.\n\n"
+	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API 
+	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
+	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%223%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
+	printf "Finished creating default data.\n\n"
 else
 	printf "Unknown distribution. Please contact support@logentries.com with your system details\n\n"
 fi
+
