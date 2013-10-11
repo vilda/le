@@ -328,7 +328,7 @@ if [ $FOUND == "1" ]; then
 	LE_COMMAND=$(le ls /hosts/`python -c "import socket; print socket.getfqdn().split('.')[0]"`/syslog | grep key)
 	LOG_KEY=${LE_COMMAND#key = }
 
-	echo "Creating Events & Tags \n"
+	printf "Creating Events & Tags\n"
 	$CURL -O "https://raw.github.com/StephenHynes7/le/master/install/linux/seeding.py"
 	chmod +x seeding.py
 	TAG_ID=$(python seeding.py createEvent $USER_KEY $LOG_KEY)
