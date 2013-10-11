@@ -34,7 +34,7 @@ DEBIAN_UPDATE="apt-get update -y"
 DEBIAN_AGENT_INSTALL="apt-get install logentries -qq -y"
 DEBIAN_PROCTITLE_INSTALL="apt-get install python-setproctitle -qq -y"
 DEBIAN_DAEMON_INSTALL="apt-get install logentries-daemon -qq -y"
-DEBIAN_CURL_INSTALL="yum apt-get install curl -y"
+DEBIAN_CURL_INSTALL="apt-get install curl -y"
 
 REDHAT_REPO_CONF="/etc/yum.repos.d/logentries.repo"
 REDHAT_UPDATE="yum update -y"
@@ -138,8 +138,7 @@ EOL
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
 
-	USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
-	USER_KEY=${USER_KEY_LINE#*= }
+
 	printf "Installing logentries daemon package...\n"
 	$REDHAT_DAEMON_INSTALL
 
@@ -213,8 +212,7 @@ elif [ -f /etc/debian_version ]; then
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
-	USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
-	USER_KEY=${USER_KEY_LINE#*= }
+
 	printf "Installing logentries daemon package...\n"
 	$DEBIAN_DAEMON_INSTALL
 
@@ -260,8 +258,7 @@ EOL
 	else
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
-	USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
-	USER_KEY=${USER_KEY_LINE#*= }
+
 	printf "Installing logentries daemon package...\n"
 	$REDHAT_DAEMON_INSTALL
 
@@ -326,11 +323,14 @@ if [ $FOUND == "1" ]; then
 	printf "********************************\n\n"
 
 	printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds\n\n"
+	USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
+	USER_KEY=${USER_KEY_LINE#*= }
 	LE_COMMAND=$(le ls /hosts/`python -c "import socket; print socket.getfqdn().split('.')[0]"`/syslog | grep key)
 	LOG_KEY=${LE_COMMAND#key = }
 
 	echo "Creating Events & Tags \n"
-
+	$CURL -O "https://raw.github.com/StephenHynes7/le/master/install/linux/seeding.py"
+	chmod +x seeding.py
 	TAG_ID=$(python seeding.py createEvent $USER_KEY $LOG_KEY)
 
 	echo "Seeding data, this can take up to 15 seconds"
@@ -412,7 +412,7 @@ if [ $FOUND == "1" ]; then
 	printf "Creating Graphs.\n\n"
 	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API 
 	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
-	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failled+login+attempts%22%2C%22event%22%3A%22Warning%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Events+Per+Day%22%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%223%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
+	$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Stopped%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-bars%22%2C%22options%22%3A%7B%22title%22%3A%22SSH+Access%22%2C%22tags_to_show%22%3A%5B%22User+Logged+In%22%2C%22Error%22%5D%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%222%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%221%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%223%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
 	printf "Finished creating default data.\n\n"
 else
 	printf "Unknown distribution. Please contact support@logentries.com with your system details\n\n"
