@@ -185,7 +185,7 @@ elif [ -f /etc/debian_version ]; then
 	$KEY_CMD_COMPLETE
 	$KEY_CMD_CLEAN
 
-	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
 	$DEBIAN_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
@@ -238,7 +238,7 @@ baseurl=http://rep.logentries.com/$DIST/\$basearch
 $GPG
 EOL
 
-	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
 	$REDHAT_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
