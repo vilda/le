@@ -106,6 +106,11 @@ NET_DEVICES = [ '  eth', ' wlan', 'venet', ' veth']
 
 EPOCH = 5 # in seconds
 
+# File Handler Positions
+FILE_BEGIN = 0
+FILE_CURRENT = 1
+FILE_END = 2
+
 # Config response parameters
 CONF_RESPONSE = 'response'
 CONF_REASON = 'reason'
@@ -1213,6 +1218,23 @@ class Follower(object):
 		except os.error:
 			return None
 
+	def open_posix_log( self, real_name):
+		""" Opens a logfile on *NIX systems."""
+		try:
+			f = open( real_name)
+		except IOError:
+			f = None
+		return f
+
+	def open_windows_log( self, real_name):
+		""" Opens a logfile on Windows NT systems."""
+		try:
+			f = win32file.CreateFile( real_name, win32con.GENERIC_READ, win32con.FILE_SHARE_DELETE |
+					win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_READ, None, win32con.OPEN_EXISTING, 0, None)
+		except pywintypes.error:
+			f = None
+		return f
+
 	def open_log( self):
 		"""Keeps trying to re-open the log file. Returns when the file
 		has been opened or when requested to remove."""
@@ -1223,11 +1245,14 @@ class Follower(object):
 			candidate = self.file_candidate()
 
 			if candidate:
-				try:
-					self.real_name = candidate
-					self.file = open( self.real_name)
+				self.real_name = candidate
+				if os.name != "posix":
+					self.file = self.open_windows_log( self.real_name)
+				else:	
+					self.file = self.open_posix_log( self.real_name)
+
+				if self.file is not None:
 					break
-				except IOError: pass
 
 			if error_info:
 				log.info( "Cannot open file '%s', re-trying in %ss intervals"%(self.name, REOPEN_INT))
@@ -1241,29 +1266,53 @@ class Follower(object):
 		candidate = self.file_candidate()
 		if not candidate: return False
 
-		try:
-			# This is tricky routine we found during our work on
-			# Windows machines which we would like to support. Here
-			# we need to detect whether the open log file is the
-			# same as file_adept. This is easy in Linux, but not in
-			# Windows. What we do now is to compare ctime (creation
-			# in Windows and change in Unix) and detect whether
-			# those are the same. This works relialibly for log
-			# renaming.
-			ctime1 = os.fstat( self.file.fileno()).st_mtime
-			ctime_new = os.path.getmtime( candidate)
-			ctime2 = os.fstat( self.file.fileno()).st_mtime
+		# win32file.GetFileTime returns [create, access, write]
+		# It also requires an open HANDLE so we create a temporary
+		# one for checking the candidate modify time
+		if os.name != "posix":
+			try:
+				ctime1 = int(win32file.GetFileTime( self.file)[2])
+				temp = win32file.CreateFile( candidate, win32con.GENERIC_READ, win32con.FILE_SHARE_DELETE |
+					win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_READ, None, win32con.OPEN_EXISTING, 0, None)
+				ctime_new = int(win32file.GetFileTime( temp)[2])
+				win32file.CloseHandle(temp)
+				ctime2 = int(win32file.GetFileTime( self.file)[2])
+			except pywintypes.error: pass
+		else:
+			try:
+				ctime1 = os.fstat( self.file.fileno()).st_mtime
+				ctime_new = os.path.getmtime( candidate)
+				ctime2 = os.fstat( self.file.fileno()).st_mtime
+			except os.error: pass
 
-			if ctime1 == ctime2 and ctime1 != ctime_new:
-				# We have a name change according to the time
-				return True
-		except os.error: pass
+		if ctime1 == ctime2 and ctime1 != ctime_new:
+			# We have a name change according to the time
+			return True
+
 		return False
 
 	def read_log_line(self):
 		""" Reads a line from the log. Checks maximal line size. """
+		if os.name != "posix":
+			buffLen, buff = win32file.ReadFile( self.file, MAX_EVENTS)
+		else:
+			buff = self.file.read( MAX_EVENTS)
+		return buff
 
-		return self.file.read( MAX_EVENTS)
+	def set_file_position( self, offset, start=FILE_BEGIN):
+		""" Move the position of posix or Windows NT filepointers."""
+		if os.name != "posix":
+			win32file.SetFilePointer( self.file, offset, start)
+		else:
+			self.file.seek( offset, start)
+
+	def get_file_position( self):
+		""" Returns the position of posix or Windows NT filepointers."""
+		if os.name != "posix":
+			pos = win32file.SetFilePointer( self.file, 0, FILE_CURRENT)
+		else:
+			pos = self.file.tell()
+		return pos
 
 	def get_events( self):
 		""" Returns a block of newly detected events from the log.
@@ -1271,7 +1320,7 @@ class Follower(object):
 
 		# Moves at the end of the log file
 		if self.flush:
-			self.file.seek( 0, 2)
+			self.set_file_position( 0, FILE_END)
 			self.flush = False
 
 		# TODO: investigate select-like approach?
@@ -1295,17 +1344,17 @@ class Follower(object):
 					iaa_cnt = 0
 				else:
 					# Recover from external file modification
-					position = self.file.tell()
-					self.file.seek( 0, 2)
-					file_size = self.file.tell()
+					position = self.get_file_position()
+					self.set_file_position( 0, FILE_END)
+					file_size = self.get_file_position()
 					if file_size < position:
 						# File has been externaly modified
 						position = file_size
-					self.file.seek( position)
+					self.set_file_position( position)
 				idle_cnt = 0
 			else:
 				# To reset end-of-line error
-				self.file.seek( self.file.tell())
+				self.set_file_position( self.get_file_position())
 			iaa_cnt += 1
 
 		# Send IAA packet if required
@@ -1820,7 +1869,9 @@ if os.name != "posix":
 	import win32con
 	import winerror
 	import traceback
+	import pywintypes
 	import win32api
+	import win32file
 	import win32serviceutil
 	import win32service
 	import win32evtlog		
