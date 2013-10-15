@@ -1266,26 +1266,29 @@ class Follower(object):
 		candidate = self.file_candidate()
 		if not candidate: return False
 
-		try:
-			# win32file.GetFileTime returns [create, access, write]
-			# It also requires an open HANDLE so we create a temporary
-			# one for checking the candidate modify time
-			if os.name != "posix":
+		# win32file.GetFileTime returns [create, access, write]
+		# It also requires an open HANDLE so we create a temporary
+		# one for checking the candidate modify time
+		if os.name != "posix":
+			try:
 				ctime1 = int(win32file.GetFileTime( self.file)[2])
 				temp = win32file.CreateFile( candidate, win32con.GENERIC_READ, win32con.FILE_SHARE_DELETE |
 					win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_READ, None, win32con.OPEN_EXISTING, 0, None)
 				ctime_new = int(win32file.GetFileTime( temp)[2])
 				win32file.CloseHandle(temp)
 				ctime2 = int(win32file.GetFileTime( self.file)[2])
-			else:
+			except pywintypes.error: pass
+		else:
+			try:
 				ctime1 = os.fstat( self.file.fileno()).st_mtime
 				ctime_new = os.path.getmtime( candidate)
 				ctime2 = os.fstat( self.file.fileno()).st_mtime
+			except os.error: pass
 
-			if ctime1 == ctime2 and ctime1 != ctime_new:
-				# We have a name change according to the time
-				return True
-		except os.error: pass
+		if ctime1 == ctime2 and ctime1 != ctime_new:
+			# We have a name change according to the time
+			return True
+
 		return False
 
 	def read_log_line(self):
