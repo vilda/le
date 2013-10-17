@@ -109,7 +109,7 @@ baseurl=http://rep.logentries.com/rh/\$basearch
 gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
 EOL
 
-	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$REDHAT_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
@@ -185,7 +185,7 @@ elif [ -f /etc/debian_version ]; then
 	$KEY_CMD_COMPLETE
 	$KEY_CMD_CLEAN
 
-	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$DEBIAN_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
@@ -238,7 +238,7 @@ baseurl=http://rep.logentries.com/$DIST/\$basearch
 $GPG
 EOL
 
-	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$REDHAT_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
@@ -322,7 +322,7 @@ if [ $FOUND == "1" ]; then
 	printf "For a full list of commands, run 'le --help' in the terminal.\n\n"
 	printf "********************************\n\n"
 
-	read -p "Would you like to some default log entries, Tags & Graphs to be created for your Syslog log?..(y) or (n): "
+	read -p "Would you like to have some default log entries, Tags & Graphs to be created for your Syslog log?..(y) or (n): "
 	printf "\n"
 	if [[ $REPLY =~ ^[Yy]$ ]];then
 

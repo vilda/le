@@ -6,14 +6,14 @@ import urllib
 import urllib2
 import json
 
-TAG_NAMES=["Kernel - Process Terminated", "Kernel - Process Killed", "Kernel - Process Started", "Kernel - Process Stopped", "User Logged In", "Invalid User Login attempt", "POSSIBLE BREAK-IN ATTEMPT", "Error"]
+TAG_NAMES=["Sample Event:Kernel - Process Terminated", "Sample Event:Kernel - Process Killed", "Sample Event:Kernel - Process Started", "Sample Event:Kernel - Process Stopped", "Sample Event:User Logged In", "Sample Event:Invalid User Login attempt", "Sample Event:POSSIBLE BREAK-IN ATTEMPT", "Sample Event:Error"]
 TAG_PATTERNS=["/terminated with status 100/", "/Killed process/", "/\/proc\/kmsg started/", "/Kernel logging (proc) stopped/", "/Accepted publickey for/", "/Invalid user/", "/POSSIBLE BREAK-IN ATTEMPT/", "/probe of rtc_cmos failed/"]
 EVENT_COLOR=["ff0000", "ff9933", "009900", "663333", "66ff66", "333333", "000099", "0099ff"]
 TAG_ID=[]
 USER_KEY=""
 LOG_KEY=""
-# Standard boilerplate to call the main() function to begin                                                                                               
-# the program.                                                                                                                                            
+# Standard boilerplate to call the main() function to begin
+# the program.
 
 
 
@@ -32,14 +32,14 @@ def createEvent():
 				'desc':TAG_NAMES[idx],
 				'color':EVENT_COLOR[idx],
 				'vtype':'bar'
-				
+
 			})
 			response = urllib2.urlopen("http://api.logentries.com", params)
 			response_dict = json.loads(response.read())
 			print response_dict['tag_id']
 			TAG_ID.append(response_dict['tag_id'])
-	createTag()	
-	
+	createTag()
+
 
 def accountEventsAlreadyExist():
 	params = urllib.urlencode ({
@@ -64,12 +64,12 @@ def createTag():
 		params = urllib.urlencode({
 			'request':'set_tagfilter',
 			'user_key':USER_KEY,
-			'log_key': LOG_KEY,		
+			'log_key': LOG_KEY,
 			'name': TAG_NAMES[idx],
 			'pattern': TAG_PATTERNS[idx],
 			'tags': TAG_ID[idx],
 			'tagfilter_key':''
-			
+
 		})
 		response = urllib.urlopen("http://api.logentries.com", params)
 		print "Creating tag " + TAG_NAMES[idx]
