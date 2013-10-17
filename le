@@ -1695,7 +1695,7 @@ class Config:
 		Exits with error message if the user key is not defined.
 		"""
 		if self.user_key == NOT_SET:
-			log.info( "Account key is required. Enter your login credentials or specify the account key with --account-key parameter.")
+			log.info( "Account key is required. Enter your Logentries login credentials or specify the account key with --account-key parameter.")
 			self.user_key = retrieve_account_key()
 			config.save()
 
