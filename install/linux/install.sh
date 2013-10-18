@@ -340,77 +340,64 @@ if [ $FOUND == "1" ]; then
 		echo "Seeding data, this can take up to 15 seconds"
 		if hash logger 2>/dev/null; then
 
-			i=1
-			while [ $i -le 2 ]
-			do
+			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."
+			$LOGGER_CMD "mongodb main process (127x) terminated with status 100)"
+			$LOGGER_CMD "Out of Memory: Killed process 2592 (oracle)"
+			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "kernel: imklog 5.8.6, log source = /proc/kmsg started."
 
-				$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."
-				$LOGGER_CMD "mongodb main process (127x) terminated with status 100)"
-				$LOGGER_CMD "Out of Memory: Killed process 2592 (oracle)"
-				$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "kernel: imklog 5.8.6, log source = /proc/kmsg started."
+			$LOGGER_CMD "kernel: Kernel logging (proc) stopped."
+			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x "
+			$LOGGER_CMD "sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x"
+			$LOGGER_CMD "sshd[562x]: Invalid user root from 5x.x.x.5x"
+			$LOGGER_CMD "sshd[562x]: Invalid user admin from 5x.x.x.5x"
+			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
+			$LOGGER_CMD "sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2"
+			$LOGGER_CMD "kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38"
 
-				$LOGGER_CMD "kernel: Kernel logging (proc) stopped."
-				$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x "
-				$LOGGER_CMD "sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x"
-				$LOGGER_CMD "sshd[562x]: Invalid user root from 5x.x.x.5x"
-				$LOGGER_CMD "sshd[562x]: Invalid user admin from 5x.x.x.5x"
-				$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-				$LOGGER_CMD "sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2"
-				$LOGGER_CMD "kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38"
-
-				sleep 0.1
-				i=$(( $i + 1 ))
-			done
 		else
-			i=1
-			while [ $i -le 2 ]
-			do
 
-				echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."  >> /var/log/syslog
-				echo "Logentries Test Event: mongodb main process (127x) terminated with status 100)" >> /var/log/syslog
-				echo "Logentries Test Event: Out of Memory: Killed process 2592 (oracle)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: kernel: imklog 5.8.6, log source = /proc/kmsg started." >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."  >> /var/log/syslog
+			echo "Logentries Test Event: mongodb main process (127x) terminated with status 100)" >> /var/log/syslog
+			echo "Logentries Test Event: Out of Memory: Killed process 2592 (oracle)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: kernel: imklog 5.8.6, log source = /proc/kmsg started." >> /var/log/syslog
+	
+			echo "Logentries Test Event: kernel: Kernel logging (proc) stopped." >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x " >> /var/log/syslog
+			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x" >> /var/log/syslog
+			echo "Logentries Test Event: sshd[562x]: Invalid user root from 5x.x.x.5x" >> /var/log/syslog
+			echo "Logentries Test Event: sshd[562x]: Invalid user admin from 5x.x.x.5x" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts -le -report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
+			echo "Logentries Test Event: sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2" >> /var/log/syslog
+			echo "Logentries Test Event: kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38" >> /var/log/syslog
 
-				echo "Logentries Test Event: kernel: Kernel logging (proc) stopped." >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x " >> /var/log/syslog
-				echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x" >> /var/log/syslog
-				echo "Logentries Test Event: sshd[562x]: Invalid user root from 5x.x.x.5x" >> /var/log/syslog
-				echo "Logentries Test Event: sshd[562x]: Invalid user admin from 5x.x.x.5x" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts -le -report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-				echo "Logentries Test Event: sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2" >> /var/log/syslog
-				echo "Logentries Test Event: kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38" >> /var/log/syslog
-
-				sleep 0.1
-				i=$(( $i + 1 ))
-			done
 		fi
 
 		printf "Creating Graphs.\n\n"
@@ -419,7 +406,7 @@ if [ $FOUND == "1" ]; then
 		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
 		printf "\n"
 		printf "Finished creating default data.\n\n"
-		printf "\n Setup complete. Please view your monitor to see your logs.\n\n"
+		printf "\n Setup complete. Please view your monitor, you will be redirected to your logs in less then 30 seconds.\n\n"
 	else
 		printf "\n Setup complete. Please view your monitor, you will be redirected to your logs in less then 30 seconds.\n\n"
 
