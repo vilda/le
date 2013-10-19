@@ -6,7 +6,7 @@ import urllib
 import urllib2
 import json
 
-TAG_NAMES=["Sample Event:Kernel - Process Terminated", "Sample Event:Kernel - Process Killed", "Sample Event:Kernel - Process Started", "Sample Event:Kernel - Process Stopped", "Sample Event:User Logged In", "Sample Event:Invalid User Login attempt", "Sample Event:POSSIBLE BREAK-IN ATTEMPT", "Sample Event:Error"]
+TAG_NAMES=["Kernel - Process Terminated", "Kernel - Process Killed", "Event:Kernel - Process Started", "Event:Kernel - Process Stopped", "Event:User Logged In", "Event:Invalid User Login attempt", "Event:POSSIBLE BREAK-IN ATTEMPT", "Event:Error"]
 TAG_PATTERNS=["/terminated with status 100/", "/Killed process/", "/\/proc\/kmsg started/", "/Kernel logging (proc) stopped/", "/Accepted publickey for/", "/Invalid user/", "/POSSIBLE BREAK-IN ATTEMPT/", "/probe of rtc_cmos failed/"]
 EVENT_COLOR=["ff0000", "ff9933", "009900", "663333", "66ff66", "333333", "000099", "0099ff"]
 TAG_ID=[]
