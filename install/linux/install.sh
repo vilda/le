@@ -185,7 +185,7 @@ elif [ -f /etc/debian_version ]; then
 	$KEY_CMD_COMPLETE
 	$KEY_CMD_CLEAN
 
-	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$DEBIAN_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
@@ -238,7 +238,7 @@ baseurl=http://rep.logentries.com/$DIST/\$basearch
 $GPG
 EOL
 
-	printf "Updating packages...(This may take a few minutes if you have alot of updates)\n"
+	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$REDHAT_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
@@ -334,7 +334,6 @@ if [ $FOUND == "1" ]; then
 
 		printf "Creating Events & Tags \n"
 		$CURL -O "https://raw.github.com/logentries/le/master/install/linux/seeding.py"
-		chmod +x seeding.py
 		TAG_ID=$(python seeding.py createEvent $USER_KEY $LOG_KEY)
 
 		echo "Seeding data, this can take up to 15 seconds"
@@ -381,7 +380,7 @@ if [ $FOUND == "1" ]; then
 			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
 			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
 			echo "Logentries Test Event: kernel: imklog 5.8.6, log source = /proc/kmsg started." >> /var/log/syslog
-	
+
 			echo "Logentries Test Event: kernel: Kernel logging (proc) stopped." >> /var/log/syslog
 			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
 			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog

@@ -1,6 +1,3 @@
-import json
-#!/usr/bin/env python
-
 import sys
 import urllib
 import urllib2
@@ -80,4 +77,3 @@ if __name__ == '__main__':
     	USER_KEY=sys.argv[2]
     	LOG_KEY=sys.argv[3]
     	createEvent()
-
