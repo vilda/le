@@ -84,11 +84,13 @@ declare -a LOGS_TO_FOLLOW=(
 /var/log/faillog);
 
 if [ -f /etc/le/config ]; then
-	printf "******WARNING******\n"
+	printf "\n***** WARNING *****\n"
 	printf "It looks like you already have the Logentries agent registered on this machine\n"
-	read -p "Are you sure you want to wipe your existing settings and continue with the installation? (y) or (n): "
+	read -p "Are you sure you want to clear your existing settings and continue with the installation? (y) or (n): "
 	if [[ $REPLY =~ ^[Yy]$ ]]; then
 		$CONFIG_DELETE_CMD
+		echo ""
+		printf "OK\n"
 	else
 		echo ""
 		printf "Exiting install script\n"
@@ -96,7 +98,16 @@ if [ -f /etc/le/config ]; then
 	fi
 fi
 
-printf "*****Beginning Logentries Installation*****\n"
+printf "\n"
+
+# Check if curl is installed, if not, mark it for installation
+if hash curl 2>/dev/null;then
+	INSTALL_CURL=0
+else
+	INSTALL_CURL=1
+fi
+
+printf "***** Step 1 of 4 - Beginning Logentries Installation *****\n"
 
 if [ -f /etc/issue ] && grep "Amazon Linux AMI" /etc/issue -q; then
 	# Amazon Linux AMI
@@ -124,23 +135,26 @@ EOL
 		exit 1
 	fi
 
-	# Check if curl is installed, if not install it
-	if  hash curl 2>/dev/null;then
-       echo "curl already installed"
-	else
-	    REDHAT_CURL_INSTALL
+	# Check if curl is marked for install
+	if [ $INSTALL_CURL == "1" ]; then
+		$REDHAT_CURL_INSTALL
 	fi
+
+
+	echo "\n"
+	printf "***** Step 2 of 4 - Login *****\n"
 
 	# Prompt the user for their Logentries credentials and register the agent
 	if [[ -z "$LE_ACCOUNT_KEY" ]];then
 		$REGISTER_CMD
 	else
+		printf "Account Key found, registering automatically...\n"
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
 
 
 	printf "Installing logentries daemon package...\n"
-	$REDHAT_DAEMON_INSTALL
+	$REDHAT_DAEMON_INSTALL >/tmp/logentriesDebug 2>&1
 
 	FOUND=1
 
@@ -182,39 +196,41 @@ elif [ -f /etc/debian_version ]; then
 	fi
 
 	$KEY_CMD_EXPORT >/tmp/le.key
-	$KEY_CMD_COMPLETE
+	$KEY_CMD_COMPLETE >/tmp/logentriesDebug 2>&1
 	$KEY_CMD_CLEAN
 
 	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
 	$DEBIAN_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
-	$DEBIAN_AGENT_INSTALL
+	$DEBIAN_AGENT_INSTALL >/tmp/logentriesDebug 2>&1
 	# Try and install the python-setproctitle package on certain distro's
 	$DEBIAN_PROCTITLE_INSTALL >/tmp/logentriesDebug 2>&1
 
 	# Check if agent executable exists before trying to register
 	if [ ! -f /usr/bin/le ];then
-		echo $AGENT_NO_FOUND
+		echo $AGENT_NOT_FOUND
 		exit 1
 	fi
 
-	# Check if curl is installed, if not install it
-	if  hash curl 2>/dev/null;then
-       echo "curl already installed"
-	else
-	    DEBIAN_CURL_INSTALL
+	# Check if curl is marked for install
+	if [ $INSTALL_CURL == "1" ]; then
+		$DEBIAN_CURL_INSTALL
 	fi
+
+	printf "\n\n"
+	printf "***** Step 2 of 4 - Login *****\n"
 
 	# Prompt the user for their Logentries credentials and register the agent
 	if [[ -z "$LE_ACCOUNT_KEY" ]];then
 		$REGISTER_CMD
 	else
+		printf "Account Key found, registering automatically...\n"
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
 
 	printf "Installing logentries daemon package...\n"
-	$DEBIAN_DAEMON_INSTALL
+	$DEBIAN_DAEMON_INSTALL >/tmp/logentriesDebug 2>&1
 
 	FOUND=1
 
@@ -252,77 +268,71 @@ EOL
 		echo $AGENT_NOT_FOUND
 	fi
 
+	echo "\n"
+	printf "***** Step 2 of 4 - Login *****\n"
+
 	# Prompt the user for their Logentries credentials and register the agent
 	if [[ -z "$LE_ACCOUNT_KEY" ]];then
 		$REGISTER_CMD
 	else
+		printf "Account Key found, registering automatically...\n"
 		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
 	fi
 
 	printf "Installing logentries daemon package...\n"
-	$REDHAT_DAEMON_INSTALL
+	$REDHAT_DAEMON_INSTALL >/tmp/logentriesDebug 2>&1
 
 	FOUND=1
 fi
 
 if [ $FOUND == "1" ]; then
+	printf "Logentries Install Complete\n\n"
+
 	if [ -f /var/log/syslog ]; then
 		$FOLLOW_CMD /var/log/syslog >/tmp/logentriesDebug 2>&1
+		printf "The Logentries agent is now monitoring /var/log/syslog\n"
 	fi
 
-	printf "**** Install Complete! ****\n\n"
-	printf "The Logentries agent is now monitoring /var/log/syslog by default\n"
-	printf "This install script can also monitor the following files by default..\n"
+	printf "\n\n"
+
+	printf "***** Step 3 of 4 - Additional Logs *****\n"
+
+	FILES_FOUND=0
 
 	for x in "${LOGS_TO_FOLLOW[@]}"
 	do
-		echo $x
-	done
-	read -p "Would you like to monitor these also, you can choose certain logs?..(y) or (n): "
-	printf "\n"
-	if [[ $REPLY =~ ^[Yy]$ ]];then
-		for j in "${LOGS_TO_FOLLOW[@]}"
-		do
-			if [ -f $j ]; then
-				read -p "Would you like to follow $j ?..(y) or (n): "
-				if [[ $REPLY =~ ^[Yy]$ ]]; then
-					$FOLLOW_CMD $j >/tmp/LogentriesDebug 2>&1
-					printf "Will monitor $j\n"
-				fi
-			fi
-		done
-		$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
-	fi
-	echo ""
-	CUSTOM_LOOP=0
-	while [ $CUSTOM_LOOP -lt 1 ]
-	do
-		read -p "Would you like to monitor another log by entering the filepath?..(y) or (n): "
-		if [[ $REPLY =~ ^[Yy]$ ]];then
-			read -p "Enter the full filepath for the log: "
-			if [ ! -f $REPLY ];then
-				printf "The filepath: $REPLY does not exist\n"
-				continue
-			fi
-			$FOLLOW_CMD $REPLY >/tmp/logentriesDebug 2>&1
-			printf "Will monitor: $REPLY\n"
-		else
-			CUSTOM_LOOP=1
-			printf "\n"
+		if [ -f $x ]; then
+			let FILES_FOUND=FILES_FOUND+1
 		fi
 	done
 
+	printf "$FILES_FOUND additional logs found.\n"
+	read -p "Would you like to monitor all of these too? (n) allows you to choose individual logs...(y) or (n): "
+	printf "\n\n"
+	if [[ $REPLY =~ ^[Yy]$ ]];then
+		printf "Monitoring all logs\n"
+		for j in "${LOGS_TO_FOLLOW[@]}"
+		do
+			$FOLLOW_CMD $j >/tmp/LogentriesDebug 2>&1
+			printf "."
+		done
+		printf "\n"
+	else	
+		for j in "${LOGS_TO_FOLLOW[@]}"
+		do
+			if [ -f $j ]; then
+				read -p "Would you like to monitor $j ?..(y) or (n): "
+				if [[ $REPLY =~ ^[Yy]$ ]]; then
+					$FOLLOW_CMD $j >/tmp/LogentriesDebug 2>&1
+				fi
+			fi
+		done
+	fi
 	$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
+	printf "\n\n"
 
-	sleep 1
-
-	printf "If you would like to monitor more files, simply run this command as root, 'le follow filepath', e.g. 'le follow /var/log/auth.log'\n\n"
-	printf "And be sure to restart the agent service for new files to take effect, you can do this with 'sudo service logentries restart'\n"
-	printf "On some older systems, the command is: sudo /etc/init.d/logentries restart\n\n"
-	printf "For a full list of commands, run 'le --help' in the terminal.\n\n"
-	printf "********************************\n\n"
-
-	read -p "Would you like to have some default log entries, Tags & Graphs to be created for your Syslog log?..(y) or (n): "
+	printf "***** Step 4 of 4 - Sample Data *****\n"
+	read -p "Would you like us to seed some default log entries, Tags & Graphs in your Syslog log?..(y) or (n): "
 	printf "\n"
 	if [[ $REPLY =~ ^[Yy]$ ]];then
 
@@ -400,15 +410,17 @@ if [ $FOUND == "1" ]; then
 		fi
 
 		printf "Creating Graphs.\n\n"
-		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
-		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
-		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API
+		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API >/tmp/logentriesDebug 2>&1
+		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API >/tmp/logentriesDebug 2>&1
+		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API >/tmp/logentriesDebug 2>&1
 		printf "\n"
 		printf "Finished creating default data.\n\n"
-		printf "\n Setup complete. Please view your monitor, you will be redirected to your logs in less then 30 seconds.\n\n"
+		printf "***** Install Complete! *****\n"
+		printf "Please note that it may take a few moments for the log data to show in your account.\n\n"
+		printf "This will be automatically detected within 60 seconds.\n"
 	else
-		printf "\n Setup complete. Please view your monitor, you will be redirected to your logs in less then 30 seconds.\n\n"
-
+		printf "***** Install Complete! *****\n"
+		printf "Please note that it may take a few moments for the log data to show in your account.\n\n"
 	fi
 
 
