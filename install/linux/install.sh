@@ -89,7 +89,6 @@ if [ -f /etc/le/config ]; then
 	read -p "Are you sure you want to clear your existing settings and continue with the installation? (y) or (n): "
 	if [[ $REPLY =~ ^[Yy]$ ]]; then
 		$CONFIG_DELETE_CMD
-		echo ""
 		printf "OK\n"
 	else
 		echo ""
