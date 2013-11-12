@@ -37,7 +37,6 @@ DEBIAN_DAEMON_INSTALL="apt-get install logentries-daemon -qq -y"
 DEBIAN_CURL_INSTALL="apt-get install curl -y"
 
 REDHAT_REPO_CONF="/etc/yum.repos.d/logentries.repo"
-REDHAT_UPDATE="yum update -y"
 REDHAT_AGENT_INSTALL="yum install logentries -q -y"
 REDHAT_PROCTITLE_INSTALL="yum install python-setproctitle -q -y"
 REDHAT_DAEMON_INSTALL="yum install logentries-daemon -q -y"
@@ -118,9 +117,6 @@ metadata_expire=1d
 baseurl=http://rep.logentries.com/rh/\$basearch
 gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
 EOL
-
-	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
-	$REDHAT_UPDATE >/tmp/logentriesDebug 2>&1
 
 	printf "Installing logentries package...\n"
 	$REDHAT_AGENT_INSTALL >/tmp/logentriesDebug 2>&1
