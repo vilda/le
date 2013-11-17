@@ -30,7 +30,7 @@ KEY_CMD_COMPLETE="apt-key add /tmp/le.key"
 KEY_CMD_CLEAN="rm /tmp/le.key"
 
 DEBIAN_REPO_CONF="/etc/apt/sources.list.d/logentries.list"
-DEBIAN_UPDATE="apt-get update -y"
+DEBIAN_UPDATE="apt-get update"
 DEBIAN_AGENT_INSTALL="apt-get install logentries -qq -y"
 DEBIAN_PROCTITLE_INSTALL="apt-get install python-setproctitle -qq -y"
 DEBIAN_DAEMON_INSTALL="apt-get install logentries-daemon -qq -y"
