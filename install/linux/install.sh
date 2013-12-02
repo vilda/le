@@ -249,9 +249,6 @@ baseurl=http://rep.logentries.com/$DIST/\$basearch
 $GPG
 EOL
 
-	printf "Updating packages...(This may take a few minutes if you have a lot of updates)\n"
-	$REDHAT_UPDATE >/tmp/logentriesDebug 2>&1
-
 	printf "Installing logentries package...\n"
 	$REDHAT_AGENT_INSTALL >/tmp/logentriesDebug 2>&1
 
