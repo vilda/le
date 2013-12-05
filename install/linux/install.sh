@@ -136,7 +136,7 @@ EOL
 	fi
 
 
-	echo "\n"
+	echo ""
 	printf "***** Step 2 of 4 - Login *****\n"
 
 	# Prompt the user for their Logentries credentials and register the agent
@@ -329,6 +329,10 @@ if [ $FOUND == "1" ]; then
 	if [[ $REPLY =~ ^[Yy]$ ]];then
 
 		printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds\n\n"
+		if [ ! -f /etc/le/config ];then
+			printf "Logentries config not found, unable to continue with seeding data.\n"
+			exit 0
+		fi
 		USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
 		USER_KEY=${USER_KEY_LINE#*= }
 		LE_COMMAND=$(le ls /hosts/`python -c "import socket; print socket.getfqdn().split('.')[0]"`/syslog | grep key)

@@ -1,7 +1,15 @@
 import sys
 import urllib
 import urllib2
-import json
+
+try:
+	import json
+except ImportError:
+	try:
+		import simplejson
+	except ImportError:
+		print "Please install json or simplejson python module"
+		sys.exit(0)
 
 TAG_NAMES=["Kernel - Process Terminated", "Kernel - Process Killed", "Kernel - Process Started", "Kernel - Process Stopped", "User Logged In", "Invalid User Login attempt", "POSSIBLE BREAK-IN ATTEMPT", "Error"]
 TAG_PATTERNS=["/terminated with status 100/", "/Killed process/", "/\/proc\/kmsg started/", "/Kernel logging (proc) stopped/", "/Accepted publickey for/", "/Invalid user/", "/POSSIBLE BREAK-IN ATTEMPT/", "/probe of rtc_cmos failed/"]
@@ -11,8 +19,6 @@ USER_KEY=""
 LOG_KEY=""
 # Standard boilerplate to call the main() function to begin
 # the program.
-
-
 
 def createEvent():
 	print "checkTags"
@@ -56,6 +62,7 @@ def accountEventsAlreadyExist():
 	else:
 		return True
 
+
 def createTag():
 	for idx, val in enumerate(TAG_ID):
 		params = urllib.urlencode({
@@ -70,6 +77,8 @@ def createTag():
 		})
 		response = urllib.urlopen("http://api.logentries.com", params)
 		print "Creating tag " + TAG_NAMES[idx]
+
+
 if __name__ == '__main__':
     # Map command line arguments to function arguments.
 
