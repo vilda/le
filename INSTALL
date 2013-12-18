@@ -152,3 +152,20 @@ exit
 
 # You will need to install python packages separately
 
+CentOS 6
+--------
+su -
+tee /etc/yum.repos.d/logentries.repo <<EOF
+[logentries]
+name=Logentries repo
+enabled=1
+metadata_expire=1d
+gpgcheck=0
+baseurl=http://rep.logentries.com/centos\$releasever/\$basearch
+EOF
+yum update
+yum install logentries
+exit
+
+# You will need to install python packages separately
+
