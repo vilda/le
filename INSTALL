@@ -97,8 +97,8 @@ aptitude update
 aptitude install logentries
 exit
 
-Fedora 14, 15
--------------
+Fedora 14-19
+------------
 su -
 tee /etc/yum.repos.d/logentries.repo <<EOF
 [logentries]
@@ -108,6 +108,14 @@ metadata_expire=1d
 baseurl=http://rep.logentries.com/fedora\$releasever/\$basearch
 gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
 EOF
+yum update
+yum install logentries
+exit
+
+Fedora 20
+---------
+su -
+yum-config-manager --add-repo http://rep.logentries.com/helpers/fedora20/logentries.repo
 yum update
 yum install logentries
 exit
