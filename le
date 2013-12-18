@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.15"
+VERSION = "1.2.16"
 
 NOT_SET = None
 
@@ -442,8 +442,6 @@ except ImportError:
 	try: x = httplib.HTTPSConnection
 	except AttributeError:
 		die( 'NOTE: Please install Python "ssl" module.')
-
-	log.warning( '\nWarning: Not verifying cetrificates since the "ssl" module is not present. Install "ssl" module or newer Python (>=2.6) to avoid this message.')
 
 	def wrap_socket( sock, ca_certs=None, cert_reqs=None):
 		return socket.ssl( sock)
