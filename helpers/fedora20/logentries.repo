@@ -1,0 +1,6 @@
+[logentries]
+name=Logentries repo
+enabled=1
+metadata_expire=3d
+baseurl=http://rep.logentries.com/fedora\$releasever/\$basearch
+gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
