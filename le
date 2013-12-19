@@ -375,6 +375,7 @@ import os.path
 import platform
 import socket
 import subprocess
+import traceback
 import sys
 import threading
 import time
@@ -410,6 +411,9 @@ def die(cause, exit_code=EXIT_ERR):
 	log.critical( cause)
 	sys.exit( exit_code)
 
+def debug_filters(msg, *args):
+	if config.debug_filters:
+		print >>sys.stderr, msg%args
 
 #
 # Imports that may not be available
@@ -1549,6 +1553,8 @@ class Config:
 		self.debug = False
 		# All recognized events are logged
 		self.debug_events = False
+		# All filtering actions are logged
+		self.debug_filters = False
 		# Adapter connects to locahost
 		self.debug_local = False
 		# Do not collect statistics
@@ -1780,7 +1786,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl force-api-host=".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-filters debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl force-api-host=".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err))
 		for name, value in optlist:
@@ -1825,6 +1831,8 @@ class Config:
 				self.debug = True
 			elif name == "--debug-events":
 				self.debug_events = True
+			elif name == "--debug-filters":
+				self.debug_filters = True
 			elif name == "--local":
 				self.debug_local = True
 			elif name == "--debug-stats":
@@ -1866,7 +1874,6 @@ if os.name != "posix":
 	import win32event
 	import win32con
 	import winerror
-	import traceback
 	import pywintypes
 	import win32api
 	import win32file
@@ -2580,8 +2587,12 @@ def load_logs():
 			import filters
 			available_filters = getattr( filters, 'filters', {})
 			filter_filenames = getattr( filters, 'filter_filenames', default_filter_filenames)
-		except ImportError:
-			log.error( 'Cannot import event filters from %s', config.filters)
+
+			debug_filters( "Available filters: %s", available_filters)
+			debug_filters( "Filter filenames: %s", filter_filenames)
+		except:
+			log.error( 'Cannot import event filter module %s: %s', config.filters, sys.exc_info()[1])
+			log.error( 'Details: %s', traceback.print_exc(sys.exc_info()))
 
 	# Start followers
 	for l in logs:
@@ -2590,17 +2601,26 @@ def load_logs():
 			log_filename = l['filename']
 			log_key = l['key']
 
+			debug_filters( "Log name=%s key=%s filename=%s", log_name, log_key, log_filename)
+
 			# Check filters
 			if not filter_filenames( log_filename):
+				debug_filters( " Log blocked by filter_filenames, not following")
 				log.info( 'Not following %s, blocked by filter_filenames', log_name)
 				continue
+			debug_filters( " Looking for filters by name and key")
 			event_filter = available_filters.get( log_name)
 			if not event_filter:
+				debug_filters( " No filter found by name, checking key")
 				event_filter = available_filters.get( log_key)
 			if event_filter and not hasattr( event_filter, '__call__'):
+				debug_filters( " Filter found, but ignored because it's not a function")
 				event_filter = None
 			if not event_filter:
 				event_filter = filter_events
+				debug_filters( " No filter found")
+			else:
+				debug_filters( " Using filter %s", event_filter)
 
 			# Instantiate the follower
 			if 'logtype' in l and l['logtype'] == WINEVENT_LOGTYPE: # UUID of type windowseventlogs
