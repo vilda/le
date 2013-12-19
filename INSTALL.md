@@ -10,95 +10,115 @@ Just works as a standa-alone application.
 
 Debian 5.0 Lenny
 ----------------
+```
 su -
 echo 'deb http://rep.logentries.com/ lenny main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
+```
 
 
 Debian 6.0 Squeeze
 ------------------
+```
 su -
 echo 'deb http://rep.logentries.com/ squeeze main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
+```
 
 
 Debian 7.0 Wheezy
 ------------------
+```
 su -
 echo 'deb http://rep.logentries.com/ wheezy main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
+```
 
 
 Debian 8.0 Jessie/SID
 ---------------------
+```
 su -
 echo 'deb http://rep.logentries.com/ jessie main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
+```
 
 
 Ubuntu 9.10 Karmic Koala
 ------------------------
+```
 sudo -sH
 echo 'deb http://rep.logentries.com/ karmic main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
+```
 
 
 Ubuntu 10.10 Maverick Meerkat
 -----------------------------
+```
 sudo -sH
 echo 'deb http://rep.logentries.com/ maverick main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 apt-get update
 apt-get install logentries
 exit
+```
 
 
 Ubuntu 11.10 Oneiric Ocelot
 -----------------------------
+```
 sudo -sH
 echo 'deb http://rep.logentries.com/ oneiric main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 apt-get update
 apt-get install logentries
 exit
+```
 
 
 Ubuntu 13.04 Raring Ringtail
 -----------------------------
+```
 sudo -sH
 echo 'deb http://rep.logentries.com/ raring main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 apt-get update
 apt-get install logentries
 exit
+```
 
 
 Ubuntu 13.10 Saucy Salamander
 -----------------------------
+```
 sudo -sH
 echo 'deb http://rep.logentries.com/ saucy main' >/etc/apt/sources.list.d/logentries.list
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
+```
+
 
 Fedora 14-19
 ------------
+```
 su -
 tee /etc/yum.repos.d/logentries.repo <<EOF
 [logentries]
@@ -111,17 +131,23 @@ EOF
 yum update
 yum install logentries
 exit
+```
+
 
 Fedora 20
 ---------
+```
 su -
 yum-config-manager --add-repo http://rep.logentries.com/helpers/fedora20/logentries.repo
 yum update
 yum install logentries
 exit
+```
+
 
 Amazon Linux AMI
 -------------
+```
 su -
 tee /etc/yum.repos.d/logentries.repo <<EOF
 [logentries]
@@ -134,9 +160,12 @@ EOF
 yum update
 yum install logentries
 exit
+```
+
 
 CentOS 5
 --------
+```
 su -
 tee /etc/yum.repos.d/logentries.repo <<EOF
 [logentries]
@@ -149,11 +178,12 @@ EOF
 yum update
 yum install logentries
 exit
+```
 
-# You will need to install python packages separately
 
 CentOS 6
 --------
+```
 su -
 tee /etc/yum.repos.d/logentries.repo <<EOF
 [logentries]
@@ -166,6 +196,8 @@ EOF
 yum update
 yum install logentries
 exit
+```
 
-# You will need to install python packages separately
+
+### You will need to install python packages separately
 

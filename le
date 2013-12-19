@@ -2393,6 +2393,21 @@ def no_more_args( args):
 		die( "No more than one argument is expected.")
 
 
+def _startup_info():
+    """
+    Prints correct startup information based on OS
+    """
+    if 'darwin' in sys.platform:
+        log.info('  sudo launchctl unload /Library/LaunchDaemons/com.logentries.agent.plist')
+        log.info('  sudo launchctl load /Library/LaunchDaemons/com.logentries.agent.plist')
+    elif 'linux' in sys.platform:
+        log.info('  sudo /etc/init.d/logentries restart')
+    elif 'sunos' in sys.platform:
+        log.info('  sudo svcadm disable logentries')
+        log.info('  sudo svcadm enable logentries')
+    else:
+        log.info('')
+
 
 def request_follow( filename, name, type_opt):
 	"""
@@ -2409,6 +2424,7 @@ def request_follow( filename, name, type_opt):
 	api_request( request, True, True)
 	log.info( "Will follow %s as %s"%(filename, name))
 	log.info( "Don't forget to restart the daemon")
+	_startup_info()
 
 
 def request_hosts( logs=False):
@@ -2714,7 +2730,7 @@ def follow_given_win_event( event_name ):
 
 	# Check that we don't follow that event log already
 	if not config.force and is_followed( event_name):
-		die( 'Already following %s Event Log'%event_name)
+		die( 'Already following %s Event Log'%event_name, EXIT_OK)
   
 	request_follow( event_name, event_name, type_opt)
 
