@@ -173,8 +173,8 @@ Where parameters are:
 WINDOWS_USAGE="""
 Windows specific commands:
   windowsevents     follow the Application, System and Security win event logs 
-  windowsevents <eventlog>  follow the windows event log specified 
-  installwinservice	installs the agent as a windows service 
+  windowsevents <eventlog>  follow the windows event log specified
+  installwinservice	installs the agent as a windows service
 	--no-defaults   do not follow standard windows logs automatically
   monitorwinservice	starts monitoring as a windows service
 """
@@ -2760,6 +2760,9 @@ def cmd_follow( args):
 	if len(args) == 0:
 		die( "Error: Specify the file name of the log to follow.")
 	if len(args) != 1:
+		print >>sys.stderr, "You've specified more than one file to follow which is not allowed. A common mistake is to specify a wildcard (*) in file name, but forgot to disable shell expansion. To avoid shell expansion, enclose the file name in quotes, i.e.:"
+		print >>sys.stderr, "le follow '/some/path/file*'"
+
 		die( "Error: Too many arguments.")
 	config.load()
 	config.agent_key_required()
