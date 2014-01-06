@@ -1,0 +1,6 @@
+[logentries]
+name=Logentries repository
+enabled=1
+metadata_expire=3d
+baseurl=http://rep.logentries.com/sle11/noarch
+gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
