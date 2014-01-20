@@ -42,11 +42,16 @@ REDHAT_PROCTITLE_INSTALL="yum install python-setproctitle -q -y"
 REDHAT_DAEMON_INSTALL="yum install logentries-daemon -q -y"
 REDHAT_CURL_INSTALL="yum install curl curl-devel -y"
 
+GENTOO_PORTAGE="/usr/portage/local"
+GENTOO_OVERLAY="app-admin/le"
+GENTOO_REPO="http://rep.logentries.com/gentoo/portage/app-admin/le"
+GENTOO_AGENT_INSTALL="emerge ${GENTOO_OVERLAY}"
+
 CONFIG_DELETE_CMD="rm /etc/le/config"
 REGISTER_CMD="le register"
 FOLLOW_CMD="le follow"
 LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
-DAEMON_RESTART_CMD="service logentries restart"
+DAEMON_RESTART_CMD="if which service &>/dev/null ; then service logentries restart ; else /etc/init.d/logentries restart ; fi"
 FOUND=0
 AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
 SET_ACCOUNT_KEY="--account-key="
@@ -60,6 +65,8 @@ CONTENT_HEADER="\"Content-Type: application/json\""
 HEADER="-H"
 DATA="--data"
 API="api.logentries.com"
+
+WGET="wget --quiet -r -np -nd"
 
 declare -a LOGS_TO_FOLLOW=(
 /var/log/syslog
@@ -279,6 +286,41 @@ EOL
 	$REDHAT_DAEMON_INSTALL >/tmp/logentriesDebug 2>&1
 
 	FOUND=1
+
+elif [ -f /etc/gentoo-release ] ; then
+
+        if [ -d ${GENTOO_PORTAGE} ] ; then
+            rm -fr ${GENTOO_PORTAGE}
+        fi
+        mkdir -p ${GENTOO_PORTAGE}/profiles ${GENTOO_PORTAGE}/${GENTOO_OVERLAY}
+
+        echo 'le' > ${GENTOO_PORTAGE}/profiles/repo_name
+        $WGET -A "*.ebuild","Manifest","logentries" -P ${GENTOO_PORTAGE}/${GENTOO_OVERLAY} ${GENTOO_REPO}
+
+        if [ -z "`grep \"${GENTOO_PORTAGE}\" /etc/make.conf`" ] ; then
+            echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} ${GENTOO_PORTAGE}\"" >> /etc/make.conf
+        fi
+
+	printf "Installing logentries package...\n"
+	$GENTOO_AGENT_INSTALL &> /tmp/logentriesDebug
+
+	# Check that agent executable exists before trying to register
+	if [ ! -f /usr/bin/le ] ; then
+		echo $AGENT_NOT_FOUND
+	fi
+
+	echo "\n"
+	printf "***** Step 2 of 4 - Login *****\n"
+
+	# Prompt the user for their Logentries credentials and register the agent
+	if [[ -z "$LE_ACCOUNT_KEY" ]];then
+		$REGISTER_CMD
+	else
+		printf "Account Key found, registering automatically...\n"
+		$REGISTER_CMD $SET_ACCOUNT_KEY$LE_ACCOUNT_KEY
+	fi
+
+	FOUND=1
 fi
 
 if [ $FOUND == "1" ]; then
@@ -326,7 +368,7 @@ if [ $FOUND == "1" ]; then
 			fi
 		done
 	fi
-	$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
+	eval $DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
 	printf "\n\n"
 
 	printf "***** Step 4 of 4 - Sample Data *****\n"
