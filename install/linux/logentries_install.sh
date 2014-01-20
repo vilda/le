@@ -62,9 +62,11 @@ DATA="--data"
 API="api.logentries.com"
 
 declare -a LOGS_TO_FOLLOW=(
-/var/log/messages
-/var/log/dmesg
+/var/log/syslog
 /var/log/auth.log
+/var/log/messages
+/var/log/secure
+/var/log/dmesg
 /var/log/boot.log
 /var/log/daemon.log
 /var/log/dkpg.log
@@ -78,9 +80,10 @@ declare -a LOGS_TO_FOLLOW=(
 /var/log/cups
 /var/log/anaconda.log
 /var/log/cron
-/var/log/secure
 /var/log/wtmp
 /var/log/faillog);
+
+SYSLOG=messages
 
 if [ -f /etc/le/config ]; then
 	printf "\n***** WARNING *****\n"
@@ -228,6 +231,7 @@ elif [ -f /etc/debian_version ]; then
 	$DEBIAN_DAEMON_INSTALL >/tmp/logentriesDebug 2>&1
 
 	FOUND=1
+        SYSLOG=syslog
 
 elif [ -f /etc/redhat-release ]; then
 	# CentOS 6  /  RHEL 6 / Fedora / Amazon Linux AMI
@@ -280,9 +284,11 @@ fi
 if [ $FOUND == "1" ]; then
 	printf "Logentries Install Complete\n\n"
 
-	if [ -f /var/log/syslog ]; then
-		$FOLLOW_CMD /var/log/syslog >/tmp/logentriesDebug 2>&1
-		printf "The Logentries agent is now monitoring /var/log/syslog\n"
+        logfile=/var/log/${SYSLOG}
+
+	if [ -f $logfile ]; then
+		$FOLLOW_CMD $logfile >/tmp/logentriesDebug 2>&1
+		printf "The Logentries agent is now monitoring $logfile\n"
 	fi
 
 	printf "\n\n"
@@ -324,7 +330,7 @@ if [ $FOUND == "1" ]; then
 	printf "\n\n"
 
 	printf "***** Step 4 of 4 - Sample Data *****\n"
-	read -p "Would you like us to seed some default log entries, Tags & Graphs in your Syslog log?..(y) or (n): "
+	read -p "Would you like us to seed some default log entries, Tags & Graphs in your ${SYSLOG} log?..(y) or (n): "
 	printf "\n"
 	if [[ $REPLY =~ ^[Yy]$ ]];then
 
@@ -335,7 +341,7 @@ if [ $FOUND == "1" ]; then
 		fi
 		USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
 		USER_KEY=${USER_KEY_LINE#*= }
-		LE_COMMAND=$(le ls /hosts/`python -c "import socket; print socket.getfqdn().split('.')[0]"`/syslog | grep key)
+		LE_COMMAND=$(le ls /hosts/`python -c "import socket; print socket.getfqdn().split('.')[0]"`/${SYSLOG} | grep key)
 		LOG_KEY=${LE_COMMAND#key = }
 
 		printf "Creating Events & Tags \n"
@@ -374,34 +380,33 @@ if [ $FOUND == "1" ]; then
 			$LOGGER_CMD "kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38"
 
 		else
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."  >> $logfile
+			echo "Logentries Test Event: mongodb main process (127x) terminated with status 100)" >> $logfile
+			echo "Logentries Test Event: Out of Memory: Killed process 2592 (oracle)" >> $logfile
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: kernel: imklog 5.8.6, log source = /proc/kmsg started." >> $logfile
 
-			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."  >> /var/log/syslog
-			echo "Logentries Test Event: mongodb main process (127x) terminated with status 100)" >> /var/log/syslog
-			echo "Logentries Test Event: Out of Memory: Killed process 2592 (oracle)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: kernel: imklog 5.8.6, log source = /proc/kmsg started." >> /var/log/syslog
-
-			echo "Logentries Test Event: kernel: Kernel logging (proc) stopped." >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x " >> /var/log/syslog
-			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x" >> /var/log/syslog
-			echo "Logentries Test Event: sshd[562x]: Invalid user root from 5x.x.x.5x" >> /var/log/syslog
-			echo "Logentries Test Event: sshd[562x]: Invalid user admin from 5x.x.x.5x" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts -le -report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> /var/log/syslog
-			echo "Logentries Test Event: sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2" >> /var/log/syslog
-			echo "Logentries Test Event: kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38" >> /var/log/syslog
+			echo "Logentries Test Event: kernel: Kernel logging (proc) stopped." >> $logfile
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x " >> $logfile
+			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x" >> $logfile
+			echo "Logentries Test Event: sshd[562x]: Invalid user root from 5x.x.x.5x" >> $logfile
+			echo "Logentries Test Event: sshd[562x]: Invalid user admin from 5x.x.x.5x" >> $logfile
+			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts -le -report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
+			echo "Logentries Test Event: sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2" >> $logfile
+			echo "Logentries Test Event: kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38" >> $logfile
 
 		fi
 
