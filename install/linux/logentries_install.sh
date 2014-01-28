@@ -298,9 +298,12 @@ elif [ -f /etc/gentoo-release ] ; then
         echo 'le' > ${GENTOO_PORTAGE}/profiles/repo_name
         $WGET -A "*.ebuild","Manifest","logentries" -P ${GENTOO_PORTAGE}/${GENTOO_OVERLAY} ${GENTOO_REPO}
 
-        if [ -z "`grep \"${GENTOO_PORTAGE}\" /etc/make.conf`" ] ; then
-            echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} ${GENTOO_PORTAGE}\"" >> /etc/make.conf
-        fi
+        for makeconf in /etc/portage/make.conf /etc/make.conf ; do
+            if [ -f $makeconf ] && [ -z "`grep \"${GENTOO_PORTAGE}\" $makeconf`" ] ; then
+                echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} ${GENTOO_PORTAGE}\"" >> $makeconf
+                break
+            fi
+        done
 
 	printf "Installing logentries package...\n"
 	$GENTOO_AGENT_INSTALL &> $LOGFILE
