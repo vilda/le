@@ -19,7 +19,7 @@ VERSION="1.0.6"
 if [ "$(id -u)" != "0" ]
 then
 	echo "Please run this install script as root."
-	echo "Usage: sudo bash install.sh"
+	echo "Usage: sudo bash logentries_install.sh"
 	exit 1
 fi
 
