@@ -32,6 +32,7 @@ AGENT_KEY_PARAM = 'agent-key'
 FILTERS_PARAM = 'filters'
 EC2EU_PARAM = 'ec2eu'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
+FORCE_DOMAIN_PARAM = 'force_domain'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
@@ -1570,9 +1571,11 @@ class Config:
 		# Display list of logs in the system
 		self.debug_loglist = False
 		# Force host for api
-		self.force_api_host = None
+		self.force_api_host = NOT_SET
 		# Force host for data
-		self.force_data_host = None
+		self.force_data_host = NOT_SET
+		# Force host for this domain
+		self.force_domain = NOT_SET
 
 	def get_config_dir(self):
 		"""
@@ -1631,6 +1634,7 @@ class Config:
 				FILTERS_PARAM: '',
 				EC2EU_PARAM: '',
 				SUPPRESS_SSL_PARAM: '',
+				FORCE_DOMAIN_PARAM: '',
 			})
 			conf.read( self.config_filename)
 
@@ -1653,6 +1657,9 @@ class Config:
 			new_suppress_ssl = conf.get( MAIN_SECT, SUPPRESS_SSL_PARAM)
 			if new_suppress_ssl == 'True':
 				self.suppress_ssl = new_suppress_ssl
+			new_force_domain = conf.get( MAIN_SECT, FORCE_DOMAIN_PARAM)
+			if new_force_domain != '':
+				self.force_domain = new_force_domain
 		except ConfigParser.NoSectionError:
 			return False
 		except ConfigParser.NoOptionError:
@@ -1679,6 +1686,8 @@ class Config:
 				conf.set( MAIN_SECT, EC2EU_PARAM, 'True')
 			if self.suppress_ssl:
 				conf.set( MAIN_SECT, SUPPRESS_SSL_PARAM, 'True')
+			if self.force_domain:
+				conf.set( MAIN_SECT, FORCE_DOMAIN_PARAM, self.force_domain)
 			conf.write( conf_file)
 		except IOError, e:
 			die( "Error: IO error when writing to config file: %s"%e)
@@ -1857,8 +1866,11 @@ class Config:
                                 if value and value != '': self.force_api_host = value
 			elif name == "--force-data-host":
                                 if value and value != '': self.force_data_host = value
+			elif name == "--force-domain":
+				if value and value != '': self.force_domain = value
 		if self.debug_local and self.force_api_host: die( "Do not specify --local and --force-api-host at the same time.")
 		if self.debug_local and self.force_data_host: die( "Do not specify --local and --force-data-host at the same time.")
+		if self.debug_local and self.force_domain: die( "Do not specify --local and --force-domain at the same time.")
 		return args
 
 
@@ -2138,7 +2150,9 @@ def make_https_connection( s):
 
 def data_connect():
 	# Choose server address
-	if config.force_data_host:
+	if config.force_domain:
+		s = config.force_domain
+	elif config.force_data_host:
 		s = config.force_data_host
 	elif config.ec2eu:
 		# If on EC2 EU, use shorter path
