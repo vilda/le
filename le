@@ -1658,7 +1658,7 @@ class Config:
 			if new_suppress_ssl == 'True':
 				self.suppress_ssl = new_suppress_ssl
 			new_force_domain = conf.get( MAIN_SECT, FORCE_DOMAIN_PARAM)
-			if new_force_domain != '':
+			if new_force_domain:
 				self.force_domain = new_force_domain
 		except ConfigParser.NoSectionError:
 			return False
