@@ -2182,7 +2182,9 @@ def domain_connect(api=True):
 	# Find the correct server address
 	s = LE_SERVER
 	if api:
-		if config.force_api_host:
+		if config.force_domain:
+			s = config.force_domain
+		elif config.force_api_host:
 			s = config.force_api_host
 		elif config.ec2eu:
 			# If on EC2 EU, use shorter path
