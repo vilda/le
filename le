@@ -1795,7 +1795,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-filters debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl force-api-host=".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-filters debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl force-api-host= force-domain=".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err))
 		for name, value in optlist:
