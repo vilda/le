@@ -340,7 +340,7 @@ if [ $FOUND == "1" ]; then
 
 		printf "Creating Events & Tags \n"
 		$CURL -O "https://raw.github.com/logentries/le/master/install/linux/seeding.py"
-		TAG_ID=$(python seeding.py createEvent $USER_KEY $LOG_KEY)
+		TAG_ID=$(python2 seeding.py createEvent $USER_KEY $LOG_KEY)
 
 		echo "Seeding data, this can take up to 15 seconds"
 		if hash logger 2>/dev/null; then
