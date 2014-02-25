@@ -32,6 +32,7 @@ AGENT_KEY_PARAM = 'agent-key'
 FILTERS_PARAM = 'filters'
 EC2EU_PARAM = 'ec2eu'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
+USE_CA_PROVIDED_PARAM = 'use_ca_provided'
 FORCE_DOMAIN_PARAM = 'force_domain'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
@@ -385,6 +386,40 @@ aRD3DbO8Ju484JkJys/tGMUGoIFkCWJarpOMHtzugL1tcZgl4hgr1xwRCcvPFVRh
 Eet80bJiZVnSSJGEOoNuZZF6giJ1j6PLjgeV0lxcKp87UPmwxLbnvxiC9RfAzZ4/
 7sB0n9p48LYGYZz97ijMYbHvkBStr5TTfeYLGeLUX6/MonzR/RmQSKyBk1ORlUiV
 QMNIRq0Dr3JB0/WjwGgVr3iQ
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIF4TCCA8mgAwIBAgIJAMuLUWygLQmXMA0GCSqGSIb3DQEBCwUAMIGGMQswCQYD
+VQQGEwJJRTEQMA4GA1UECAwHSXJlbGFuZDEPMA0GA1UEBwwGRHVibGluMRgwFgYD
+VQQKDA9KbGl6YXJkIExpbWl0ZWQxEzARBgNVBAMMCkxvZ2VudHJpZXMxJTAjBgkq
+hkiG9w0BCQEWFnN1cHBvcnRAbG9nZW50cmllcy5jb20wHhcNMTQwMjI0MjA1MzQ2
+WhcNMTkwMjIzMjA1MzQ2WjCBhjELMAkGA1UEBhMCSUUxEDAOBgNVBAgMB0lyZWxh
+bmQxDzANBgNVBAcMBkR1YmxpbjEYMBYGA1UECgwPSmxpemFyZCBMaW1pdGVkMRMw
+EQYDVQQDDApMb2dlbnRyaWVzMSUwIwYJKoZIhvcNAQkBFhZzdXBwb3J0QGxvZ2Vu
+dHJpZXMuY29tMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAymhjhWPh
+gz7tuk5Jj+ohRfjUMNoUKCvTPVCl5LPon7seXmt+FC0Cyf68VoGY8m5fuahWseKr
+uyw7Bk7Q18vFBvsGp38q7NvQYlcQ2pCj7Ln6AvSlYvoweS4pz1C9C479ODNj9U2I
+RcqNxfZX2alxZGsoGg0u/KS3RbXFZzyMGPSXbugzMAYFyoIJM1U1iGhrjj8yAGes
+pP1BeDwrK9qHOv2Uy3yF8UtNKRm+hYE0E+yv0+s8vQLYnHaaZFwt1hulo0CGDjpJ
+vZtmR5U0qRjdFE6RZJsetfPNYeUYYeyG8qwEKMK86K3Jj8J9MR4l21Q+rIzK7JMm
+4P3Rh/L4klWEKm48WhfAhlv43CSpt/6HWhBq3B400effQzudl2O6VfC1OIlKWQ3x
+jmAKZToIlIVeF7X/5z04Azhy2SVpQ1DNVGShlKIiyTIA04ny3udMdDr0InvmXHtn
+rQexpaw5uFYno2tmOSJiElx5c7fMQtOmXO6qd/s9TFsNH8hwJ9g+Vgof11gTOo6o
+MEEgzeVfMOPd5JOtPXOD+S9X0Vt0dUlCD4xbjpwH1kJ5hfTcLtmANDOAIjF+P9pY
+ajDLE9phYM9qydyRaTawyOS7GA7XaW/WPZzgbSZ3T9KNJIUU1c1OZd3JD4BsDOBD
+ZTRxHxanHeg2pAAmiNX1rIBwz5O8Zm13rT8CAwEAAaNQME4wHQYDVR0OBBYEFDk6
+qPSf6apMD0hAGrYutT+wdnqhMB8GA1UdIwQYMBaAFDk6qPSf6apMD0hAGrYutT+w
+dnqhMAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQELBQADggIBADQg6tx70qwG74dj
+af9QDXKHhGvp8SoGMNvioQGREhrAXb0JTFiEQAECJghiP8OH4PIOjsN/ON4YI+WW
+ZPdGlcPkUgFQ/bdB7eEyKtGa7hDfH1PLL1FqVhZjoLC6poCJJVo/Q9J2dlkGaksK
+/R6+QV4SYnzfPH4cKQoN4Q/F0VuzelonSVTk9BG72RsY1fQPrm6tA/sN5Nzl+a4W
+d1UnK4KXajQH1Qsnv8VTXyBc+8wM3C12m/lsqc2npgIqU/xlQQXgDBR087+A/dX3
+osXMzZfGhh6D/NyCKs7VuAsb7hRTPP/6WMgM3c9lSc05xZyXzEZ7FL4GYg3Gjsdg
+PFQMkgfMyiECBPudVzU2RyWuXdId+i0ezl1mBSrowa+eNCx2pI5Er7OAjvEQOAlC
+v50jvvwSU9dT39XkGNh+q5uxaFLxyr6WidT09xHi17RZhgcMzWkiShRRqum/rOfL
+TUPMGFvOjLiMiRZvHYhB3XjPqO5z3DEWT6Ux8IUN0aqNWCSLV2DOc/2riflxtExc
+V1XUj6wWPCNqNPvdXeuQl/yqOZM5ekBlPCpPyxztba8SrJZKVWRXJl3RxuKPuWIE
+XI7Mr8xQHVr1HLt/SU+by7Y7im6nyZUfOzTNMkic0RXgI0fqztetDpfLedN8Xlwn
+/1NE/L7egzmDtcwoSQYUTu8g5rI4
 -----END CERTIFICATE-----
 """
 authority_certificate_files = [
@@ -1585,6 +1620,7 @@ class Config:
 		self.force = False
 		self.ec2eu = False
 		self.suppress_ssl = False
+		self.use_ca_provided = False
 
 		# Debug options
 
@@ -1673,6 +1709,7 @@ class Config:
 				EC2EU_PARAM: '',
 				SUPPRESS_SSL_PARAM: '',
 				FORCE_DOMAIN_PARAM: '',
+				USE_CA_PROVIDED_PARAM: '',
 			})
 			conf.read( self.config_filename)
 
@@ -1695,6 +1732,9 @@ class Config:
 			new_suppress_ssl = conf.get( MAIN_SECT, SUPPRESS_SSL_PARAM)
 			if new_suppress_ssl == 'True':
 				self.suppress_ssl = new_suppress_ssl
+			new_use_ca_provided = conf.get( MAIN_SECT, USE_CA_PROVIDED_PARAM)
+			if new_use_ca_provided == 'True':
+				self.use_ca_provided = new_use_ca_provided
 			new_force_domain = conf.get( MAIN_SECT, FORCE_DOMAIN_PARAM)
 			if new_force_domain:
 				self.force_domain = new_force_domain
@@ -1724,6 +1764,8 @@ class Config:
 				conf.set( MAIN_SECT, EC2EU_PARAM, 'True')
 			if self.suppress_ssl:
 				conf.set( MAIN_SECT, SUPPRESS_SSL_PARAM, 'True')
+			if self.use_ca_provided:
+				conf.set( MAIN_SECT, USE_CA_PROVIDED_PARAM, 'True')
 			if self.force_domain:
 				conf.set( MAIN_SECT, FORCE_DOMAIN_PARAM, self.force_domain)
 			conf.write( conf_file)
@@ -1833,7 +1875,7 @@ class Config:
 		accordingly.
 		"""
 		try:
-			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-filters debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl force-api-host= force-domain=".split())
+			optlist, args = getopt.gnu_getopt( params, '', "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-filters debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl use-ca-provided force-api-host= force-domain=".split())
 		except getopt.GetoptError, err:
 			die( "Parameter error: " +str( err))
 		for name, value in optlist:
@@ -1906,6 +1948,8 @@ class Config:
                                 if value and value != '': self.force_data_host = value
 			elif name == "--force-domain":
 				if value and value != '': self.force_domain = value
+			elif name == "--use-ca-provided":
+				self.use_ca_provided = True
 		if self.debug_local and self.force_api_host: die( "Do not specify --local and --force-api-host at the same time.")
 		if self.debug_local and self.force_data_host: die( "Do not specify --local and --force-data-host at the same time.")
 		if self.debug_local and self.force_domain: die( "Do not specify --local and --force-domain at the same time.")
@@ -2170,13 +2214,14 @@ def make_https_connection( s):
 	"""
 	Makes HTTPS connection. Tried all available certificates.
 	"""
-	# Try to connect with system certificate
-	try:
-		cert_file = system_cert_file()
-		if cert_file:
-			return ServerHTTPSConnection( s, cert_file)
-	except socket.error:
-		pass
+	if not config.use_ca_provided:
+		# Try to connect with system certificate
+		try:
+			cert_file = system_cert_file()
+			if cert_file:
+				return ServerHTTPSConnection( s, cert_file)
+		except socket.error:
+			pass
 	
 	# Try to connect with our default certificate
 	cert_file = default_cert_file()
