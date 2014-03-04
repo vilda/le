@@ -33,7 +33,7 @@ def createLabel(name, color):
 		'account': USER_KEY,
 		'acl': USER_KEY
 	}
-	req = urllib2.Request('https://logentries.com/api/v2/tags')
+	req = urllib2.Request('https://api.logentries.com/v2/tags')
 	req.add_header('Content-Type','application/json')
 	response = urllib2.urlopen(req, json.dumps(request))
 	response_dict = json.loads(response.read())
@@ -56,7 +56,7 @@ def createTagAction(label_id):
 			'account': USER_KEY,
 			'acl': USER_KEY
 		}
-	req = urllib2.Request('https://logentries.com/api/v2/actions')
+	req = urllib2.Request('https://api.logentries.com/v2/actions')
 	req.add_header('Content-Type', 'application/json')
 	response = urllib2.urlopen(req, json.dumps(request))
 	response_dict = json.loads(response.read())
@@ -86,7 +86,7 @@ def createHook(name, trigger, tagId):
 		'account': USER_KEY,
 		'acl': USER_KEY
 	}
-	req = urllib2.Request('https://logentries.com/api/v2/hooks')
+	req = urllib2.Request('https://api.logentries.com/v2/hooks')
 	req.add_header('Content-Type', 'application/json')
 	response = urllib2.urlopen(req, json.dumps(request))
 	response_dict = json.loads(response.read())
