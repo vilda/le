@@ -8,30 +8,6 @@ Stand-alone
 Just works as a standa-alone application.
 
 
-Debian 5.0 Lenny
-----------------
-```
-su -
-echo 'deb http://rep.logentries.com/ lenny main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
-aptitude update
-aptitude install logentries
-exit
-```
-
-
-Debian 6.0 Squeeze
-------------------
-```
-su -
-echo 'deb http://rep.logentries.com/ squeeze main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
-aptitude update
-aptitude install logentries
-exit
-```
-
-
 Debian 7.0 Wheezy
 ------------------
 ```
@@ -52,30 +28,6 @@ echo 'deb http://rep.logentries.com/ jessie main' >/etc/apt/sources.list.d/logen
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
-exit
-```
-
-
-Ubuntu 9.10 Karmic Koala
-------------------------
-```
-sudo -sH
-echo 'deb http://rep.logentries.com/ karmic main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
-aptitude update
-aptitude install logentries
-exit
-```
-
-
-Ubuntu 10.10 Maverick Meerkat
------------------------------
-```
-sudo -sH
-echo 'deb http://rep.logentries.com/ maverick main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
-apt-get update
-apt-get install logentries
 exit
 ```
 
@@ -112,6 +64,18 @@ echo 'deb http://rep.logentries.com/ saucy main' >/etc/apt/sources.list.d/logent
 gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
+exit
+```
+
+
+Ubuntu 14.04 Trusty Tahr
+------------------------
+```
+sudo -sH
+echo 'deb http://rep.logentries.com/ trusty main' >/etc/apt/sources.list.d/logentries.list
+gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+apt-get update
+apt-get install logentries
 exit
 ```
 
