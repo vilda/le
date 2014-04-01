@@ -11,7 +11,7 @@
 # Constants
 #
 
-VERSION = "1.2.18"
+VERSION = "1.2.19-SNAP"
 
 NOT_SET = None
 
@@ -38,20 +38,27 @@ KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
 
+LOG_LE_AGENT = 'logentries.com'
+
 # Logentries server details
-LE_SERVER = 'logentries.com'
-LE_SERVER_L = 'localhost:8000'
 LE_SERVER_DATA_DOMAIN = 'api.logentries.com'
 LE_SERVER_EC2EU_DATA_DOMAIN = 'ec2eu.api.logentries.com'
-LE_SERVER_LOCAL_DATA_DOMAIN = 'localhost:8081'
-LE_SERVER_API_DOMAIN = 'api.logentries.com'
-LE_SERVER_EC2EU_API_DOMAIN = 'ec2eu.api.logentries.com'
-LE_SERVER_PULL = 'pull.logentries.com'
-LE_SERVER_API_DOMAIN_L = 'localhost:8081'
-LE_SERVER_CONFIG = '/agent/config'
-LE_SERVER_LOGIN = '/login/'
 LE_SERVER_API = '/'
-LE_SERVER_PORT = 443
+
+class Domain:
+	""" Logentries domains. """
+	# General domains
+	MAIN = 'logentries.com'
+	API = 'api.logentries.com'
+	DATA = 'api.logentries.com' # TODO
+	PULL = 'pull.logentries.com'
+	# EC2 EU shortcuts
+	API_EC2EU = 'ec2eu.api.logentries.com'
+	DATA_EC2EU = 'ec2eu.api.logentries.com' # TODO
+	# Local debugging
+	MAIN_LOCAL = 'localhost:8000'
+	API_LOCAL = 'localhost:8081'
+	DATA_LOCAL = 'localhost:8081'
 
 CONTENT_LENGTH = 'content-length'
 
@@ -428,7 +435,7 @@ import atexit
 # Start logging
 #
 
-log = logging.getLogger( LE_SERVER)
+log = logging.getLogger( LOG_LE_AGENT)
 if not log:
 	report( "Cannot open log output")
 	sys.exit( EXIT_ERR)
@@ -1022,7 +1029,7 @@ def retrieve_account_key():
 		password = getpass.getpass()
 
 		try:
-			c = domain_connect( api=False)
+			c = domain_connect( Domain.MAIN)
 			c.request( 'POST', ACCOUNT_KEYS_API,
 				urllib.urlencode( {'username':username,'password':password}),
 				{
@@ -1822,7 +1829,7 @@ class Config:
 		test_resp = ''
 		socket.setdefaulttimeout( 3)
 		try:
-			response = urllib2.urlopen( 'http://%s/'%LE_SERVER_EC2EU_API_DOMAIN)
+			response = urllib2.urlopen( 'http://%s/'%Domain.API_EC2EU)
 			test_resp = response.read( 1024)
 			response.close()
 		except:
@@ -2202,13 +2209,13 @@ def data_connect():
 		s = config.force_data_host
 	elif config.ec2eu:
 		# If on EC2 EU, use shorter path
-		s = LE_SERVER_EC2EU_DATA_DOMAIN
+		s = Domain.DATA_EC2EU
 	else:
-		s = LE_SERVER_DATA_DOMAIN
+		s = Domain.DATA
 
 	# Special case for local debugging
 	if config.debug_local:
-		s = LE_SERVER_LOCAL_DATA_DOMAIN
+		s = Domain.API_LOCAL
 
 	# Connect to server with SSL in untrusted network
 	log.debug( 'Connecting to %s', s)
@@ -2224,26 +2231,28 @@ def data_connect():
 		return httplib.HTTPConnection( s)
 
 
-def domain_connect(api=True):
+def domain_connect(domain):
+	""" Connects to the domain specified.
+	"""
 	# Find the correct server address
-	s = LE_SERVER
-	if api:
+	s = domain
+	if domain == Domain.API:
 		if config.force_domain:
 			s = config.force_domain
 		elif config.force_api_host:
 			s = config.force_api_host
 		elif config.ec2eu:
 			# If on EC2 EU, use shorter path
-			s = LE_SERVER_EC2EU_API_DOMAIN
+			s = Domain.API_EC2EU
 		else:
-			s = LE_SERVER_API_DOMAIN
+			s = Domain.API
 
 	# Special case for local debugging
 	if config.debug_local:
-		if api:
-			s = LE_SERVER_API_DOMAIN_L
+		if domain == Domain.API:
+			s = Domain.API_LOCAL
 		else:
-			s = LE_SERVER_L
+			s = Domain.MAIN_LOCAL
 
 	# Connect to server with SSL in untrusted network
 	log.debug( 'Connecting to %s', s)
@@ -2253,7 +2262,7 @@ def domain_connect(api=True):
 	use_ssl = True
 	if config.debug_local:
 		use_ssl = False
-	elif api:
+	elif domain == Domain.API:
 		use_ssl = not config.suppress_ssl
 
 	# Pass the connection
@@ -2271,14 +2280,14 @@ def do_request( conn, operation, addr, data=None, headers={}):
 		conn.request( operation, addr, headers=headers)
 
 
-def get_response( operation, addr, data=None, headers={}, silent=False, die_on_error=True, api=True):
+def get_response( operation, addr, data=None, headers={}, silent=False, die_on_error=True, domain=Domain.API):
 	"""
 	Returns response from the domain or API server.
 	"""
 	response = None
 	conn = None
 	try:
-		conn = domain_connect( api)
+		conn = domain_connect( domain)
 		do_request( conn, operation, addr, data, headers)
 		response = conn.getresponse()
 		return response, conn
@@ -2304,7 +2313,7 @@ def api_request( request, required=False, check_status=False, silent=False, die_
 	"""
 	# Obtain response
 	response,conn = get_response( "POST", LE_SERVER_API, urllib.urlencode( request),
-			silent=silent, die_on_error=die_on_error, api=True)
+			silent=silent, die_on_error=die_on_error, domain=Domain.API)
 
 	# Check the response
 	if not response:
@@ -2351,7 +2360,7 @@ def pull_request( what, params):
 
 	# Obtain response
 	addr = '/%s/%s/?%s'%(config.user_key,urllib.quote( what),urllib.urlencode( params))
-	response,conn = get_response( "GET", addr)
+	response,conn = get_response( "GET", addr, domain=Domain.PULL)
 
 	# Check the response
 	if not response:
@@ -2463,7 +2472,7 @@ def _startup_info():
         log.info('  sudo launchctl unload /Library/LaunchDaemons/com.logentries.agent.plist')
         log.info('  sudo launchctl load /Library/LaunchDaemons/com.logentries.agent.plist')
     elif 'linux' in sys.platform:
-        log.info('  sudo /etc/init.d/logentries restart')
+        log.info('  sudo service logentries restart')
     elif 'sunos' in sys.platform:
         log.info('  sudo svcadm disable logentries')
         log.info('  sudo svcadm enable logentries')
