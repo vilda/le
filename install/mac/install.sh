@@ -21,7 +21,7 @@ CURL="/usr/bin/env curl -O"
 
 LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
 DAEMON="com.logentries.agent.plist"
-DAEMON_DL_LOC="https://raw.github.com/logentries/le/master/install/mac/$DAEMON"
+DAEMON_DL_LOC="https://raw.githubusercontent.com/logentries/le/master/install/mac/$DAEMON"
 DAEMON_PATH="/Library/LaunchDaemons/"
 
 INSTALL_PATH="/usr/bin/le"
