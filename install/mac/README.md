@@ -7,7 +7,7 @@ Installation
 To install, download `install.sh` and run:
 
 ```shell
-$ curl -O https://raw.github.com/logentries/le/master/install/mac/install.sh
+$ curl -O https://raw.githubusercontent.com/logentries/le/master/install/mac/install.sh
 $ chmod +x install.sh
 $ sudo ./install.sh
 ```
