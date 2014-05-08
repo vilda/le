@@ -15,7 +15,7 @@ if [ "$(id -u)" != "0" ]; then
     exit 1
 fi
 
-LE_LOCATION="https://raw.github.com/logentries/le/master/le"
+LE_LOCATION="https://raw.githubusercontent.com/logentries/le/master/le"
 
 CURL="/usr/bin/env curl -O"
 
