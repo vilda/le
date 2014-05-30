@@ -37,6 +37,7 @@ FORCE_DOMAIN_PARAM = 'force_domain'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
+STAT_FILE = '/var/log/logentries/logentries-system-stats.log'
 
 LOG_LE_AGENT = 'logentries.com'
 
@@ -44,6 +45,7 @@ LOG_LE_AGENT = 'logentries.com'
 LE_SERVER_DATA_DOMAIN = 'api.logentries.com'
 LE_SERVER_EC2EU_DATA_DOMAIN = 'ec2eu.api.logentries.com'
 LE_SERVER_API = '/'
+
 
 class Domain:
 	""" Logentries domains. """
@@ -182,7 +184,7 @@ Where parameters are:
 
 WINDOWS_USAGE="""
 Windows specific commands:
-  windowsevents     follow the Application, System and Security win event logs 
+  windowsevents     follow the Application, System and Security win event logs
   windowsevents <eventlog>  follow the windows event log specified
   installwinservice	installs the agent as a windows service
 	--no-defaults   do not follow standard windows logs automatically
@@ -209,7 +211,7 @@ def print_usage( version_only=False):
 
 		if os.name != "posix":
 			report( WINDOWS_USAGE)
-		
+
 	sys.exit( EXIT_HELP)
 
 
@@ -523,7 +525,7 @@ def default_filter_filenames( filename):
 	""" By default we allow to follow any files specified in the condifuration.
 	"""
 	return True
-	
+
 
 def call( command):
 	"""
@@ -659,7 +661,7 @@ def daemonize():
 	"""
 	Creates a daemon from the current process.
 
-	It uses helper file as a lock and then checks inside critical section 
+	It uses helper file as a lock and then checks inside critical section
 	whether pid file contains pid of a valid process .
 	If not then it daemonizes itself, otherwise it dies.
 	"""
@@ -704,7 +706,7 @@ def collect_log_names( system_info):
 		for name in files:
 			if name[-3:] != '.gz' and re.match( r'.*\.\d+$', name) == None:
 				logs.append( os.path.join(root, name))
-	
+
 	log.debug( "Collected logs: %s"%logs)
 	try:
 		c = httplib.HTTPSConnection( LE_SERVER_API)
@@ -728,7 +730,7 @@ def collect_log_names( system_info):
 		die( 'Error: Invalid response from the server (Parsing error %s)'%msg)
 	except KeyError:
 		die( 'Error: Invalid response from the server, log data not present.')
-	
+
 	return log_data
 
 def lsb_release( system_info):
@@ -743,7 +745,7 @@ def lsb_release( system_info):
 			pass
 		except KeyError:
 			pass
-	
+
 	# Information not found
 	return False
 
@@ -814,7 +816,7 @@ def system_detect( details):
 			['/etc/va-release', 'VA-Linux/RH-VALE'],
 			['/etc/yellowdog-release', 'Yellow Dog'],
 			]
-		
+
 		# Check for known system IDs
 		for release in releases:
 			if release_test( release[0], release[1], system_info):
@@ -987,7 +989,7 @@ def parse_timestamp_range( text):
 	start_group = timestamp_group( parts[0])
 	start = start_group[0]
 	end = start+start_group[1]
-	
+
 	if len(parts) > 1:
 		end_range = timestamp_range( parts[1])
 		if end_range != -1:
@@ -995,7 +997,7 @@ def parse_timestamp_range( text):
 		else:
 			end_group = timestamp_group( parts[1])
 			end = end_group[0]+end_group[1]
-	
+
 	return [start,end]
 
 
@@ -1006,13 +1008,13 @@ def choose_account_key( accounts):
 		die( 'No account is associated with your profile. Log in to Logentries to create a new account.')
 	if len(accounts) == 1:
 		return accounts[0][ 'account_key']
-	
+
 	for i in range(0, len(accounts)):
 		account = accounts[ i]
 		print >>sys.stderr, '[%s] %s %s'%(i, account[ 'account_key'][:8], account[ 'name'])
 
 	while True:
-		try: 
+		try:
 			selection = int( raw_input( 'Pick account you would like to use: '))
 			if selection in range(0, len(accounts)):
 				return accounts[ selection][ 'account_key']
@@ -1078,6 +1080,11 @@ class Stats:
 		self.prev_cpu_stats = [ 0, 0, 0, 0, 0, 0, 0]
 		self.prev_disk_stats = [ 0, 0]
 		self.prev_net_stats = [ 0, 0]
+		self.total={}
+		self.total[ 'dr' ] = 0
+		self.total[ 'dw' ] = 0
+		self.total[ 'ni' ] = 0
+		self.total[ 'no' ] = 0
 
 		if not config.debug_nostats:
 			self.send_stats()
@@ -1145,6 +1152,8 @@ class Stats:
 		self.save_data( data, 'dr', reads -self.prev_disk_stats[0])
 		self.save_data( data, 'dw', writes -self.prev_disk_stats[1])
 		self.prev_disk_stats = [ reads, writes]
+		self.total[ 'dr' ] = reads
+		self.total[ 'dw' ] = writes
 
 	def mem_stats(self,data):
 		"""
@@ -1185,6 +1194,8 @@ class Stats:
 		self.save_data( data, 'ni', receive-self.prev_net_stats[0])
 		self.save_data( data, 'no', transmit-self.prev_net_stats[1])
 		self.prev_net_stats = [receive, transmit]
+		self.total[ 'ni' ] = receive
+		self.total[ 'no' ] = transmit
 
 	def stats(self):
 		"""Collects statistics."""
@@ -1217,6 +1228,7 @@ class Stats:
 		if not self.first:
 			# Send data
 			self.new_request( results)
+			self.write_stats(results);
 		else:
 			self.first = False
 
@@ -1226,6 +1238,25 @@ class Stats:
 			self.timer = threading.Timer( next_step, self.send_stats, ())
 			self.timer.daemon = True
 			self.timer.start()
+
+	def write_stats(self, data):
+		"""
+		Write statistics to file
+		"""
+		total=data['cu']+data['cl']+data['cs']+data['ci']+data['cio']+data['cq']+data['csq']
+		cu=data['cu']*100/total
+		cl=data['cl']*100/total
+		cs=data['cs']*100/total
+		ci=data['ci']*100/total
+		cio=data['cio']*100/total
+		cq=data['cq']*100/total
+		csq=data['csq']*100/total
+		statCpuString = "CPU.user={0}%;CPU.nice={1}%;CPU.system={2}%;CPU.idle={3}%;CPU.wait={4}%;CPU.irq={5}%;CPU.softirq={6}%;".format(cu, cl, cs, ci, cio, cq, csq)
+		statMemString = "Mem.total={0};Mem.active={1};Mem.cached={2};".format(data['mt'], data['ma'], data['mc'])
+		statDiskString = "Disk.write={0};Disk.read={1};".format(self.total['dw'], self.total['dr'])
+		statNetString = "Net.send={0};Net.resv={1}".format(self.total['no'], self.total['ni'])
+		with open(STAT_FILE, 'a') as stat_file:
+			stat_file.write(statCpuString+statMemString+statDiskString+statNetString+'\n')
 
 	def cancel(self):
 		self.to_remove = True
@@ -1244,9 +1275,20 @@ class Follower(object):
 		self.flush = True
 		self.event_filter = event_filter
 		log.info("Following %s"%name)
+		self.send_identifier()
 		monitoring_thread = threading.Thread( target=monitorlogs, name=self.name)
 		monitoring_thread.daemon = True
 		monitoring_thread.start()
+
+	def send_identifier(self):
+		self.open_connection()
+		msgIdentifier = "###{0}### - Agent initialized".format(config.hostname_required())
+		while not shutdown:
+			try:
+				self.conn.send( msgIdentifier)
+				break
+			except socket.error, (err_no, err_str):
+				self.open_connection()
 
 	def file_candidate( self):
 		""" Returns list of file names which corresponds to the
@@ -1294,7 +1336,7 @@ class Follower(object):
 				self.real_name = candidate
 				if os.name != "posix":
 					self.file = self.open_windows_log( self.real_name)
-				else:	
+				else:
 					self.file = self.open_posix_log( self.real_name)
 
 				if self.file is not None:
@@ -1408,7 +1450,7 @@ class Follower(object):
 			return None
 
 		return events
-	
+
 	def open_connection(self):
 		""" Opens a push connection to logentries. """
 		log.debug( "Opening connection %s", self.log_addr)
@@ -1424,7 +1466,7 @@ class Follower(object):
 				break
 			except socket.error:
 				if shutdown: return
-	
+
 	def send_events( self, events):
 		""" Sends a block of new lines. """
 		if events:
@@ -1443,12 +1485,12 @@ class Follower(object):
 		if config.debug_events:
 			print >>sys.stderr, events,
 
-	
+
 class LogFollower(Follower):
 
 	def __init__(self, name, log_key, event_filter):
 		super(LogFollower, self).__init__( name, log_key, self.monitorlogs, event_filter)
-	
+
 	def monitorlogs(self):
 		""" Opens the log file and starts to collect new events. """
 		self.open_connection()
@@ -1461,20 +1503,20 @@ class LogFollower(Follower):
 					log.debug( "IOError: %s", e)
 				self.open_log()
 			self.send_events( events)
-	
 
-# Some of the code is from 
+
+# Some of the code is from
 # http://docs.activestate.com/activepython/2.4/pywin32/Windows_NT_Eventlog.html
 class WinEventFollower(Follower):
 
 	def __init__(self, name, log_key, event_filter):
 		super(WinEventFollower, self).__init__( name, log_key, self.monitorlogs, event_filter)
-		
+
 	def monitorlogs(self):
 		""" Opens the windows event log file and starts to collect new events. """
 		self.open_connection()
 		self.open_windows_event_log()
-	
+
 	def date2sec(self, evt_date):
 		'''
 		This function converts dates with format
@@ -1495,7 +1537,7 @@ class WinEventFollower(Follower):
 	def date2output(self, evt_date):
 		'''
 		This function converts dates with format
-		'12/23/99 15:54:09' to the following linux style format '2011-04-22 10:43:58' 
+		'12/23/99 15:54:09' to the following linux style format '2011-04-22 10:43:58'
 		'''
 		regexp = re.compile( '(.*)\\s(.*)') #store result in site
 		reg_result = regexp.search( evt_date)
@@ -1518,13 +1560,13 @@ class WinEventFollower(Follower):
 			win32con.EVENTLOG_WARNING_TYPE: 'EVENTLOG_WARNING_TYPE',
 			win32con.EVENTLOG_ERROR_TYPE: 'EVENTLOG_ERROR_TYPE'}
 
-		begin_sec = time.time() # get the current time 
-		
-		try:		
+		begin_sec = time.time() # get the current time
+
+		try:
 			while not shutdown:
 				eventdata = ''
 				events = win32evtlog.ReadEventLog( hand, flags, 0)
-				
+
 				while len( events) == 0 and not shutdown:
 					time.sleep( TAIL_RECHECK)
  					events = win32evtlog.ReadEventLog( hand, flags, 0)
@@ -1532,13 +1574,13 @@ class WinEventFollower(Follower):
 				for ev_obj in events:
 
 					the_time = ev_obj.TimeGenerated.Format() #'12/23/99 15:54:09'
-					event_time = self.date2output( the_time) # convert to '2011-04-22 10:43:58' 
+					event_time = self.date2output( the_time) # convert to '2011-04-22 10:43:58'
 					seconds = self.date2sec( the_time)
 
 					# if message was in the log before we started monitoring disregard
 					# only monitor new messages in the log
-				
-					if seconds < begin_sec: break 
+
+					if seconds < begin_sec: break
 
 					evt_id = str(winerror.HRESULT_CODE(ev_obj.EventID))
 					# FIXME not used
@@ -1546,12 +1588,12 @@ class WinEventFollower(Follower):
 					cat = ev_obj.EventCategory
 					record = ev_obj.RecordNumber
 					msg = win32evtlogutil.SafeFormatMessage(ev_obj, self.name)
-	
+
 					msg = msg.replace('\r\n','\r')
 					msg = msg.encode('utf-8')
-					
+
 			 		source = str(ev_obj.SourceName)
-					
+
 					if not ev_obj.EventType in evt_dict.keys():
 						evt_type = "unknown"
 					else:
@@ -1637,7 +1679,7 @@ class Config:
 			# Running as an ordinary user (Windows)
 			try:
 				from win32com.shell import shellcon, shell
-				# use CSIDL_COMMON_APPDATA so that config files are always in the same location 
+				# use CSIDL_COMMON_APPDATA so that config files are always in the same location
 				# whether run as user applicaiton or as a windows service
 				c_dir = shell.SHGetFolderPath(0, shellcon.CSIDL_COMMON_APPDATA, 0, 0)
 				#debug
@@ -1659,7 +1701,7 @@ class Config:
 				log.warning( "Error: %s: %s"%(self.config_filename, e.strerror))
 				return False
 		return True
-		
+
 
 	def basic_setup(self):
 		pass
@@ -1943,7 +1985,7 @@ if os.name != "posix":
 	import win32file
 	import win32serviceutil
 	import win32service
-	import win32evtlog		
+	import win32evtlog
 	import win32evtlogutil
 
 	class Service(win32serviceutil.ServiceFramework):
@@ -1985,7 +2027,7 @@ if os.name != "posix":
 	def instwinservice(cls, name, display_name, stay_alive=True):
 	    '''
 		Install a Service
-		    
+
 		    cls : the class (derived from Service) that implement the Service
 		    name : Service name
 		    display_name : the name displayed in the service manager
@@ -2013,7 +2055,7 @@ if os.name != "posix":
 	    except Exception, x:
 		print str(x)
 
-		
+
 	def stwinservice(cls, name, display_name, stay_alive=True):
 	    '''
 		Start Service
@@ -2105,7 +2147,7 @@ def write_default_cert_file():
 	f = open( cert_filename, 'wb')
 	f.write( authority_certificate)
 	f.close()
-	
+
 
 def default_cert_file():
 	"""
@@ -2192,7 +2234,7 @@ def make_https_connection( s):
 				return ServerHTTPSConnection( s, cert_file)
 		except socket.error:
 			pass
-	
+
 	# Try to connect with our default certificate
 	cert_file = default_cert_file()
 	if not cert_file:
@@ -2303,7 +2345,7 @@ def get_response( operation, addr, data=None, headers={}, silent=False, die_on_e
 			die( error)
 		else:
 			log.info( error)
-		
+
 	return None, None
 
 
@@ -2428,7 +2470,7 @@ def request( request, required=False, check_status=False, rtype='GET', retry=Fal
 	while True:
 		# Obtain response
 		response,conn = get_response( rtype, urllib.quote('/'+config.user_key+'/'+request), die_on_error=not retry)
-		
+
 		# Check the response
 		if response:
 			break
@@ -2658,7 +2700,7 @@ def load_logs():
 		resp = request( 'hosts/%s/'%config.agent_key, False, False, retry=True)
 		if resp['response'] != 'ok':
 			if not noticed:
-				log.error( 'Error retrieving list of logs: %s, retrying in %ss intervals'%(resp['reason'],SRV_RECON_TIMEOUT)) 
+				log.error( 'Error retrieving list of logs: %s, retrying in %ss intervals'%(resp['reason'],SRV_RECON_TIMEOUT))
 				noticed = True
 			time.sleep( SRV_RECON_TIMEOUT)
 			continue
@@ -2796,13 +2838,13 @@ def follow_given_win_event( event_name ):
 	"""
 	config.load()
 	config.agent_key_required()
-	
+
 	type_opt = "windowseventlogs"
 
 	# Check that we don't follow that event log already
 	if not config.force and is_followed( event_name):
 		die( 'Already following %s Event Log'%event_name, EXIT_OK)
-  
+
 	request_follow( event_name, event_name, type_opt)
 
 
@@ -2810,7 +2852,7 @@ def cmd_install_win_service( args):
 	"""
 	Installs a windows service
 	"""
-	
+
 	config.load()
 
 	if len(args) != 0:
@@ -2845,7 +2887,7 @@ def cmd_follow( args):
 	type_opt = config.type_opt
 	if type_opt == NOT_SET:
 		type_opt = ""
-	
+
 	# Check that we don't follow that file already
 	if not config.force and is_followed( filename):
 		die( 'Already following %s'%filename, EXIT_OK)
@@ -2870,7 +2912,7 @@ def cmd_followed( args):
 	config.agent_key_required()
 
 	filename = os.path.abspath( args[0])
-	
+
 	# Check that we don't follow that file already
 	if is_followed( filename):
 		print 'Following %s'%filename
@@ -2975,7 +3017,7 @@ def list_object( request, hostnames=False):
 		pass
 	else:
 		die( 'Unknown object type "%s". Agent too old?'%t)
-	
+
 	# Standard list, print it sorted
 	ilist = request['list']
 	ilist = sorted( ilist, key=lambda item: item[index_name])
@@ -3234,7 +3276,7 @@ def cmd_ls( args):
 	# Make sure we are not downloading log
 	if is_log_fs( addr):
 		die( 'Use pull to get log content.')
-	
+
 	#if addr.count('/') > 2:
 	#	die( 'Path not found')
 	list_object( request( addr, True, True), hostnames=addr.startswith('hostnames'))
@@ -3285,7 +3327,7 @@ def cmd_pull( args):
 	if len(args) > 3:
 		try: params['limit'] = int( args[ 3])
 		except ValueError: die( 'Error: Limit must be integer')
-	
+
 	pull_request( addr, params)
 
 
@@ -3311,7 +3353,7 @@ def cmd_push( args):
 	params = {}
 	if len(args) > 2:
 		params['logtype'] = args[ 2]
-	
+
 	try:
 		data_size = os.path.getsize( filename)
 		logfile = open( filename, "r")
@@ -3325,7 +3367,7 @@ def cmd_push( args):
 #
 # Main method
 #
-	
+
 def main():
 	# Read command line parameters
 	args = config.process_params( sys.argv[1:])
