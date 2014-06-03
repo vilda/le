@@ -1263,6 +1263,7 @@ class Stats:
 		if self.timer:
 			self.timer.cancel()
 
+
 class Follower(object):
 	""" The follower keeps an eye on the file specified and sends new
 	events to the logentries infrastructure.  """
@@ -1282,7 +1283,7 @@ class Follower(object):
 
 	def send_identifier(self):
 		self.open_connection()
-		msgIdentifier = "###{0}### - Agent initialized".format(config.hostname_required())
+		msgIdentifier = "###LA01### - Agent initialized"
 		while not shutdown:
 			try:
 				self.conn.send( msgIdentifier)
