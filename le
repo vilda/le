@@ -778,6 +778,11 @@ def system_detect( details):
 		pass
 	elif sys == "AIX":
 		system_info[ 'distver'] = call( "oslevel -r")
+	elif sys == "Darwin":
+		system_info[ 'distname'] = call( "sw_vers -productName")
+		system_info[ 'distver'] = call( "sw_vers -productVersion")
+		system_info[ 'kernel'] = uname[2]
+		
 	elif sys == "Linux":
 		system_info[ 'kernel'] = uname[2]
 		# XXX CentOS?
@@ -1086,6 +1091,19 @@ class Stats:
 		self.total[ 'ni' ] = 0
 		self.total[ 'no' ] = 0
 
+		self.procfilesystem = True
+		if not os.path.exists( CPUSTATS_FILE):
+		    # store system type for later reference in pulling stats
+		    # in an alternate manner
+		    self.procfilesystem = False
+		    self.uname = platform.uname()
+		    self.sys = self.uname[0]
+		    log.debug( 'sys: %s'%(self.sys))
+
+		# for scaling in osx_top_stats -- key is a scale factor (gig,
+		# meg, etc), value is what to multiply by to get to kilobytes
+		self.scale2kb = { 'M': 1024, 'G': 1048576 }
+
 		if not config.debug_nostats:
 			self.send_stats()
 
@@ -1197,13 +1215,184 @@ class Stats:
 		self.total[ 'ni' ] = receive
 		self.total[ 'no' ] = transmit
 
+	def osx_top_stats(self, data):
+	    """
+		Darwin/OS-X doesn't seem to provide nearly the same amount of
+		detail as the /proc filesystem under Linux -- at least not
+		easily accessible to the command line.  The headers from
+		top(1) seem to be the quickest & most detailed source of data
+		about CPU, and disk transfer as separated into reads & writes.
+		(vs. iostat, which shows CPU less granularly; it shows more
+		 detail about per-disk IO, but does not split IO into reads and
+		 writes)
+		
+		Frustratingly, the level of per-disk statistics from top is
+		incredibly un-granular
+
+		We'll get physical memory details from here too
+	    """
+	    cpure = re.compile('CPU usage:\s+([\d.]+)\% user, ([\d.]+)\% sys, '
+			       '([\d.]+)\% idle')
+	    memre = re.compile('PhysMem:\s+(\d+\w+) wired, '
+			       '(\d+\w+) active, (\d+\w+) inactive, '
+			       '(\d+\w+) used, (\d+\w+) free.')
+	    diskre = re.compile('Disks: (\d+)/(\d+\w+) read, '
+				'(\d+)/(\d+\w+) written.')
+
+	    # scaling routine for use in map() later
+	    def scaletokb(value):
+		# take a value like 1209M or 10G and return an integer
+		# representing the value in kilobytes
+
+		(size, scale)=re.split('([A-z]+)',value)[:2]
+		size = int(size)
+		if scale:
+		    if self.scale2kb.has_key(scale):
+			size *= self.scale2kb[scale]
+		    else:
+			log.warning( "Error: value in %s expressed in "
+			    "dimension I can't translate to kb: %s %s"%
+			    (line, size, scale))
+		return size
+
+	    # the first set of 'top' headers display average values over
+	    # system uptime.  so we only want to read the second set that we
+	    # see.
+	    toppass = 0
+
+	    # we should really do this first, so that we don't waste any time
+	    # if top fails to work.  however, it 'reads' better at this point
+	    try:
+		proc = subprocess.Popen(['top',
+					 '-i','2','-l','2','-n','0'],
+					stdout=subprocess.PIPE)
+	    except:
+		return
+
+	    for line in proc.stdout:
+		# skip the first output
+		if line.startswith('Processes: '):
+		    toppass += 1
+		elif line.startswith('CPU usage: ') and toppass == 2:
+		    cpuresult = cpure.match(line)
+		    """
+		    the data we send to logentries is expected to be in terms
+		    of centiseconds of (user/system/idle/etc) time as all we
+		    have is %, multiply that % by the EPOCH and 100.
+		    """
+		    if cpuresult:
+			(cu, cs, ci) = map( lambda x: int(float(x)*100*EPOCH),
+					    cpuresult.group(1,2,3) )
+			self.save_data( data, 'cu', cu )
+			self.save_data( data, 'cs', cs )
+			self.save_data( data, 'ci', ci )
+			# send zero in case all must be present
+			self.save_data( data, 'cl', 0 )
+			self.save_data( data, 'cio', 0 )
+			self.save_data( data, 'cq', 0 )
+			self.save_data( data, 'csq', 0 )
+		    else:
+			log.warning( "Error: could not parse CPU stats "
+			    "in top output line %s"%(line))
+
+		elif line.startswith('PhysMem: ') and toppass == 2:
+		    """
+		    OS-X has no fixed cache size -- cached pages are stored in
+		    virtual memory as part of the Unified Buffer Cache.  It
+		    would appear to be nearly impossible to find out what the
+		    current size of the UBC is, save running purge(8) and
+		    comparing the values before and after -- UBC uncertainty
+		    principal? :-)
+
+		    http://wagerlabs.com/blog/2008/03/04/hacking-the-mac-osx-unified-buffer-cache/
+		    books.google.ie/books?isbn=0132702266
+		    http://reviews.cnet.com/8301-13727_7-57372267-263/purge-the-os-x-disk-cache-to-analyze-memory-usage/
+		    """
+		    memresult = memre.match(line)
+		    if memresult:
+			# logentries is expecting values in kilobytes
+			(wired, active, inactive, used, free) = map (
+			    scaletokb, memresult.group(1,2,3,4,5))
+			self.save_data( data, 'mt', used + free)
+			self.save_data( data, 'ma', active)
+			self.save_data( data, 'mc', 0)
+		    else:
+			log.warning( "Error: could not parse memory stats "
+			    "in top output line %s"%(line))
+
+		elif line.startswith('Disks: ') and toppass == 2:
+		    diskresult = diskre.match(line)
+		    """
+		    the data we send to logentries is expected to be in bytes
+		    """
+		    if diskresult:
+			(reads, writes) = map ( scaletokb,
+						diskresult.group(2,4))
+			reads *= 1024
+			writes *= 1024
+
+			self.save_data( data, 'dr',
+					reads -self.prev_disk_stats[0])
+			self.save_data( data, 'dw',
+					writes -self.prev_disk_stats[1])
+			self.prev_disk_stats = [ reads, writes]
+		    else:
+			log.warning( "Error: could not parse disk stats "
+			    "in top output line %s"%(line))
+
+	def netstats_stats(self, data):
+	    """
+	    Read network bytes in/out from the output of "netstat -s"
+	    Not exact, as on OS-X it doesn't display bytes for every protocol,
+	    but more exact than using 'top' or 'netstat <interval>'
+	    """
+	    try:
+		proc = subprocess.Popen(['netstat', '-bi'],
+					stdout=subprocess.PIPE)
+	    except:
+		return
+
+	    # if we see 11 non-blank fields,
+	    # #7 is input bytes, and #10 is output bytes, but avoid duplicate
+	    # device lines
+
+	    receive=0L
+	    transmit=0L
+	    netseen = {}
+
+	    for line in proc.stdout:
+		if line.startswith('Name'):
+		    continue
+
+		parts = line.split()
+		if len(parts) != 11:
+		    continue
+		if netseen.has_key(parts[1]):
+		    continue
+		if not parts[6].isdigit():
+		    continue
+
+		receive += long(parts[6])
+		transmit += long(parts[9])
+		netseen[parts[0]] = 1
+
+	    self.save_data( data, 'ni', receive-self.prev_net_stats[0])
+	    self.save_data( data, 'no', transmit-self.prev_net_stats[1])
+	    self.prev_net_stats = [receive, transmit]
+
 	def stats(self):
 		"""Collects statistics."""
 		data = {}
-		self.cpu_stats(data)
-		self.disk_stats(data)
-		self.mem_stats(data)
-		self.net_stats(data)
+
+		if self.procfilesystem:
+		    self.cpu_stats(data)
+		    self.disk_stats(data)
+		    self.mem_stats(data)
+		    self.net_stats(data)
+		else:
+		    if self.sys == "Darwin":
+			self.osx_top_stats(data)
+			self.netstats_stats(data)
 		return data
 
 	def new_request(self, rq):
