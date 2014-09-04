@@ -52,7 +52,6 @@ LE_SERVER_API = '/'
 
 DEFAULT_ENDPOINT_ADDRESS = 'api.logentries.com'
 DEFAULT_TOKEN_PORT = 10000
-DEFAULT_MSG_QUEUE_SLEEP = 0.1  # In seconds
 
 
 class Domain:
@@ -481,12 +480,9 @@ class StatisticsSendingWorker(threading.Thread):
 
     def run(self):
         while True:
-            if self.msg_queue.not_empty:
-                msg = self.msg_queue.get()
-                self.transport.send(msg)
-                self.msg_queue.task_done()
-            else:
-                time.sleep(DEFAULT_MSG_QUEUE_SLEEP)
+            msg = self.msg_queue.get(true)
+            self.transport.send(msg)
+            self.msg_queue.task_done()
 
 
 class StatsTCPSender:
