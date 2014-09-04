@@ -466,6 +466,128 @@ stream_handler.setFormatter(logging.Formatter("%(message)s"))
 log.addHandler(stream_handler)
 
 
+class StatisticsSendingWorker(threading.Thread):
+    """
+    Class that is used for sending statistics over TCP stream (Token-based).
+    Must receive message queue reference in constructor
+    and reference to transport provider. Works as separate thread
+    just grabbing a message from the queue and pushing it to transport provider.
+    """
+
+    def __init__(self, StatsTCPTransport, msgQueue):
+        threading.Thread.__init__(self)
+        self.msgQueue = msgQueue
+        self.transport = StatsTCPTransport
+
+    def run(self):
+        while True:
+            if self.msgQueue.not_empty:
+                msg = self.msgQueue.get()
+                self.transport.send(msg)
+                self.msgQueue.task_done()
+            else:
+                time.sleep(DEFAULT_MSG_QUEUE_SLEEP)
+
+
+class StatsTCPSender:
+    """
+    Class that is used to format system stats messages to Syslog format
+    and send to LE service using TCP stream handler
+    """
+    def __init__(self, tag, address, port):
+        self.logger = logging.getLogger(tag)
+        self.logger.setLevel(logging.INFO)
+        self.handler = logging.handlers.SysLogHandler(address=(address, port),
+                                                          socktype=socket.SOCK_STREAM)
+        self.handler.setLevel(logging.DEBUG)
+        log_format = "%(asctime)s {0} {1}: %(message)s\r\n".format(config.hostname_required(), tag.replace(' ', '_'))
+        time_format = "%Y-%m-%dT%H:%M:%SZ"
+        log_formatter = logging.Formatter(log_format, time_format)
+        log_formatter.converter = time.gmtime
+        self.handler.setFormatter(log_formatter)
+        self.logger.addHandler(self.handler)
+
+
+    def send(self, msg):
+        self.logger.info(msg)
+
+
+class TokenBasedTCPSender(object):
+    """
+    Class that encapsulates both transport and message sending worker.
+    Used to send system stats messages to LE service in non-Syslog mode
+    e.g. not using DataHub.
+    """
+    def __init__(self, tag="SystemStats", endpointAddress=DEFAULT_ENDPOINT_ADDRESS, endpointPort=DEFAULT_TOKEN_PORT):
+        self.msgQueue = Queue.Queue()
+        self.endpointAddress = endpointAddress
+        self.endpointPort = endpointPort
+        self.tag = tag
+
+        # Initialize token value
+        self.token = ''
+        self.token = self.TryLoadTokenFromConfig()
+        if (self.token is None) or (self.token == ''):
+            self.token = self.TryObtainToken()
+        config.system_stats_token_required()
+
+        self.transport = StatsTCPSender(self.tag, self.endpointAddress, self.endpointPort)
+        self.statSenderThread = StatisticsSendingWorker(self.transport, self.msgQueue)
+        self.statSenderThread.setDaemon(True)
+        self.statSenderThread.start()
+
+    def TryLoadTokenFromConfig(self):
+        return config.system_stats_token
+
+    def TryObtainToken(self, name="SystemStats.log", filename="SystemStats.log", type_opt=''):
+        config.system_stats_token = GetLogToken(name, filename, type_opt)
+        config.save()
+        return config.system_stats_token
+
+    def push(self, msg):
+        self.msgQueue.put(self.token + " " + msg)
+
+
+class SyslogSender:
+    def __init__(self, tag):
+        self.logger = logging.getLogger(tag)
+        self.logger.setLevel(logging.INFO)
+        if config.syslog_mode:
+            config.syslog_options_required()
+            self.handler = logging.handlers.SysLogHandler(address=(config.datahub_ip, config.datahub_port),
+                                                          socktype=socket.SOCK_STREAM)
+            self.handler.setLevel(logging.DEBUG)
+            log_format = "%(asctime)s {0} {1}: %(message)s\r\n".format(config.hostname_required(), tag.replace(' ', '_'))
+            time_format = "%Y-%m-%dT%H:%M:%SZ"
+            log_formatter = logging.Formatter(log_format, time_format)
+            log_formatter.converter = time.gmtime
+            self.handler.setFormatter(log_formatter)
+            self.logger.addHandler(self.handler)
+
+    def send_message(self, msg):
+        if config.syslog_mode:
+            self.logger.info(msg)
+
+
+def GetLogToken(name, filename, type_opt):
+    config.agent_key_required()
+    log_request = {"request": "new_log",
+                   "user_key": config.user_key,
+                   "host_key": config.agent_key,
+                   "name": name,
+                   "filename": filename,
+                   "type": type_opt,
+                   "source": "token",
+                   "retention": -1}
+    log_response = api_request(log_request, True, True)
+    token = NOT_SET
+    try:
+        log_set = log_response['log']
+        token = log_set['token']
+    except KeyError:
+        die("Cannot obtain token for " + filename + " log file. The response is corrupted.")
+
+    return token
 
 def die(cause, exit_code=EXIT_ERR):
     log.critical(cause)
@@ -1150,6 +1272,8 @@ class Stats:
         self.syslogSender = SyslogSender("Statistics")
 
         if not config.debug_nostats:
+            if not config.syslog_mode:
+                self.statsStream = TokenBasedTCPSender()
             self.send_stats()
 
     @staticmethod
@@ -1461,8 +1585,11 @@ class Stats:
             log.info(results)
         if not self.first:
             # Send data
-            self.new_request( results)
-            self.write_stats(results);
+            if config.syslog_mode:
+                self.syslogSender.send_message(self.stats_to_string(results))
+            else:
+                self.new_request(results)
+                self.statsStream.push(self.stats_to_string(results))
         else:
             self.first = False
 
@@ -1487,8 +1614,8 @@ class Stats:
         statMemString = "Mem.total={0};Mem.active={1};Mem.cached={2};".format(data['mt'], data['ma'], data['mc'])
         statDiskString = "Disk.write={0};Disk.read={1};".format(self.total['dw'], self.total['dr'])
         statNetString = "Net.send={0};Net.resv={1}".format(self.total['no'], self.total['ni'])
-        with open(STAT_FILE, 'a') as stat_file:
-            stat_file.write(statCpuString+statMemString+statDiskString+statNetString+'\n')
+        hostString = "HostName={0};".format(config.hostname_required())
+        return hostString + statCpuString + statMemString + statDiskString + statNetString
 
     def cancel(self):
         self.to_remove = True
@@ -1508,6 +1635,7 @@ class Follower(object):
         self.log_addr = '/%s/hosts/%s/%s/?realtime=1' % (config.user_key, config.agent_key, log_key)
         self.flush = True
         self.event_filter = event_filter
+        self.syslog_sender = SyslogSender(os.path.basename(name))
         log.info("Following %s" % name)
         self.send_identifier()
         monitoring_thread = threading.Thread(target=monitorlogs, name=self.name)
@@ -1515,6 +1643,10 @@ class Follower(object):
         monitoring_thread.start()
 
     def send_identifier(self):
+        msgIdentifier = "###LA01### - Agent initialized"
+        if config.syslog_mode:
+            self.syslog_sender.send_message(msgIdentifier)
+            return
         self.open_connection()
 
         while not shutdown:
@@ -1686,6 +1818,8 @@ class Follower(object):
         return events
 
     def open_connection(self):
+        if config.syslog_mode:
+            return
         """ Opens a push connection to logentries. """
         log.debug("Opening connection %s", self.log_addr)
         retry = 1
@@ -1708,16 +1842,33 @@ class Follower(object):
             if not events:
                 return
         else:
-            events = IAA_TOKEN
-        while not shutdown:
-            try:
-                self.conn.send( events)
-                break
-            except socket.error, (err_no, err_str):
-                self.open_connection()
+            if config.syslog_mode:
+                return
+            else:
+                events = IAA_TOKEN
+        if config.syslog_mode:
+            eventsArray = events.splitlines()
+            for event in eventsArray:
+                self.syslog_sender.send_message(event)
+        else:
+            while not shutdown:
+                try:
+                    self.conn.send(events)
+                    break
+                except socket.error, (err_no, err_str):
+                    self.open_connection()
 
         if config.debug_events:
-            print >>sys.stderr, events,
+            print >> sys.stderr, events,
+
+
+def open_posix_log(real_name):
+    """ Opens a logfile on *NIX systems."""
+    try:
+        f = open(real_name)
+    except IOError:
+        f = None
+    return f
 
 
 class LogFollower(Follower):
@@ -1995,6 +2146,25 @@ class Config:
             new_force_domain = conf.get(MAIN_SECT, FORCE_DOMAIN_PARAM)
             if new_force_domain:
                 self.force_domain = new_force_domain
+
+            if self.syslog_mode == NOT_SET:
+                if conf.get(MAIN_SECT, SYSLOG_MODE_PARAM) == 'True':
+                    self.syslog_mode = True
+                else:
+                    self.syslog_mode = False
+            if self.datahub_ip == NOT_SET:
+                self.datahub_ip = conf.get(MAIN_SECT, DATAHUB_IP_PARAM)
+                if (self.datahub_ip == ''):
+                    self.datahub_ip = NOT_SET
+            if self.datahub_port == NOT_SET:
+                datahub_port_str = conf.get(MAIN_SECT, DATAHUB_PORT_PARAM)
+                if datahub_port_str != '':
+                    self.datahub_port = int(datahub_port_str)
+            if self.system_stats_token == NOT_SET:
+                system_stats_token_str = conf.get(MAIN_SECT, SYSSTAT_TOKEN_PARAM)
+                if system_stats_token_str != '':
+                    self.system_stats_token = system_stats_token_str
+
         except ConfigParser.NoSectionError:
             return False
         except ConfigParser.NoOptionError:
@@ -2058,6 +2228,16 @@ class Config:
             self.user_key = retrieve_account_key()
             config.save()
 
+    def set_system_stat_token(self, value):
+        if not self.check_key(value):
+            die('Error: system stat token does not look right.')
+        self.system_stats_token = value
+
+    def system_stats_token_required(self):
+        if self.system_stats_token == NOT_SET:
+            die("System stat token is required.")
+        config.save()
+
     def set_agent_key(self, value):
         if not self.check_key(value):
             die('Error: Agent key does not look right.')
@@ -2092,6 +2272,18 @@ class Config:
         if self.name == NOT_SET:
             self.name = self.hostname_required().split('.')[0]
         return self.name
+
+    def syslog_options_required(self):
+        """
+        Exits with error message if the datahub-ip or datahub-port isn't set.
+        """
+        if not self.syslog_mode:
+            return
+
+        if self.datahub_ip == NOT_SET:
+            die("Datahub ip is required. Specify the datahub ip or host name with the --datahub-ip parameter.")
+        if self.datahub_port == NOT_SET:
+            die("Datahub port is required. Specify the port with the --datahub_port parameter.")
 
     def detect_ec2eu(self):
         """
