@@ -1637,24 +1637,9 @@ class Follower(object):
         self.event_filter = event_filter
         self.syslog_sender = SyslogSender(os.path.basename(name))
         log.info("Following %s" % name)
-        self.send_identifier()
         monitoring_thread = threading.Thread(target=monitorlogs, name=self.name)
         monitoring_thread.daemon = True
         monitoring_thread.start()
-
-    def send_identifier(self):
-        msgIdentifier = "###LA01### - Agent initialized"
-        if config.syslog_mode:
-            self.syslog_sender.send_message(msgIdentifier)
-            return
-        self.open_connection()
-
-        while not shutdown:
-            try:
-                self.conn.send(msgIdentifier)
-                break
-            except socket.error, (err_no, err_str):
-                self.open_connection()
 
     def file_candidate(self):
         """
