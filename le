@@ -192,8 +192,8 @@ Where parameters are:
   --force-api-host     use particular host as an api server
   --system-stat-token  the token to be used for sending system metrics
   --syslog-mode        boolean value whether Agent is in Syslog mode or not
-  --datahub-ip         required if syslog-mode is true, the IP used to connect to a DataHub instance
-  --datahub-port       required if syslog-mode is true, the port used to connect to a DataHub instance
+  --datahub-ip         Datahub IP address, required in syslog-mode
+  --datahub-port       DataHub port number, required in syslog-mode
 """
 
 WINDOWS_USAGE = """
@@ -474,17 +474,17 @@ class StatisticsSendingWorker(threading.Thread):
     just grabbing a message from the queue and pushing it to transport provider.
     """
 
-    def __init__(self, StatsTCPTransport, msgQueue):
+    def __init__(self, stats_tcp_transport, msg_queue):
         threading.Thread.__init__(self)
-        self.msgQueue = msgQueue
-        self.transport = StatsTCPTransport
+        self.msg_queue = msg_queue
+        self.transport = stats_tcp_transport
 
     def run(self):
         while True:
-            if self.msgQueue.not_empty:
-                msg = self.msgQueue.get()
+            if self.msg_queue.not_empty:
+                msg = self.msg_queue.get()
                 self.transport.send(msg)
-                self.msgQueue.task_done()
+                self.msg_queue.task_done()
             else:
                 time.sleep(DEFAULT_MSG_QUEUE_SLEEP)
 
@@ -518,34 +518,34 @@ class TokenBasedTCPSender(object):
     Used to send system stats messages to LE service in non-Syslog mode
     e.g. not using DataHub.
     """
-    def __init__(self, tag="SystemStats", endpointAddress=DEFAULT_ENDPOINT_ADDRESS, endpointPort=DEFAULT_TOKEN_PORT):
-        self.msgQueue = Queue.Queue()
-        self.endpointAddress = endpointAddress
-        self.endpointPort = endpointPort
+    def __init__(self, tag="SystemStats", endpoint_address=DEFAULT_ENDPOINT_ADDRESS, endpoint_port=DEFAULT_TOKEN_PORT):
+        self.msg_queue = Queue.Queue()
+        self.endpoint_address = endpoint_address
+        self.endpoint_port = endpoint_port
         self.tag = tag
 
         # Initialize token value
         self.token = ''
-        self.token = self.TryLoadTokenFromConfig()
+        self.token = self.try_load_token_from_config()
         if (self.token is None) or (self.token == ''):
-            self.token = self.TryObtainToken()
+            self.token = self.try_obtain_token()
         config.system_stats_token_required()
 
-        self.transport = StatsTCPSender(self.tag, self.endpointAddress, self.endpointPort)
-        self.statSenderThread = StatisticsSendingWorker(self.transport, self.msgQueue)
-        self.statSenderThread.setDaemon(True)
-        self.statSenderThread.start()
+        self.transport = StatsTCPSender(self.tag, self.endpoint_address, self.endpoint_port)
+        self.stat_sender_thread = StatisticsSendingWorker(self.transport, self.msg_queue)
+        self.stat_sender_thread.setDaemon(True)
+        self.stat_sender_thread.start()
 
-    def TryLoadTokenFromConfig(self):
+    def try_load_token_from_config(self):
         return config.system_stats_token
 
-    def TryObtainToken(self, name="SystemStats.log", filename="SystemStats.log", type_opt=''):
-        config.system_stats_token = GetLogToken(name, filename, type_opt)
+    def try_obtain_token(self, name="SystemStats.log", filename="SystemStats.log", type_opt=''):
+        config.system_stats_token = get_log_token(name, filename, type_opt)
         config.save()
         return config.system_stats_token
 
     def push(self, msg):
-        self.msgQueue.put(self.token + " " + msg)
+        self.msg_queue.put(self.token + " " + msg)
 
 
 class SyslogSender:
@@ -569,7 +569,7 @@ class SyslogSender:
             self.logger.info(msg)
 
 
-def GetLogToken(name, filename, type_opt):
+def get_log_token(name, filename, type_opt):
     config.agent_key_required()
     log_request = {"request": "new_log",
                    "user_key": config.user_key,
@@ -1269,11 +1269,11 @@ class Stats:
         # meg, etc), value is what to multiply by to get to kilobytes
         self.scale2kb = { 'M': 1024, 'G': 1048576 }
 
-        self.syslogSender = SyslogSender("Statistics")
+        self.syslog_sender = SyslogSender("Statistics")
 
         if not config.debug_nostats:
             if not config.syslog_mode:
-                self.statsStream = TokenBasedTCPSender()
+                self.stats_stream = TokenBasedTCPSender()
             self.send_stats()
 
     @staticmethod
@@ -1586,10 +1586,10 @@ class Stats:
         if not self.first:
             # Send data
             if config.syslog_mode:
-                self.syslogSender.send_message(self.stats_to_string(results))
+                self.syslog_sender.send_message(self.stats_to_string(results))
             else:
                 self.new_request(results)
-                self.statsStream.push(self.stats_to_string(results))
+                self.stats_stream.push(self.stats_to_string(results))
         else:
             self.first = False
 
@@ -1609,13 +1609,13 @@ class Stats:
         cio = data['cio'] * 100 / total
         cq = data['cq'] * 100 / total
         csq = data['csq'] * 100 / total
-        statCpuString = "CPU.user={0}%;CPU.nice={1}%;CPU.system={2}%;CPU.idle={3}%;CPU.wait={4}%;CPU.irq={5}%;CPU.softirq={6}%;".format(
+        stat_cpu_string = "CPU.user={0}%;CPU.nice={1}%;CPU.system={2}%;CPU.idle={3}%;CPU.wait={4}%;CPU.irq={5}%;CPU.softirq={6}%;".format(
             cu, cl, cs, ci, cio, cq, csq)
-        statMemString = "Mem.total={0};Mem.active={1};Mem.cached={2};".format(data['mt'], data['ma'], data['mc'])
-        statDiskString = "Disk.write={0};Disk.read={1};".format(self.total['dw'], self.total['dr'])
-        statNetString = "Net.send={0};Net.resv={1}".format(self.total['no'], self.total['ni'])
-        hostString = "HostName={0};".format(config.hostname_required())
-        return hostString + statCpuString + statMemString + statDiskString + statNetString
+        stat_mem_string = "Mem.total={0};Mem.active={1};Mem.cached={2};".format(data['mt'], data['ma'], data['mc'])
+        stat_disk_string = "Disk.write={0};Disk.read={1};".format(self.total['dw'], self.total['dr'])
+        stat_net_string = "Net.send={0};Net.resv={1}".format(self.total['no'], self.total['ni'])
+        host_string = "HostName={0};".format(config.hostname_required())
+        return host_string + stat_cpu_string + stat_mem_string + stat_disk_string + stat_net_string
 
     def cancel(self):
         self.to_remove = True
@@ -1847,8 +1847,8 @@ class Follower(object):
             else:
                 events = IAA_TOKEN
         if config.syslog_mode:
-            eventsArray = events.splitlines()
-            for event in eventsArray:
+            events_array = events.splitlines()
+            for event in events_array:
                 self.syslog_sender.send_message(event)
         else:
             while not shutdown:
