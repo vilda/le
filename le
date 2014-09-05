@@ -2985,7 +2985,7 @@ def request_follow(filename, name, type_opt):
                "type": type_opt,
                "follow": "true"}
     api_request(request, True, True)
-    log.info("Will follow %s as %s" % (filename, name))
+    print "Will follow %s as %s" % (filename, name)
     log.info("Don't forget to restart the daemon")
     _startup_info()
 
