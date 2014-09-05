@@ -2268,8 +2268,8 @@ class Config:
 
     def detect_ec2eu(self):
         """
-        Detects if this machine is within EC2 EU region. If it is,
-        the flag ec2eu is set as well as SSL is suppress.
+	Detects EC2 EU region and tests direct access to api/data instances. If
+	all goes well, the flag ec2eu is set.
         """
         # No need to detect if the flag ec2eu is set already
         if self.ec2eu:
@@ -2288,13 +2288,11 @@ class Config:
 
         # If the response is in EU, set the flag
         self.ec2eu = avz.startswith(EC2_AVZ_EU_PREFIX)
-        # Disable SSL in EC2
-        self.suppress_ssl = avz != ''
 
         if not self.ec2eu:
             return
 
-        # Secodary test if we are inside EC2 VPN
+        # Secondary test to rule out firewalled EC2 VPN
         test_resp = ''
         socket.setdefaulttimeout(3)
         try:
