@@ -480,7 +480,7 @@ class StatisticsSendingWorker(threading.Thread):
 
     def run(self):
         while True:
-            msg = self.msg_queue.get(true)
+            msg = self.msg_queue.get(True)
             self.transport.send(msg)
             self.msg_queue.task_done()
 
