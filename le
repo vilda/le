@@ -1605,12 +1605,12 @@ class Stats:
         cio = data['cio'] * 100 / total
         cq = data['cq'] * 100 / total
         csq = data['csq'] * 100 / total
-        stat_cpu_string = "CPU.user={0}%;CPU.nice={1}%;CPU.system={2}%;CPU.idle={3}%;CPU.wait={4}%;CPU.irq={5}%;CPU.softirq={6}%;".format(
+        stat_cpu_string = "CPU.user={0}% CPU.nice={1}% CPU.system={2}% CPU.idle={3}% CPU.wait={4}% CPU.irq={5}% CPU.softirq={6}% ".format(
             cu, cl, cs, ci, cio, cq, csq)
-        stat_mem_string = "Mem.total={0};Mem.active={1};Mem.cached={2};".format(data['mt'], data['ma'], data['mc'])
-        stat_disk_string = "Disk.write={0};Disk.read={1};".format(self.total['dw'], self.total['dr'])
-        stat_net_string = "Net.send={0};Net.resv={1}".format(self.total['no'], self.total['ni'])
-        host_string = "HostName={0};".format(config.hostname_required())
+        stat_mem_string = "Mem.total={0} Mem.active={1} Mem.cached={2} ".format(data['mt'], data['ma'], data['mc'])
+        stat_disk_string = "Disk.write={0} Disk.read={1} ".format(self.total['dw'], self.total['dr'])
+        stat_net_string = "Net.send={0} Net.resv={1} ".format(self.total['no'], self.total['ni'])
+        host_string = "HostName={0} ".format(config.hostname_required())
         return host_string + stat_cpu_string + stat_mem_string + stat_disk_string + stat_net_string
 
     def cancel(self):
