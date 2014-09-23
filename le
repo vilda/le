@@ -1650,10 +1650,10 @@ class Follower(object):
 
             if candidate:
                 self.real_name = candidate
-		try:
-		    self.file = None
+                try:
+                    self.file = None
                     self.file = open(self.real_name)
-		    break
+                    break
                 except IOError:
                     pass
 
@@ -2094,8 +2094,8 @@ class Config:
 
     def detect_ec2eu(self):
         """
-	Detects EC2 EU region and tests direct access to api/data instances. If
-	all goes well, the flag ec2eu is set.
+        Detects EC2 EU region and tests direct access to api/data instances. If
+        all goes well, the flag ec2eu is set.
         """
         # No need to detect if the flag ec2eu is set already
         if self.ec2eu:
