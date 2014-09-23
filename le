@@ -72,9 +72,6 @@ class Domain:
 
 CONTENT_LENGTH = 'content-length'
 
-# Windows event log type ID
-WINEVENT_LOGTYPE = '9c0912b7-674b-47f1-89ac-eed5aa3affe0'
-
 # URL to detect EC2 availability zone
 EC2_AVZ_URL = 'http://169.254.169.254/latest/meta-data/placement/availability-zone'
 EC2_AVZ_EU_PREFIX = 'eu-west-1'
@@ -195,15 +192,6 @@ Where parameters are:
   --datahub-port       DataHub port number, required in syslog-mode
 """
 
-WINDOWS_USAGE = """
-Windows specific commands:
-  windowsevents     follow the Application, System and Security win event logs
-  windowsevents <eventlog>  follow the windows event log specified
-  installwinservice installs the agent as a windows service
-    --no-defaults   do not follow standard windows logs automatically
-  monitorwinservice starts monitoring as a windows service
-"""
-
 
 # Global indicator of monitoring interruption
 shutdown = False
@@ -224,9 +212,6 @@ def print_usage(version_only=False):
         report(VERSION)
     else:
         report(USAGE)
-
-        if os.name != "posix":
-            report(WINDOWS_USAGE)
 
     sys.exit(EXIT_HELP)
 
@@ -727,7 +712,6 @@ def _lock_pid():
     Tries to exclusively open file for protecting of critical section
     for daemonizing.
     """
-    # FIXME: Does exclusive file creation work in Windows ?
     file_name = _lock_pid_file_name()
     try:
         fd = os.open(file_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
@@ -1654,16 +1638,6 @@ class Follower(object):
         except os.error:
             return None
 
-    def open_windows_log(self, real_name):
-        """ Opens a logfile on Windows NT systems."""
-        try:
-            f = win32file.CreateFile(real_name, win32con.GENERIC_READ, win32con.FILE_SHARE_DELETE |
-                                     win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_READ, None, win32con.OPEN_EXISTING,
-                                     0, None)
-        except pywintypes.error:
-            f = None
-        return f
-
     def open_log(self):
         """
         Keeps trying to re-open the log file. Returns when the file has been opened or when requested to remove.
@@ -1676,13 +1650,12 @@ class Follower(object):
 
             if candidate:
                 self.real_name = candidate
-                if os.name != "posix":
-                    self.file = self.open_windows_log(self.real_name)
-                else:
-                    self.file = open_posix_log(self.real_name)
-
-                if self.file is not None:
+                try:
+                    self.file = None
+                    self.file = open(self.real_name)
                     break
+                except IOError:
+                    pass
 
             if error_info:
                 log.info("Cannot open file '%s', re-trying in %ss intervals" % (self.name, REOPEN_INT))
@@ -1696,27 +1669,12 @@ class Follower(object):
         candidate = self.file_candidate()
         if not candidate: return False
 
-        # win32file.GetFileTime returns [create, access, write]
-        # It also requires an open HANDLE so we create a temporary
-        # one for checking the candidate modify time
-        if os.name != "posix":
-            try:
-                ctime1 = int(win32file.GetFileTime(self.file)[2])
-                temp = win32file.CreateFile(candidate, win32con.GENERIC_READ, win32con.FILE_SHARE_DELETE |
-                                            win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_READ, None,
-                                            win32con.OPEN_EXISTING, 0, None)
-                ctime_new = int(win32file.GetFileTime(temp)[2])
-                win32file.CloseHandle(temp)
-                ctime2 = int(win32file.GetFileTime(self.file)[2])
-            except pywintypes.error:
-                pass
-        else:
-            try:
-                ctime1 = os.fstat(self.file.fileno()).st_mtime
-                ctime_new = os.path.getmtime(candidate)
-                ctime2 = os.fstat(self.file.fileno()).st_mtime
-            except os.error:
-                pass
+        try:
+            ctime1 = os.fstat(self.file.fileno()).st_mtime
+            ctime_new = os.path.getmtime(candidate)
+            ctime2 = os.fstat(self.file.fileno()).st_mtime
+        except os.error:
+            pass
 
         if ctime1 == ctime2 and ctime1 != ctime_new:
             # We have a name change according to the time
@@ -1726,25 +1684,16 @@ class Follower(object):
 
     def read_log_line(self):
         """ Reads a line from the log. Checks maximal line size. """
-        if os.name != "posix":
-            buffLen, buff = win32file.ReadFile(self.file, MAX_EVENTS)
-        else:
-            buff = self.file.read(MAX_EVENTS)
+        buff = self.file.read(MAX_EVENTS)
         return buff
 
     def set_file_position(self, offset, start=FILE_BEGIN):
-        """ Move the position of posix or Windows NT filepointers."""
-        if os.name != "posix":
-            win32file.SetFilePointer(self.file, offset, start)
-        else:
-            self.file.seek(offset, start)
+        """ Move the position of filepointers."""
+        self.file.seek(offset, start)
 
     def get_file_position(self):
-        """ Returns the position of posix or Windows NT filepointers."""
-        if os.name != "posix":
-            pos = win32file.SetFilePointer(self.file, 0, FILE_CURRENT)
-        else:
-            pos = self.file.tell()
+        """ Returns the position filepointers."""
+        pos = self.file.tell()
         return pos
 
     def get_events(self):
@@ -1843,15 +1792,6 @@ class Follower(object):
             print >> sys.stderr, events,
 
 
-def open_posix_log(real_name):
-    """ Opens a logfile on *NIX systems."""
-    try:
-        f = open(real_name)
-    except IOError:
-        f = None
-    return f
-
-
 class LogFollower(Follower):
     def __init__(self, name, log_key, event_filter):
         super(LogFollower, self).__init__(name, log_key, self.monitorlogs, event_filter)
@@ -1868,104 +1808,6 @@ class LogFollower(Follower):
                     log.debug("IOError: %s", e)
                 self.open_log()
             self.send_events(events)
-
-
-# Some of the code is from
-# http://docs.activestate.com/activepython/2.4/pywin32/Windows_NT_Eventlog.html
-class WinEventFollower(Follower):
-    def __init__(self, name, log_key, event_filter):
-        super(WinEventFollower, self).__init__(name, log_key, self.monitorlogs, event_filter)
-
-    def monitorlogs(self):
-        """ Opens the windows event log file and starts to collect new events. """
-        self.open_connection()
-        self.open_windows_event_log()
-
-    def date2sec(self, evt_date):
-        """
-        This function converts dates with format '12/23/99 15:54:09' to seconds since 1970.
-        """
-        regexp = re.compile('(.*)\\s(.*)')  # store result in site
-        reg_result = regexp.search(evt_date)
-        date = reg_result.group(1)
-        the_time = reg_result.group(2)
-        (mon, day, yr) = map(lambda x: int(x), string.split(date, '/'))
-        (hr, mins, sec) = map(lambda x: int(x), string.split(the_time, ':'))
-        tup = [yr, mon, day, hr, mins, sec, 0, 0, 0]
-
-        sec = time.mktime(tup)
-
-        return sec
-
-    def date2output(self, evt_date):
-        """
-        This function converts dates with format
-        '12/23/99 15:54:09' to the following linux style format '2011-04-22 10:43:58'
-        """
-        regexp = re.compile('(.*)\\s(.*)')  # store result in site
-        reg_result = regexp.search(evt_date)
-        date = reg_result.group(1)
-        the_time = reg_result.group(2)
-        (mon, day, yr) = map(lambda x: int(x), string.split(date, '/'))
-        (hr, mins, sec) = map(lambda x: int(x), string.split(the_time, ':'))
-        tup = [yr, mon, day, hr, mins, sec, 0, 0, 0]
-
-        return time.strftime("%Y-%m-%d %H:%M:%S", tup)
-
-    def open_windows_event_log(self):
-        server = None  # None = local machine
-        hand = win32evtlog.OpenEventLog(server, self.name)
-        flags = win32evtlog.EVENTLOG_SEQUENTIAL_READ | win32evtlog.EVENTLOG_FORWARDS_READ
-        evt_dict = {
-            win32con.EVENTLOG_AUDIT_FAILURE: 'EVENTLOG_AUDIT_FAILURE',
-            win32con.EVENTLOG_AUDIT_SUCCESS: 'EVENTLOG_AUDIT_SUCCESS',
-            win32con.EVENTLOG_INFORMATION_TYPE: 'EVENTLOG_INFORMATION_TYPE',
-            win32con.EVENTLOG_WARNING_TYPE: 'EVENTLOG_WARNING_TYPE',
-            win32con.EVENTLOG_ERROR_TYPE: 'EVENTLOG_ERROR_TYPE'}
-
-        begin_sec = time.time()  # get the current time
-
-        try:
-            while not shutdown:
-                eventdata = ''
-                events = win32evtlog.ReadEventLog(hand, flags, 0)
-
-                while len(events) == 0 and not shutdown:
-                    time.sleep(TAIL_RECHECK)
-                    events = win32evtlog.ReadEventLog(hand, flags, 0)
-
-                for ev_obj in events:
-
-                    the_time = ev_obj.TimeGenerated.Format()  # '12/23/99 15:54:09'
-                    event_time = self.date2output(the_time)  # convert to '2011-04-22 10:43:58'
-                    seconds = self.date2sec(the_time)
-
-                    # if message was in the log before we started monitoring disregard
-                    # only monitor new messages in the log
-
-                    if seconds < begin_sec: break
-
-                    evt_id = str(winerror.HRESULT_CODE(ev_obj.EventID))
-                    # FIXME not used
-                    computer = str(ev_obj.ComputerName)
-                    cat = ev_obj.EventCategory
-                    record = ev_obj.RecordNumber
-                    msg = win32evtlogutil.SafeFormatMessage(ev_obj, self.name)
-
-                    msg = msg.replace('\r\n', '\r')
-                    msg = msg.encode('utf-8')
-
-                    source = str(ev_obj.SourceName)
-
-                    if not ev_obj.EventType in evt_dict.keys():
-                        evt_type = "unknown"
-                    else:
-                        evt_type = str(evt_dict[ev_obj.EventType])
-                    eventdata = "%s %s %s %s %s #%s %s %s\n" % (
-                        event_time, computer, cat, evt_id, evt_type, record, source, msg)
-                    self.send_events(eventdata)
-        except:
-            print traceback.print_exc(sys.exc_info())
 
 
 class Config:
@@ -1988,9 +1830,6 @@ class Config:
         self.daemon = False
         self.winservice = False
         self.pid_file = PID_FILE
-
-        # Windows Options
-        self.no_defaults = False
 
         # Special options
         self.yes = False
@@ -2041,25 +1880,12 @@ class Config:
         Identifies a configuration directory for the current user.
         Always terminated with slash.
         """
-        if os.name == "posix":
-            if os.geteuid() == 0:
-                # Running as root
-                c_dir = CONFIG_DIR_SYSTEM
-            else:
-                # Running as an ordinary user
-                c_dir = os.path.expanduser('~') + '/' + CONFIG_DIR_USER
+        if os.geteuid() == 0:
+            # Running as root
+            c_dir = CONFIG_DIR_SYSTEM
         else:
-            # Running as an ordinary user (Windows)
-            try:
-                from win32com.shell import shellcon, shell
-                # use CSIDL_COMMON_APPDATA so that config files are always in the same location
-                # whether run as user applicaiton or as a windows service
-                c_dir = shell.SHGetFolderPath(0, shellcon.CSIDL_COMMON_APPDATA, 0, 0)
-                # debug
-            # print c_dir
-
-            except ImportError:
-                c_dir = os.path.expanduser('~') + '/' + CONFIG_DIR_USER
+            # Running as an ordinary user
+            c_dir = os.path.expanduser('~') + '/' + CONFIG_DIR_USER
 
         return c_dir + '/'
 
@@ -2268,8 +2094,8 @@ class Config:
 
     def detect_ec2eu(self):
         """
-	Detects EC2 EU region and tests direct access to api/data instances. If
-	all goes well, the flag ec2eu is set.
+        Detects EC2 EU region and tests direct access to api/data instances. If
+        all goes well, the flag ec2eu is set.
         """
         # No need to detect if the flag ec2eu is set already
         if self.ec2eu:
@@ -2373,8 +2199,6 @@ class Config:
                 self.debug_requests = True
             elif name == "--debug-system":
                 self.debug_system = True
-            elif name == "--no-defaults":
-                self.no_defaults = True
             elif name == "--ec2eu":
                 self.ec2eu = True
             elif name == "--suppress-ssl":
@@ -2405,159 +2229,6 @@ class Config:
 
 
 config = Config()
-
-# windows specific imports
-if os.name != "posix":
-
-    # winservice.py
-    # code adapted from http://code.activestate.com/recipes/551780/
-
-    from os.path import splitext, abspath
-    import win32event
-    import win32con
-    import winerror
-    import pywintypes
-    import win32api
-    import win32file
-    import win32serviceutil
-    import win32service
-    import win32evtlog
-    import win32evtlogutil
-
-    class Service(win32serviceutil.ServiceFramework):
-        _svc_name_ = '_LEService'
-        _svc_display_name_ = '_Service Template'
-
-        def __init__(self, *args):
-            win32serviceutil.ServiceFramework.__init__(self, *args)
-            self.log('init')
-            self.stop_event = win32event.CreateEvent(None, 0, 0, None)
-
-        def log(msg):
-            import servicemanager
-
-            servicemanager.LogInfoMsg(str(msg))
-
-        def sleep(sec):
-            win32api.Sleep(sec * 1000, True)
-
-        def SvcDoRun(self):
-            self.ReportServiceStatus(win32service.SERVICE_START_PENDING)
-            try:
-                self.ReportServiceStatus(win32service.SERVICE_RUNNING)
-                self.log('start')
-                self.start()
-                self.log('wait')
-                win32event.WaitForSingleObject(self.stop_event, win32event.INFINITE)
-                self.log('done')
-            except Exception, x:
-                self.log('Exception : %s' % x)
-                self.SvcStop()
-
-        def SvcStop(self):
-            self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-            self.log('stopping')
-            self.stop()
-            self.log('stopped')
-            win32event.SetEvent(self.stop_event)
-            self.ReportServiceStatus(win32service.SERVICE_STOPPED)
-
-        # to be overridden
-        def start(self):
-            pass
-
-        # to be overridden
-        def stop(self):
-            pass
-
-    def instwinservice(cls, name, display_name, stay_alive=True):
-        """
-        Install a Service
-            cls : the class (derived from Service) that implement the Service
-            name : Service name
-            display_name : the name displayed in the service manager
-            stay_alive : Service will stop on logout if False
-        """
-        cls._svc_name_ = name
-        cls._svc_display_name_ = display_name or name
-        try:
-            module_path = sys.modules[cls.__module__].__file__
-        except AttributeError:
-            # maybe py2exe went by
-            from sys import executable
-
-            module_path = executable
-        module_file = splitext(abspath(module_path))[0]
-        cls._svc_reg_class_ = '%s.%s' % (module_file, cls.__name__)
-        if stay_alive: win32api.SetConsoleCtrlHandler(lambda x: True, True)
-        try:
-            win32serviceutil.InstallService(
-                cls._svc_reg_class_,
-                cls._svc_name_,
-                cls._svc_display_name_,
-                startType=win32service.SERVICE_AUTO_START
-            )
-            print 'Install ok'
-        except Exception, x:
-            print str(x)
-
-    def stwinservice(cls, name, display_name, stay_alive=True):
-        """
-        Start Service
-            cls : the class (derived from Service) that implement the Service
-            name : Service name
-            display_name : the name displayed in the service manager
-            stay_alive : Service will stop on logout if False
-        """
-
-        cls._svc_name_ = name
-        cls._svc_display_name_ = display_name or name
-        try:
-            module_path = sys.modules[cls.__module__].__file__
-        except AttributeError:
-            # maybe py2exe went by
-            from sys import executable
-
-            module_path = executable
-        module_file = splitext(abspath(module_path))[0]
-        cls._svc_reg_class_ = '%s.%s' % (module_file, cls.__name__)
-        if stay_alive: win32api.SetConsoleCtrlHandler(lambda x: True, True)
-        try:
-            win32serviceutil.StartService(
-                cls._svc_name_
-            )
-            print 'Start ok'
-        except Exception, x:
-            print str(x)
-
-    class WinStart(Service):
-
-        def start(self):
-            self.runflag = True
-            self.log("Logentries is alive ...")
-
-            # from win32com.shell import shellcon, shell
-            # c_dir = shell.SHGetFolderPath(0, shellcon.CSIDL_COMMON_APPDATA, 0, 0)
-            # self.log(c_dir)
-            cmd_monitor([])
-
-        def stop(self):
-            self.runflag = False
-            self.log("I'm done")
-
-    def installwinservice(args):
-        no_more_args(args)
-        config.load()
-        config.agent_key_required()
-        config.user_key_required()
-        instwinservice(WinStart, 'Logentries', 'Logentries')
-
-    def startwinservice(args):
-        no_more_args(args)
-        config.load()
-        config.agent_key_required()
-        config.user_key_required()
-        stwinservice(WinStart, 'Logentries', 'Logentries')
 
 
 def default_cert_file_name():
@@ -3204,10 +2875,7 @@ def load_logs():
                 debug_filters(" Using filter %s", event_filter)
 
             # Instantiate the follower
-            if 'logtype' in l and l['logtype'] == WINEVENT_LOGTYPE:  # UUID of type windowseventlogs
-                WinEventFollower(log_filename, log_key, event_filter)
-            else:
-                LogFollower(log_filename, log_key, event_filter)
+            LogFollower(log_filename, log_key, event_filter)
 
 
 def is_followed(filename):
@@ -3258,64 +2926,6 @@ def cmd_monitor_daemon(args):
     """
     config.daemon = True
     cmd_monitor(args)
-
-
-def cmd_win_service(args):
-    """
-    Monitors as a windows service and sends events collected to logentries infrastructure.
-    """
-    startwinservice(args)
-
-
-def cmd_follow_win_events(args):
-    """
-    Follow the windows event logs: Application, Security, System
-    """
-    if len(args) == 1:
-        follow_given_win_event(args[0])
-    elif len(args) != 0:
-        die("Error: Too many arguments.")
-    else:
-        config.load()
-        config.agent_key_required()
-
-        type_opt = "windowseventlogs"
-        request_follow("Application", "Application", type_opt)
-        request_follow("System", "System", type_opt)
-        request_follow("Security", "Security", type_opt)
-
-
-def follow_given_win_event(event_name):
-    """
-    Follow a specific windows event
-    """
-    config.load()
-    config.agent_key_required()
-
-    type_opt = "windowseventlogs"
-
-    # Check that we don't follow that event log already
-    if not config.force and is_followed(event_name):
-        die('Already following %s Event Log' % event_name, EXIT_OK)
-
-    request_follow(event_name, event_name, type_opt)
-
-
-def cmd_install_win_service(args):
-    """
-    Installs a windows service
-    """
-
-    config.load()
-
-    if len(args) != 0:
-        die("Error: Too many arguments.")
-
-    installwinservice(args)
-
-    # checks no-default flag
-    if not config.no_defaults:
-        cmd_follow_win_events(args)
 
 
 def cmd_follow(args):
@@ -3852,8 +3462,6 @@ def main():
 
     if len(args) == 0:
         report(USAGE)
-        if os.name != "posix":
-            report(WINDOWS_USAGE)
         sys.exit(EXIT_HELP)
 
     commands = {
@@ -3865,11 +3473,7 @@ def main():
         'follow': cmd_follow,
         'followed': cmd_followed,
         'clean': cmd_clean,
-        'whoami': cmd_whoami,  # Windows
-        'monitorwinservice': cmd_win_service,
-        'installwinservice': cmd_install_win_service,
-        'windowsevents': cmd_follow_win_events,  # Clusters  #'new-cluster': cmd_new_cluster,
-        # 'set-cluster': cmd_set_cluster,  # Apps  #'new-app': cmd_new_app,  #'set-app': cmd_set_app,
+        'whoami': cmd_whoami,
         # Filesystem operations
         'ls': cmd_ls,
         'rm': cmd_rm,
@@ -3894,7 +3498,3 @@ if __name__ == '__main__':
 # http://pypi.python.org/pypi/ssl#downloads
 # python setup install.py
 
-#
-# Windows event logs:
-# http://www.blog.pythonlibrary.org/2010/07/27/pywin32-getting-windows-event-logs/
-#
