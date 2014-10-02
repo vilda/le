@@ -80,8 +80,7 @@ declare -a LOGS_TO_FOLLOW=(
 /var/log/cron
 /var/log/secure
 /var/log/wtmp
-/var/log/faillog
-/var/log/logentries/logentries-system-stats.log);
+/var/log/faillog);
 
 if [ -f /etc/le/config ]; then
 	printf "\n***** WARNING *****\n"
@@ -289,11 +288,6 @@ if [ $FOUND == "1" ]; then
 	printf "\n\n"
 
 	printf "***** Step 3 of 3 - Additional Logs *****\n"
-
-	if [ ! -f /var/log/logentries/logentries-system-stats.log ]; then
-		mkdir /var/log/logentries
-		> /var/log/logentries/logentries-system-stats.log
-	fi
 
 	FILES_FOUND=0
 

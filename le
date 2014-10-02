@@ -35,10 +35,6 @@ EC2EU_PARAM = 'ec2eu'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
 USE_CA_PROVIDED_PARAM = 'use_ca_provided'
 FORCE_DOMAIN_PARAM = 'force_domain'
-SYSLOG_MODE_PARAM = 'syslog-mode'
-DATAHUB_IP_PARAM = 'datahub-ip'
-DATAHUB_PORT_PARAM = 'datahub-port'
-SYSSTAT_TOKEN_PARAM = 'system-stat-token'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
@@ -49,9 +45,6 @@ LOG_LE_AGENT = 'logentries.com'
 LE_SERVER_DATA_DOMAIN = 'api.logentries.com'
 LE_SERVER_EC2EU_DATA_DOMAIN = 'ec2eu.api.logentries.com'
 LE_SERVER_API = '/'
-
-DEFAULT_ENDPOINT_ADDRESS = 'api.logentries.com'
-DEFAULT_TOKEN_PORT = 10000
 
 
 class Domain:
@@ -179,17 +172,12 @@ Where parameters are:
   --version            display version number and exit
   --account-key=       set account key and exit
   --host-key=          set local host key and exit, generate key if key is empty
-  --system-stat-token= set the token for system stats log
   --no-timestamps      no timestamps in agent reportings
   --force              force given operation
   --ec2eu              assume the host is in EC2 EU region
   --suppress-ssl       do not use SSL with API server
   --yes                always respond yes
   --force-api-host     use particular host as an api server
-  --system-stat-token  the token to be used for sending system metrics
-  --syslog-mode        boolean value whether Agent is in Syslog mode or not
-  --datahub-ip         Datahub IP address, required in syslog-mode
-  --datahub-port       DataHub port number, required in syslog-mode
 """
 
 
@@ -430,7 +418,6 @@ import httplib
 import getpass
 import atexit
 import logging.handlers
-import Queue
 
 
 #
@@ -449,126 +436,6 @@ stream_handler.setLevel(logging.DEBUG)
 stream_handler.setFormatter(logging.Formatter("%(message)s"))
 log.addHandler(stream_handler)
 
-
-class StatisticsSendingWorker(threading.Thread):
-    """
-    Class that is used for sending statistics over TCP stream (Token-based).
-    Must receive message queue reference in constructor
-    and reference to transport provider. Works as separate thread
-    just grabbing a message from the queue and pushing it to transport provider.
-    """
-
-    def __init__(self, stats_tcp_transport, msg_queue):
-        threading.Thread.__init__(self)
-        self.msg_queue = msg_queue
-        self.transport = stats_tcp_transport
-
-    def run(self):
-        while True:
-            msg = self.msg_queue.get(True)
-            self.transport.send(msg)
-            self.msg_queue.task_done()
-
-
-class StatsTCPSender:
-    """
-    Class that is used to format system stats messages to Syslog format
-    and send to LE service using TCP stream handler
-    """
-    def __init__(self, tag, address, port):
-        self.logger = logging.getLogger(tag)
-        self.logger.setLevel(logging.INFO)
-        self.handler = logging.handlers.SysLogHandler(address=(address, port),
-                                                          socktype=socket.SOCK_STREAM)
-        self.handler.setLevel(logging.DEBUG)
-        log_format = "%(asctime)s {0} {1}: %(message)s\r\n".format(config.hostname_required(), tag.replace(' ', '_'))
-        time_format = "%Y-%m-%dT%H:%M:%SZ"
-        log_formatter = logging.Formatter(log_format, time_format)
-        log_formatter.converter = time.gmtime
-        self.handler.setFormatter(log_formatter)
-        self.logger.addHandler(self.handler)
-
-
-    def send(self, msg):
-        self.logger.info(msg)
-
-
-class TokenBasedTCPSender(object):
-    """
-    Class that encapsulates both transport and message sending worker.
-    Used to send system stats messages to LE service in non-Syslog mode
-    e.g. not using DataHub.
-    """
-    def __init__(self, tag="SystemStats", endpoint_address=DEFAULT_ENDPOINT_ADDRESS, endpoint_port=DEFAULT_TOKEN_PORT):
-        self.msg_queue = Queue.Queue()
-        self.endpoint_address = endpoint_address
-        self.endpoint_port = endpoint_port
-        self.tag = tag
-
-        # Initialize token value
-        self.token = ''
-        self.token = self.try_load_token_from_config()
-        if (self.token is None) or (self.token == ''):
-            self.token = self.try_obtain_token()
-        config.system_stats_token_required()
-
-        self.transport = StatsTCPSender(self.tag, self.endpoint_address, self.endpoint_port)
-        self.stat_sender_thread = StatisticsSendingWorker(self.transport, self.msg_queue)
-        self.stat_sender_thread.setDaemon(True)
-        self.stat_sender_thread.start()
-
-    def try_load_token_from_config(self):
-        return config.system_stats_token
-
-    def try_obtain_token(self, name="SystemStats.log", filename="SystemStats.log", type_opt=''):
-        config.system_stats_token = get_log_token(name, filename, type_opt)
-        config.save()
-        return config.system_stats_token
-
-    def push(self, msg):
-        self.msg_queue.put(self.token + " " + msg)
-
-
-class SyslogSender:
-    def __init__(self, tag):
-        self.logger = logging.getLogger(tag)
-        self.logger.setLevel(logging.INFO)
-        if config.syslog_mode:
-            config.syslog_options_required()
-            self.handler = logging.handlers.SysLogHandler(address=(config.datahub_ip, config.datahub_port),
-                                                          socktype=socket.SOCK_STREAM)
-            self.handler.setLevel(logging.DEBUG)
-            log_format = "%(asctime)s {0} {1}: %(message)s\r\n".format(config.hostname_required(), tag.replace(' ', '_'))
-            time_format = "%Y-%m-%dT%H:%M:%SZ"
-            log_formatter = logging.Formatter(log_format, time_format)
-            log_formatter.converter = time.gmtime
-            self.handler.setFormatter(log_formatter)
-            self.logger.addHandler(self.handler)
-
-    def send_message(self, msg):
-        if config.syslog_mode:
-            self.logger.info(msg)
-
-
-def get_log_token(name, filename, type_opt):
-    config.agent_key_required()
-    log_request = {"request": "new_log",
-                   "user_key": config.user_key,
-                   "host_key": config.agent_key,
-                   "name": name,
-                   "filename": filename,
-                   "type": type_opt,
-                   "source": "token",
-                   "retention": -1}
-    log_response = api_request(log_request, True, True)
-    token = NOT_SET
-    try:
-        log_set = log_response['log']
-        token = log_set['token']
-    except KeyError:
-        die("Cannot obtain token for " + filename + " log file. The response is corrupted.")
-
-    return token
 
 def die(cause, exit_code=EXIT_ERR):
     log.critical(cause)
@@ -912,7 +779,7 @@ def system_detect(details):
         system_info['distname'] = call("sw_vers -productName")
         system_info['distver'] = call("sw_vers -productVersion")
         system_info['kernel'] = uname[2]
-        
+
     elif sys == "Linux":
         system_info['kernel'] = uname[2]
         # XXX CentOS?
@@ -1249,12 +1116,6 @@ class Stats:
         # meg, etc), value is what to multiply by to get to kilobytes
         self.scale2kb = { 'M': 1024, 'G': 1048576 }
 
-        self.syslog_sender = SyslogSender("Statistics")
-
-        if not config.debug_nostats:
-            if not config.syslog_mode:
-                self.stats_stream = TokenBasedTCPSender()
-            self.send_stats()
 
     @staticmethod
     def save_data(data, name, value):
@@ -1565,11 +1426,7 @@ class Stats:
             log.info(results)
         if not self.first:
             # Send data
-            if config.syslog_mode:
-                self.syslog_sender.send_message(self.stats_to_string(results))
-            else:
-                self.new_request(results)
-                self.stats_stream.push(self.stats_to_string(results))
+            self.new_request(results)
         else:
             self.first = False
 
@@ -1579,23 +1436,6 @@ class Stats:
             self.timer = threading.Timer(next_step, self.send_stats, ())
             self.timer.daemon = True
             self.timer.start()
-
-    def stats_to_string(self, data):
-        total = data['cu'] + data['cl'] + data['cs'] + data['ci'] + data['cio'] + data['cq'] + data['csq']
-        cu = data['cu'] * 100 / total
-        cl = data['cl'] * 100 / total
-        cs = data['cs'] * 100 / total
-        ci = data['ci'] * 100 / total
-        cio = data['cio'] * 100 / total
-        cq = data['cq'] * 100 / total
-        csq = data['csq'] * 100 / total
-        stat_cpu_string = "CPU.user={0}% CPU.nice={1}% CPU.system={2}% CPU.idle={3}% CPU.wait={4}% CPU.irq={5}% CPU.softirq={6}% ".format(
-            cu, cl, cs, ci, cio, cq, csq)
-        stat_mem_string = "Mem.total={0} Mem.active={1} Mem.cached={2} ".format(data['mt'], data['ma'], data['mc'])
-        stat_disk_string = "Disk.write={0} Disk.read={1} ".format(self.total['dw'], self.total['dr'])
-        stat_net_string = "Net.send={0} Net.resv={1} ".format(self.total['no'], self.total['ni'])
-        host_string = "HostName={0} ".format(config.hostname_required())
-        return host_string + stat_cpu_string + stat_mem_string + stat_disk_string + stat_net_string
 
     def cancel(self):
         self.to_remove = True
@@ -1615,7 +1455,6 @@ class Follower(object):
         self.log_addr = '/%s/hosts/%s/%s/?realtime=1' % (config.user_key, config.agent_key, log_key)
         self.flush = True
         self.event_filter = event_filter
-        self.syslog_sender = SyslogSender(os.path.basename(name))
         log.info("Following %s" % name)
         monitoring_thread = threading.Thread(target=monitorlogs, name=self.name)
         monitoring_thread.daemon = True
@@ -1748,8 +1587,6 @@ class Follower(object):
         return events
 
     def open_connection(self):
-        if config.syslog_mode:
-            return
         """ Opens a push connection to logentries. """
         log.debug("Opening connection %s", self.log_addr)
         retry = 1
@@ -1772,21 +1609,13 @@ class Follower(object):
             if not events:
                 return
         else:
-            if config.syslog_mode:
-                return
-            else:
-                events = IAA_TOKEN
-        if config.syslog_mode:
-            events_array = events.splitlines()
-            for event in events_array:
-                self.syslog_sender.send_message(event)
-        else:
-            while not shutdown:
-                try:
-                    self.conn.send(events)
-                    break
-                except socket.error, (err_no, err_str):
-                    self.open_connection()
+            events = IAA_TOKEN
+        while not shutdown:
+            try:
+                self.conn.send(events)
+                break
+            except socket.error, (err_no, err_str):
+                self.open_connection()
 
         if config.debug_events:
             print >> sys.stderr, events,
@@ -1837,14 +1666,6 @@ class Config:
         self.ec2eu = False
         self.suppress_ssl = False
         self.use_ca_provided = False
-
-        # Syslog options
-        self.syslog_mode = NOT_SET
-        self.datahub_ip = NOT_SET
-        self.datahub_port = NOT_SET
-
-        # System stats. token
-        self.system_stats_token = NOT_SET
 
         # Debug options
 
@@ -1920,11 +1741,7 @@ class Config:
                 EC2EU_PARAM: '',
                 SUPPRESS_SSL_PARAM: '',
                 FORCE_DOMAIN_PARAM: '',
-                USE_CA_PROVIDED_PARAM: '',
-                SYSLOG_MODE_PARAM: '',
-                DATAHUB_IP_PARAM: '',
-                DATAHUB_PORT_PARAM: '',
-                SYSSTAT_TOKEN_PARAM: ''
+                USE_CA_PROVIDED_PARAM: ''
             })
             conf.read(self.config_filename)
 
@@ -1953,24 +1770,6 @@ class Config:
             new_force_domain = conf.get(MAIN_SECT, FORCE_DOMAIN_PARAM)
             if new_force_domain:
                 self.force_domain = new_force_domain
-
-            if self.syslog_mode == NOT_SET:
-                if conf.get(MAIN_SECT, SYSLOG_MODE_PARAM) == 'True':
-                    self.syslog_mode = True
-                else:
-                    self.syslog_mode = False
-            if self.datahub_ip == NOT_SET:
-                self.datahub_ip = conf.get(MAIN_SECT, DATAHUB_IP_PARAM)
-                if (self.datahub_ip == ''):
-                    self.datahub_ip = NOT_SET
-            if self.datahub_port == NOT_SET:
-                datahub_port_str = conf.get(MAIN_SECT, DATAHUB_PORT_PARAM)
-                if datahub_port_str != '':
-                    self.datahub_port = int(datahub_port_str)
-            if self.system_stats_token == NOT_SET:
-                system_stats_token_str = conf.get(MAIN_SECT, SYSSTAT_TOKEN_PARAM)
-                if system_stats_token_str != '':
-                    self.system_stats_token = system_stats_token_str
 
         except ConfigParser.NoSectionError:
             return False
@@ -2002,14 +1801,6 @@ class Config:
                 conf.set(MAIN_SECT, USE_CA_PROVIDED_PARAM, 'True')
             if self.force_domain:
                 conf.set(MAIN_SECT, FORCE_DOMAIN_PARAM, self.force_domain)
-            if self.syslog_mode != NOT_SET:
-                conf.set(MAIN_SECT, SYSLOG_MODE_PARAM, str(self.syslog_mode))
-            if self.datahub_ip != NOT_SET:
-                conf.set(MAIN_SECT, DATAHUB_IP_PARAM, self.datahub_ip)
-            if self.datahub_port != NOT_SET:
-                conf.set(MAIN_SECT, DATAHUB_PORT_PARAM, str(self.datahub_port))
-            if self.system_stats_token != NOT_SET:
-                conf.set(MAIN_SECT, SYSSTAT_TOKEN_PARAM, self.system_stats_token)
             conf.write(conf_file)
         except IOError, e:
             die("Error: IO error when writing to config file: %s" % e)
@@ -2034,16 +1825,6 @@ class Config:
                 "Account key is required. Enter your Logentries login credentials or specify the account key with --account-key parameter.")
             self.user_key = retrieve_account_key()
             config.save()
-
-    def set_system_stat_token(self, value):
-        if not self.check_key(value):
-            die('Error: system stat token does not look right.')
-        self.system_stats_token = value
-
-    def system_stats_token_required(self):
-        if self.system_stats_token == NOT_SET:
-            die("System stat token is required.")
-        config.save()
 
     def set_agent_key(self, value):
         if not self.check_key(value):
@@ -2079,18 +1860,6 @@ class Config:
         if self.name == NOT_SET:
             self.name = self.hostname_required().split('.')[0]
         return self.name
-
-    def syslog_options_required(self):
-        """
-        Exits with error message if the datahub-ip or datahub-port isn't set.
-        """
-        if not self.syslog_mode:
-            return
-
-        if self.datahub_ip == NOT_SET:
-            die("Datahub ip is required. Specify the datahub ip or host name with the --datahub-ip parameter.")
-        if self.datahub_port == NOT_SET:
-            die("Datahub port is required. Specify the port with the --datahub_port parameter.")
 
     def detect_ec2eu(self):
         """
@@ -2138,7 +1907,7 @@ class Config:
         """
         try:
             optlist, args = getopt.gnu_getopt(params, '',
-                                              "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-filters debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl use-ca-provided force-api-host= force-domain= syslog-mode= datahub-ip= datahub-port= system-stat-token=".split())
+                                              "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-filters debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl use-ca-provided force-api-host= force-domain=".split())
         except getopt.GetoptError, err:
             die("Parameter error: " + str(err))
         for name, value in optlist:
@@ -2211,14 +1980,6 @@ class Config:
                 if value and value != '': self.force_domain = value
             elif name == "--use-ca-provided":
                 self.use_ca_provided = True
-            elif name == "--syslog-mode":
-                self.syslog_mode = (value.lower() == "true")
-            elif name == "--datahub-ip":
-                self.datahub_ip = value
-            elif name == "--datahub-port":
-                self.datahub_port = value
-            elif name == "--system-stat-token":
-                self.set_system_stat_token(value)
 
         if self.debug_local and self.force_api_host:
             die("Do not specify --local and --force-api-host at the same time.")
@@ -3497,4 +3258,3 @@ if __name__ == '__main__':
 # aptitude install python-dev libbluetooth-dev
 # http://pypi.python.org/pypi/ssl#downloads
 # python setup install.py
-
