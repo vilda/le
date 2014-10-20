@@ -1116,6 +1116,9 @@ class Stats:
         # meg, etc), value is what to multiply by to get to kilobytes
         self.scale2kb = { 'M': 1024, 'G': 1048576 }
 
+        if not config.debug_nostats:
+            self.send_stats()
+
 
     @staticmethod
     def save_data(data, name, value):
