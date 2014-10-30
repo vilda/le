@@ -35,7 +35,8 @@ Where ARGS are:
   --host-key=       set local host key and exit, generate key if key is empty
   --no-timestamps   no timestamps in agent reportings
   --force           force given operation
-  --ec2eu           assume the host is in EC2 EU region
+  --datahub         send logs to the specified data hub address
+                    the format is address:port with port being optional
   --suppress-ssl    do not use SSL with API server
   --yes	            always respond yes
 

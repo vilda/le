@@ -1,0 +1,9 @@
+usr/bin/le usr/bin/le-init
+usr/bin/le usr/bin/le-reinit
+usr/bin/le usr/bin/le-monitor
+usr/bin/le usr/bin/le-follow
+usr/bin/le usr/bin/le-ls
+usr/bin/le usr/bin/le-rm
+usr/bin/le usr/bin/le-push
+usr/bin/le usr/bin/le-pull
+usr/share/logentries/le usr/bin/le

@@ -3,14 +3,11 @@
 
 #
 # Logentries agent <https://logentries.com/>.
-# This work is licensed under a <http://creativecommons.org/licenses/by/3.0/>
-# Creative Commons Attribution 3.0 Unported License
-#
-
 
 #
 # Constants
 #
+from utils import *
 
 VERSION = "1.3.2"
 
@@ -24,14 +21,13 @@ DEFAULT_AGENT_KEY = NOT_SET
 CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
 LE_CONFIG = 'config'
-LE_CERT_NAME = 'ca-certs.pem'
+
 PID_FILE = '/var/run/logentries.pid'
 
 MAIN_SECT = 'Main'
 USER_KEY_PARAM = 'user-key'
 AGENT_KEY_PARAM = 'agent-key'
 FILTERS_PARAM = 'filters'
-EC2EU_PARAM = 'ec2eu'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
 USE_CA_PROVIDED_PARAM = 'use_ca_provided'
 FORCE_DOMAIN_PARAM = 'force_domain'
@@ -43,32 +39,25 @@ KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
 
-LOG_LE_AGENT = 'logentries.com'
 
 # Logentries server details
-LE_SERVER_DATA_DOMAIN = 'api.logentries.com'
-LE_SERVER_EC2EU_DATA_DOMAIN = 'ec2eu.api.logentries.com'
 LE_SERVER_API = '/'
 
 LE_DEFAULT_SSL_PORT = 20000
 LE_DEFAULT_NON_SSL_PORT = 10000
-LE_SERVER_STREAM_LOG_RECEIVER = 'data.logentries.com'
-
 
 SYSTEM_STATS_TAG = 'SystemStats'
 SYSTEM_STATS_LOG_FILE = SYSTEM_STATS_TAG + '.log'
 
 
-class Domain:
+class Domain(object):
     """ Logentries domains. """
     # General domains
     MAIN = 'logentries.com'
     API = 'api.logentries.com'
     DATA = 'api.logentries.com'  # TODO
     PULL = 'pull.logentries.com'
-    # EC2 EU shortcuts
-    API_EC2EU = 'ec2eu.api.logentries.com'
-    DATA_EC2EU = 'ec2eu.api.logentries.com'  # TODO
+    STREAM = 'data.logentries.com'
     # Local debugging
     MAIN_LOCAL = 'localhost:8000'
     API_LOCAL = 'localhost:8081'
@@ -76,10 +65,6 @@ class Domain:
 
 
 CONTENT_LENGTH = 'content-length'
-
-# URL to detect EC2 availability zone
-EC2_AVZ_URL = 'http://169.254.169.254/latest/meta-data/placement/availability-zone'
-EC2_AVZ_EU_PREFIX = 'eu-west-1'
 
 # Log root directory
 LOG_ROOT = '/var/log'
@@ -128,6 +113,9 @@ NET_DEVICES = ['  eth', ' wlan', 'venet', ' veth']
 
 EPOCH = 5  # in seconds
 
+QUEUE_WAIT_TIME = 1  # time in seconds to wait for reading from the transport queue if it is empty
+
+
 # File Handler Positions
 FILE_BEGIN = 0
 FILE_CURRENT = 1
@@ -146,11 +134,6 @@ RQ_WORKLOAD = 'push_wl'
 # Release information on LSB systems
 LSB_RELEASE = '/etc/lsb-release'
 
-# Return codes
-EXIT_OK = 0
-EXIT_NO = 1
-EXIT_ERR = 3
-EXIT_HELP = 4
 
 
 #
@@ -160,7 +143,7 @@ EXIT_HELP = 4
 PULL_USAGE = "pull <path> <when> <filter> <limit>"
 PUSH_USAGE = "push <file> <path> <log-type>"
 USAGE = "Logentries agent version " + VERSION + """
-usage: le COMMAND [ARGS]
+usage: le.py COMMAND [ARGS]
 
 Where command is one of:
   init      Write local configuration file
@@ -186,10 +169,10 @@ Where parameters are:
   --host-key=          set local host key and exit, generate key if key is empty
   --no-timestamps      no timestamps in agent reportings
   --force              force given operation
-  --ec2eu              assume the host is in EC2 EU region
   --suppress-ssl       do not use SSL with API server
   --yes                always respond yes
-  --force-api-host     use particular host as an api server
+  --datahub            send logs to the specified data hub address
+                       the format is address:port with port being optional
   --system-stat-token= set the token for system stats log
 """
 
@@ -218,198 +201,11 @@ def print_usage(version_only=False):
 
 
 #
-# Authority certificate
-#
-# Used if not provided by the underlying system
-#
-
-authority_certificate = """-----BEGIN CERTIFICATE-----
-MIIDIDCCAomgAwIBAgIENd70zzANBgkqhkiG9w0BAQUFADBOMQswCQYDVQQGEwJV
-UzEQMA4GA1UEChMHRXF1aWZheDEtMCsGA1UECxMkRXF1aWZheCBTZWN1cmUgQ2Vy
-dGlmaWNhdGUgQXV0aG9yaXR5MB4XDTk4MDgyMjE2NDE1MVoXDTE4MDgyMjE2NDE1
-MVowTjELMAkGA1UEBhMCVVMxEDAOBgNVBAoTB0VxdWlmYXgxLTArBgNVBAsTJEVx
-dWlmYXggU2VjdXJlIENlcnRpZmljYXRlIEF1dGhvcml0eTCBnzANBgkqhkiG9w0B
-AQEFAAOBjQAwgYkCgYEAwV2xWGcIYu6gmi0fCG2RFGiYCh7+2gRvE4RiIcPRfM6f
-BeC4AfBONOziipUEZKzxa1NfBbPLZ4C/QgKO/t0BCezhABRP/PvwDN1Dulsr4R+A
-cJkVV5MW8Q+XarfCaCMczE1ZMKxRHjuvK9buY0V7xdlfUNLjUA86iOe/FP3gx7kC
-AwEAAaOCAQkwggEFMHAGA1UdHwRpMGcwZaBjoGGkXzBdMQswCQYDVQQGEwJVUzEQ
-MA4GA1UEChMHRXF1aWZheDEtMCsGA1UECxMkRXF1aWZheCBTZWN1cmUgQ2VydGlm
-aWNhdGUgQXV0aG9yaXR5MQ0wCwYDVQQDEwRDUkwxMBoGA1UdEAQTMBGBDzIwMTgw
-ODIyMTY0MTUxWjALBgNVHQ8EBAMCAQYwHwYDVR0jBBgwFoAUSOZo+SvSspXXR9gj
-IBBPM5iQn9QwHQYDVR0OBBYEFEjmaPkr0rKV10fYIyAQTzOYkJ/UMAwGA1UdEwQF
-MAMBAf8wGgYJKoZIhvZ9B0EABA0wCxsFVjMuMGMDAgbAMA0GCSqGSIb3DQEBBQUA
-A4GBAFjOKer89961zgK5F7WF0bnj4JXMJTENAKaSbn+2kmOeUJXRmm/kEd5jhW6Y
-7qj/WsjTVbJmcVfewCHrPSqnI0kBBIZCe/zuf6IWUrVnZ9NA2zsmWLIodz2uFHdh
-1voqZiegDfqnc1zqcPGUIWVEX/r87yloqaKHee9570+sB3c4
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIIDVDCCAjygAwIBAgIDAjRWMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT
-MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMRswGQYDVQQDExJHZW9UcnVzdCBHbG9i
-YWwgQ0EwHhcNMDIwNTIxMDQwMDAwWhcNMjIwNTIxMDQwMDAwWjBCMQswCQYDVQQG
-EwJVUzEWMBQGA1UEChMNR2VvVHJ1c3QgSW5jLjEbMBkGA1UEAxMSR2VvVHJ1c3Qg
-R2xvYmFsIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2swYYzD9
-9BcjGlZ+W988bDjkcbd4kdS8odhM+KhDtgPpTSEHCIjaWC9mOSm9BXiLnTjoBbdq
-fnGk5sRgprDvgOSJKA+eJdbtg/OtppHHmMlCGDUUna2YRpIuT8rxh0PBFpVXLVDv
-iS2Aelet8u5fa9IAjbkU+BQVNdnARqN7csiRv8lVK83Qlz6cJmTM386DGXHKTubU
-1XupGc1V3sjs0l44U+VcT4wt/lAjNvxm5suOpDkZALeVAjmRCw7+OC7RHQWa9k0+
-bw8HHa8sHo9gOeL6NlMTOdReJivbPagUvTLrGAMoUgRx5aszPeE4uwc2hGKceeoW
-MPRfwCvocWvk+QIDAQABo1MwUTAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTA
-ephojYn7qwVkDBF9qn1luMrMTjAfBgNVHSMEGDAWgBTAephojYn7qwVkDBF9qn1l
-uMrMTjANBgkqhkiG9w0BAQUFAAOCAQEANeMpauUvXVSOKVCUn5kaFOSPeCpilKIn
-Z57QzxpeR+nBsqTP3UEaBU6bS+5Kb1VSsyShNwrrZHYqLizz/Tt1kL/6cdjHPTfS
-tQWVYrmm3ok9Nns4d0iXrKYgjy6myQzCsplFAMfOEVEiIuCl6rYVSAlk6l5PdPcF
-PseKUgzbFbS9bZvlxrFUaKnjaZC2mqUPuLk/IH2uSrW4nOQdtqvmlKXBx4Ot2/Un
-hw4EbNX/3aBd7YdStysVAq45pmp06drE57xNNB6pXE0zX5IJL4hmXXeXxx12E6nV
-5fEWCRE11azbJHFwLJhWC9kXtNHjUStedejV0NxPNO3CBWaAocvmMw==
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIID2TCCAsGgAwIBAgIDAjbQMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT
-MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMRswGQYDVQQDExJHZW9UcnVzdCBHbG9i
-YWwgQ0EwHhcNMTAwMjE5MjIzOTI2WhcNMjAwMjE4MjIzOTI2WjBAMQswCQYDVQQG
-EwJVUzEXMBUGA1UEChMOR2VvVHJ1c3QsIEluYy4xGDAWBgNVBAMTD0dlb1RydXN0
-IFNTTCBDQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJCzgMHk5Uat
-cGA9uuUU3Z6KXot1WubKbUGlI+g5hSZ6p1V3mkihkn46HhrxJ6ujTDnMyz1Hr4Gu
-FmpcN+9FQf37mpc8oEOdxt8XIdGKolbCA0mEEoE+yQpUYGa5jFTk+eb5lPHgX3UR
-8im55IaisYmtph6DKWOy8FQchQt65+EuDa+kvc3nsVrXjAVaDktzKIt1XTTYdwvh
-dGLicTBi2LyKBeUxY0pUiWozeKdOVSQdl+8a5BLGDzAYtDRN4dgjOyFbLTAZJQ50
-96QhS6CkIMlszZhWwPKoXz4mdaAN+DaIiixafWcwqQ/RmXAueOFRJq9VeiS+jDkN
-d53eAsMMvR8CAwEAAaOB2TCB1jAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFEJ5
-VBthzVUrPmPVPEhX9Z/7Rc5KMB8GA1UdIwQYMBaAFMB6mGiNifurBWQMEX2qfWW4
-ysxOMBIGA1UdEwEB/wQIMAYBAf8CAQAwOgYDVR0fBDMwMTAvoC2gK4YpaHR0cDov
-L2NybC5nZW90cnVzdC5jb20vY3Jscy9ndGdsb2JhbC5jcmwwNAYIKwYBBQUHAQEE
-KDAmMCQGCCsGAQUFBzABhhhodHRwOi8vb2NzcC5nZW90cnVzdC5jb20wDQYJKoZI
-hvcNAQEFBQADggEBANTvU4ToGr2hiwTAqfVfoRB4RV2yV2pOJMtlTjGXkZrUJPji
-J2ZwMZzBYlQG55cdOprApClICq8kx6jEmlTBfEx4TCtoLF0XplR4TEbigMMfOHES
-0tdT41SFULgCy+5jOvhWiU1Vuy7AyBh3hjELC3DwfjWDpCoTZFZnNF0WX3OsewYk
-2k9QbSqr0E1TQcKOu3EDSSmGGM8hQkx0YlEVxW+o78Qn5Rsz3VqI138S0adhJR/V
-4NwdzxoQ2KDLX4z6DOW/cf/lXUQdpj6HR/oaToODEj+IZpWYeZqF6wJHzSXj8gYE
-TpnKXKBuervdo5AaRTPvvz7SBMS24CqFZUE+ENQ=
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIIDfTCCAuagAwIBAgIDErvmMA0GCSqGSIb3DQEBBQUAME4xCzAJBgNVBAYTAlVT
-MRAwDgYDVQQKEwdFcXVpZmF4MS0wKwYDVQQLEyRFcXVpZmF4IFNlY3VyZSBDZXJ0
-aWZpY2F0ZSBBdXRob3JpdHkwHhcNMDIwNTIxMDQwMDAwWhcNMTgwODIxMDQwMDAw
-WjBCMQswCQYDVQQGEwJVUzEWMBQGA1UEChMNR2VvVHJ1c3QgSW5jLjEbMBkGA1UE
-AxMSR2VvVHJ1c3QgR2xvYmFsIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-CgKCAQEA2swYYzD99BcjGlZ+W988bDjkcbd4kdS8odhM+KhDtgPpTSEHCIjaWC9m
-OSm9BXiLnTjoBbdqfnGk5sRgprDvgOSJKA+eJdbtg/OtppHHmMlCGDUUna2YRpIu
-T8rxh0PBFpVXLVDviS2Aelet8u5fa9IAjbkU+BQVNdnARqN7csiRv8lVK83Qlz6c
-JmTM386DGXHKTubU1XupGc1V3sjs0l44U+VcT4wt/lAjNvxm5suOpDkZALeVAjmR
-Cw7+OC7RHQWa9k0+bw8HHa8sHo9gOeL6NlMTOdReJivbPagUvTLrGAMoUgRx5asz
-PeE4uwc2hGKceeoWMPRfwCvocWvk+QIDAQABo4HwMIHtMB8GA1UdIwQYMBaAFEjm
-aPkr0rKV10fYIyAQTzOYkJ/UMB0GA1UdDgQWBBTAephojYn7qwVkDBF9qn1luMrM
-TjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjA6BgNVHR8EMzAxMC+g
-LaArhilodHRwOi8vY3JsLmdlb3RydXN0LmNvbS9jcmxzL3NlY3VyZWNhLmNybDBO
-BgNVHSAERzBFMEMGBFUdIAAwOzA5BggrBgEFBQcCARYtaHR0cHM6Ly93d3cuZ2Vv
-dHJ1c3QuY29tL3Jlc291cmNlcy9yZXBvc2l0b3J5MA0GCSqGSIb3DQEBBQUAA4GB
-AHbhEm5OSxYShjAGsoEIz/AIx8dxfmbuwu3UOx//8PDITtZDOLC5MH0Y0FWDomrL
-NhGc6Ehmo21/uBPUR/6LWlxz/K7ZGzIZOKuXNBSqltLroxwUCEm2u+WR74M26x1W
-b8ravHNjkOR/ez4iyz0H7V84dJzjA1BOoa+Y7mHyhD8S
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIIFSjCCBDKgAwIBAgIDBQMSMA0GCSqGSIb3DQEBBQUAMGExCzAJBgNVBAYTAlVT
-MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMR0wGwYDVQQLExREb21haW4gVmFsaWRh
-dGVkIFNTTDEbMBkGA1UEAxMSR2VvVHJ1c3QgRFYgU1NMIENBMB4XDTEyMDkxMDE5
-NTI1N1oXDTE2MDkxMTIxMjgyOFowgcExKTAnBgNVBAUTIEpxd2ViV3RxdzZNblVM
-ek1pSzNiL21hdktiWjd4bEdjMRMwEQYDVQQLEwpHVDAzOTM4NjcwMTEwLwYDVQQL
-EyhTZWUgd3d3Lmdlb3RydXN0LmNvbS9yZXNvdXJjZXMvY3BzIChjKTEyMS8wLQYD
-VQQLEyZEb21haW4gQ29udHJvbCBWYWxpZGF0ZWQgLSBRdWlja1NTTChSKTEbMBkG
-A1UEAxMSYXBpLmxvZ2VudHJpZXMuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
-MIIBCgKCAQEAxcmFqgE2p6+N9lM2GJhe8bNUO0qmcw8oHUVrsneeVA66hj+qKPoJ
-AhGKxC0K9JFMyIzgPu6FvuVLahFZwv2wkbjXKZLIOAC4o6tuVb4oOOUBrmpvzGtL
-kKVN+sip1U7tlInGjtCfTMWNiwC4G9+GvJ7xORgDpaAZJUmK+4pAfG8j6raWgPGl
-JXo2hRtOUwmBBkCPqCZQ1mRETDT6tBuSAoLE1UMlxWvMtXCUzeV78H+2YrIDxn/W
-xd+eEvGTSXRb/Q2YQBMqv8QpAlarcda3WMWj8pkS38awyBM47GddwVYBn5ZLEu/P
-DiRQGSmLQyFuk5GUdApSyFETPL6p9MfV4wIDAQABo4IBqDCCAaQwHwYDVR0jBBgw
-FoAUjPTZkwpHvACgSs5LdW6gtrCyfvwwDgYDVR0PAQH/BAQDAgWgMB0GA1UdJQQW
-MBQGCCsGAQUFBwMBBggrBgEFBQcDAjAdBgNVHREEFjAUghJhcGkubG9nZW50cmll
-cy5jb20wQQYDVR0fBDowODA2oDSgMoYwaHR0cDovL2d0c3NsZHYtY3JsLmdlb3Ry
-dXN0LmNvbS9jcmxzL2d0c3NsZHYuY3JsMB0GA1UdDgQWBBRaMeKDGSFaz8Kvj+To
-j7eMOtT/zTAMBgNVHRMBAf8EAjAAMHUGCCsGAQUFBwEBBGkwZzAsBggrBgEFBQcw
-AYYgaHR0cDovL2d0c3NsZHYtb2NzcC5nZW90cnVzdC5jb20wNwYIKwYBBQUHMAKG
-K2h0dHA6Ly9ndHNzbGR2LWFpYS5nZW90cnVzdC5jb20vZ3Rzc2xkdi5jcnQwTAYD
-VR0gBEUwQzBBBgpghkgBhvhFAQc2MDMwMQYIKwYBBQUHAgEWJWh0dHA6Ly93d3cu
-Z2VvdHJ1c3QuY29tL3Jlc291cmNlcy9jcHMwDQYJKoZIhvcNAQEFBQADggEBAAo0
-rOkIeIDrhDYN8o95+6Y0QhVCbcP2GcoeTWu+ejC6I9gVzPFcwdY6Dj+T8q9I1WeS
-VeVMNtwJt26XXGAk1UY9QOklTH3koA99oNY3ARcpqG/QwYcwaLbFrB1/JkCGcK1+
-Ag3GE3dIzAGfRXq8fC9SrKia+PCdDgNIAFqe+kpa685voTTJ9xXvNh7oDoVM2aip
-v1xy+6OfZyGudXhXag82LOfiUgU7hp+RfyUG2KXhIRzhMtDOHpyBjGnVLB0bGYcC
-566Nbe7Alh38TT7upl/O5lA29EoSkngtUWhUnzyqYmEMpay8yZIV4R9AuUk2Y4HB
-kAuBvDPPm+C0/M4RLYs=
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIID+jCCAuKgAwIBAgIDAjbSMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT
-MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMRswGQYDVQQDExJHZW9UcnVzdCBHbG9i
-YWwgQ0EwHhcNMTAwMjI2MjEzMjMxWhcNMjAwMjI1MjEzMjMxWjBhMQswCQYDVQQG
-EwJVUzEWMBQGA1UEChMNR2VvVHJ1c3QgSW5jLjEdMBsGA1UECxMURG9tYWluIFZh
-bGlkYXRlZCBTU0wxGzAZBgNVBAMTEkdlb1RydXN0IERWIFNTTCBDQTCCASIwDQYJ
-KoZIhvcNAQEBBQADggEPADCCAQoCggEBAKa7jnrNpJxiV9RRMEJ7ixqy0ogGrTs8
-KRMMMbxp+Z9alNoGuqwkBJ7O1KrESGAA+DSuoZOv3gR+zfhcIlINVlPrqZTP+3RE
-60OUpJd6QFc1tqRi2tVI+Hrx7JC1Xzn+Y3JwyBKF0KUuhhNAbOtsTdJU/V8+Jh9m
-cajAuIWe9fV1j9qRTonjynh0MF8VCpmnyoM6djVI0NyLGiJOhaRO+kltK3C+jgwh
-w2LMpNGtFmuae8tk/426QsMmqhV4aJzs9mvIDFcN5TgH02pXA50gDkvEe4GwKhz1
-SupKmEn+Als9AxSQKH6a9HjQMYRX5Uw4ekIR4vUoUQNLIBW7Ihq28BUCAwEAAaOB
-2TCB1jAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFIz02ZMKR7wAoErOS3VuoLaw
-sn78MB8GA1UdIwQYMBaAFMB6mGiNifurBWQMEX2qfWW4ysxOMBIGA1UdEwEB/wQI
-MAYBAf8CAQAwOgYDVR0fBDMwMTAvoC2gK4YpaHR0cDovL2NybC5nZW90cnVzdC5j
-b20vY3Jscy9ndGdsb2JhbC5jcmwwNAYIKwYBBQUHAQEEKDAmMCQGCCsGAQUFBzAB
-hhhodHRwOi8vb2NzcC5nZW90cnVzdC5jb20wDQYJKoZIhvcNAQEFBQADggEBADOR
-NxHbQPnejLICiHevYyHBrbAN+qB4VqOC/btJXxRtyNxflNoRZnwekcW22G1PqvK/
-ISh+UqKSeAhhaSH+LeyCGIT0043FiruKzF3mo7bMbq1vsw5h7onOEzRPSVX1ObuZ
-lvD16lo8nBa9AlPwKg5BbuvvnvdwNs2AKnbIh+PrI7OWLOYdlF8cpOLNJDErBjgy
-YWE5XIlMSB1CyWee0r9Y9/k3MbBn3Y0mNhp4GgkZPJMHcCrhfCn13mZXCxJeFu1e
-vTezMGnGkqX2Gdgd+DYSuUuVlZzQzmwwpxb79k1ktl8qFJymyFWOIPllByTMOAVM
-IIi0tWeUz12OYjf+xLQ=
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIIF4TCCA8mgAwIBAgIJAMuLUWygLQmXMA0GCSqGSIb3DQEBCwUAMIGGMQswCQYD
-VQQGEwJJRTEQMA4GA1UECAwHSXJlbGFuZDEPMA0GA1UEBwwGRHVibGluMRgwFgYD
-VQQKDA9KbGl6YXJkIExpbWl0ZWQxEzARBgNVBAMMCkxvZ2VudHJpZXMxJTAjBgkq
-hkiG9w0BCQEWFnN1cHBvcnRAbG9nZW50cmllcy5jb20wHhcNMTQwMjI0MjA1MzQ2
-WhcNMTkwMjIzMjA1MzQ2WjCBhjELMAkGA1UEBhMCSUUxEDAOBgNVBAgMB0lyZWxh
-bmQxDzANBgNVBAcMBkR1YmxpbjEYMBYGA1UECgwPSmxpemFyZCBMaW1pdGVkMRMw
-EQYDVQQDDApMb2dlbnRyaWVzMSUwIwYJKoZIhvcNAQkBFhZzdXBwb3J0QGxvZ2Vu
-dHJpZXMuY29tMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAymhjhWPh
-gz7tuk5Jj+ohRfjUMNoUKCvTPVCl5LPon7seXmt+FC0Cyf68VoGY8m5fuahWseKr
-uyw7Bk7Q18vFBvsGp38q7NvQYlcQ2pCj7Ln6AvSlYvoweS4pz1C9C479ODNj9U2I
-RcqNxfZX2alxZGsoGg0u/KS3RbXFZzyMGPSXbugzMAYFyoIJM1U1iGhrjj8yAGes
-pP1BeDwrK9qHOv2Uy3yF8UtNKRm+hYE0E+yv0+s8vQLYnHaaZFwt1hulo0CGDjpJ
-vZtmR5U0qRjdFE6RZJsetfPNYeUYYeyG8qwEKMK86K3Jj8J9MR4l21Q+rIzK7JMm
-4P3Rh/L4klWEKm48WhfAhlv43CSpt/6HWhBq3B400effQzudl2O6VfC1OIlKWQ3x
-jmAKZToIlIVeF7X/5z04Azhy2SVpQ1DNVGShlKIiyTIA04ny3udMdDr0InvmXHtn
-rQexpaw5uFYno2tmOSJiElx5c7fMQtOmXO6qd/s9TFsNH8hwJ9g+Vgof11gTOo6o
-MEEgzeVfMOPd5JOtPXOD+S9X0Vt0dUlCD4xbjpwH1kJ5hfTcLtmANDOAIjF+P9pY
-ajDLE9phYM9qydyRaTawyOS7GA7XaW/WPZzgbSZ3T9KNJIUU1c1OZd3JD4BsDOBD
-ZTRxHxanHeg2pAAmiNX1rIBwz5O8Zm13rT8CAwEAAaNQME4wHQYDVR0OBBYEFDk6
-qPSf6apMD0hAGrYutT+wdnqhMB8GA1UdIwQYMBaAFDk6qPSf6apMD0hAGrYutT+w
-dnqhMAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQELBQADggIBADQg6tx70qwG74dj
-af9QDXKHhGvp8SoGMNvioQGREhrAXb0JTFiEQAECJghiP8OH4PIOjsN/ON4YI+WW
-ZPdGlcPkUgFQ/bdB7eEyKtGa7hDfH1PLL1FqVhZjoLC6poCJJVo/Q9J2dlkGaksK
-/R6+QV4SYnzfPH4cKQoN4Q/F0VuzelonSVTk9BG72RsY1fQPrm6tA/sN5Nzl+a4W
-d1UnK4KXajQH1Qsnv8VTXyBc+8wM3C12m/lsqc2npgIqU/xlQQXgDBR087+A/dX3
-osXMzZfGhh6D/NyCKs7VuAsb7hRTPP/6WMgM3c9lSc05xZyXzEZ7FL4GYg3Gjsdg
-PFQMkgfMyiECBPudVzU2RyWuXdId+i0ezl1mBSrowa+eNCx2pI5Er7OAjvEQOAlC
-v50jvvwSU9dT39XkGNh+q5uxaFLxyr6WidT09xHi17RZhgcMzWkiShRRqum/rOfL
-TUPMGFvOjLiMiRZvHYhB3XjPqO5z3DEWT6Ux8IUN0aqNWCSLV2DOc/2riflxtExc
-V1XUj6wWPCNqNPvdXeuQl/yqOZM5ekBlPCpPyxztba8SrJZKVWRXJl3RxuKPuWIE
-XI7Mr8xQHVr1HLt/SU+by7Y7im6nyZUfOzTNMkic0RXgI0fqztetDpfLedN8Xlwn
-/1NE/L7egzmDtcwoSQYUTu8g5rI4
------END CERTIFICATE-----
-"""
-authority_certificate_files = [  # Debian 5.x, 6.x, 7.x, Ubuntu 9.10, 10.4, 13.0
-        "/etc/ssl/certs/ca-certificates.crt",  # Fedora 12, Fedora 13, CentOS 5
-        "/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem",  # Amazon AMI
-        "/etc/pki/tls/certs/ca-bundle.crt",
-]
-
-
-#
 # Libraries
 #
 
 import string
 import re
-import errno
 import ConfigParser
 import fileinput
 import getopt
@@ -431,9 +227,8 @@ import httplib
 import getpass
 import atexit
 import logging.handlers
-import Queue
-
-
+from collections import deque
+from backports import CertificateError, match_hostname
 #
 # Start logging
 #
@@ -446,7 +241,7 @@ if not log:
 log.setLevel(logging.INFO)
 
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.DEBUG)
+stream_handler.setLevel(logging.INFO)
 stream_handler.setFormatter(logging.Formatter("%(message)s"))
 log.addHandler(stream_handler)
 
@@ -466,9 +261,11 @@ class StatisticsSendingWorker(threading.Thread):
 
     def run(self):
         while True:
-            msg = self.msg_queue.get(True)
-            self.transport.send(msg)
-            self.msg_queue.task_done()
+            try:
+                msg = self.msg_queue.popleft()
+                self.transport.send(msg)
+            except IndexError:
+                time.sleep(QUEUE_WAIT_TIME)
 
 
 # Logic of SSLSysLogHandler class is based on code from
@@ -476,21 +273,21 @@ class StatisticsSendingWorker(threading.Thread):
 # with several modifications.
 
 class SSLSysLogHandler(logging.handlers.SysLogHandler):
-
-    def __init__(self, address, port, non_ssl_port, certs=None,
-               facility=logging.handlers.SysLogHandler.LOG_USER):
+    def __init__(self, address, port, use_ssl=True, certs=None,
+                 facility=logging.handlers.SysLogHandler.LOG_USER):
         logging.handlers.SysLogHandler.__init__(self)
         self.address = address
         self.facility = facility
         self.port = port
-        self.non_ssl_port = non_ssl_port
+        self.use_ssl = use_ssl
         self.certs = certs
         self.socket = NOT_SET
 
         try:
             self.reconnect()
-        except:
-            pass
+        except Exception, e:
+            report("Encountered unexpected exception: %s - continuing" % e.message)
+            raise e
 
     def close(self):
         if not self.socket is None:
@@ -500,22 +297,20 @@ class SSLSysLogHandler(logging.handlers.SysLogHandler):
     def emit(self, record):
         msg = self.format(record)
         prio = '<%d>' % self.encodePriority(self.facility,
-                                        self.mapPriority(record.levelname))
+                                            self.mapPriority(record.levelname))
         if type(msg) is unicode:
             msg = msg.encode('utf-8')
-            msg = prio + msg
+        msg = prio + msg
         try:
-            self.socket.write(msg)
+            self.socket.sendall(msg)
         except (IOError, AttributeError):
-            if config.syslog_mode:
-                report("Unable to send message to DataHub instance. Make sure that DataHub is running.")
-            else:
-                report("Unable to send message to Logentries. Make sure the service is available.")
+            report("Unable to send message to %s:%s. Make sure the service is available." % (self.address,
+                                                                                                self.port))
             report("Trying to reconnect...")
 
             try:
                 self.reconnect()
-                self.socket.write(msg)
+                self.socket.send(msg)
                 report("Reconnection was successful, the message has been sent.")
             except (AttributeError, ValueError, IOError):
                 pass
@@ -526,69 +321,71 @@ class SSLSysLogHandler(logging.handlers.SysLogHandler):
         except:
             self.handleError(record)
 
+    def connect_ssl(self, plain_socket):
+        try:
+            self.socket = ssl.wrap_socket(plain_socket, ca_certs=self.certs, cert_reqs=ssl.CERT_REQUIRED,
+                                          ssl_version=ssl.PROTOCOL_TLSv1,
+                                          ciphers="HIGH:-aNULL:-eNULL:-PSK:RC4-SHA:RC4-MD5")
+            self.socket.connect((self.address, self.port))
+
+            try:
+                match_hostname(self.socket.getpeercert(), self.address)
+            except CertificateError, ce:
+                die("Could not validate SSL certificate for %s: %s" % (self.address, ce.message))
+
+
+        except IOError, e:
+            cause = e.strerror
+            if not cause:
+                cause = ""
+            report("Can't connect to %s via SSL at port %s. Make sure that the host and port are reachable "
+                   "and speak SSL: %s" % (self.address, self.port, cause))
+
+            self.socket.close()
+            self.socket = None
+
+    def connect_insecure(self, plain_socket):
+        try:
+            self.socket = plain_socket
+            self.socket.connect((self.address, self.port))
+        except IOError, e:
+            cause = e.strerror
+            if not cause:
+                cause = ""
+            report("Can't connect to %s via plaintext at port %s. Make sure that the host and port are reachable\n"
+                   "Error message: %s" % (self.address, self.port, e.strerror))
+
+            self.socket.close()
+            self.socket = None
+
+
     def reconnect(self):
         try:
             if not self.socket is None:
                 self.socket.close()
+                self.socket = None
         except:
             pass
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        if not self.certs is None:
-            self.socket = ssl.wrap_socket(s, ca_certs=self.certs, cert_reqs=ssl.CERT_NONE) # DataHub cannot verify CA for some reason, so handshake is not available here.
-            try:
-                self.socket.connect((self.address, self.port))  # Try to reach LE service or DataHub by default port with SSL enabled
-            except IOError:
-                if not config.syslog_mode:
-                    report('Cannot connect to Logentries service via SSL-secured socket. Make sure that port ' + str(self.port)
-                       + ' is opened. Now will try to connect without SSL on port ' +
-                       str(self.non_ssl_port))
-                else:
-                    report('Cannot connect to DataHub instance via SSL-secured socket. Make sure that port ' + str(self.port)
-                       + ' is opened. Now will try to connect without SSL on port ' +
-                       str(self.non_ssl_port))
-                try:
-                    self.socket.connect((self.address, self.non_ssl_port))
-                    if not config.syslog_mode:
-                        report('Warning! You are using insecure connection and log messages will go to Logentries service unencrypted!')
-                    else:
-                        report('Warning! You are using insecure connection and log messages will go to DataHub instance unencrypted!')
-                except IOError:
-                    if not config.syslog_mode:
-                        report('Cannot connect to Logentries service. Please check that ports ' + str(self.port) + ' and ' +
-                            str(self.non_ssl_port) + ' are not blocked by firewall and you have connection to Internet.')
-                        raise
-                    else:
-                        report('Cannot connect to DataHub instance. Please check that ports ' + str(self.port) + ' and ' +
-                            str(self.non_ssl_port) + ' are not blocked by firewall.')
-                        raise
-        else:
-            try:
-                self.socket = s
-                self.socket.connect((self.address, self.non_ssl_port))
-                if not config.syslog_mode:
-                    report('Warning! SSL option is not enabled, so you are using insecure connection and log messages will go to Logentries service or DataHub unencrypted!')
-                else:
-                    report('Warning! SSL option is not enabled, so you are using insecure connection and log messages will go to DataHub instance unencrypted!')
-            except IOError:
-                if not config.syslog_mode:
-                    report('Cannot connect to Logentries service. Please check that port ' +
-                        str(self.non_ssl_port) + ' is not blocked by firewall and you have connection to Internet.')
-                    raise
-                else:
-                    report('Cannot connect to DataHub instance. Please check that port ' +
-                        str(self.non_ssl_port) + ' is not blocked by firewall.')
-                    raise
+        s.settimeout(TCP_TIMEOUT)
 
-class StreamLogSender:
+        if self.use_ssl:
+            self.connect_ssl(s)
+        else:
+            self.connect_insecure(s)
+
+
+class StreamLogSender(object):
     """
     Class that is used to format system stats messages to Syslog format
     and send to LE service using TCP stream handler
     """
-    def __init__(self, tag, address, port, non_ssl_port, cert_name):
+
+    def __init__(self, tag, address, port, use_ssl, cert_name):
         self.logger = logging.getLogger(tag)
         self.logger.setLevel(logging.INFO)
-        self.handler = SSLSysLogHandler(address, port, non_ssl_port, cert_name)
+        self.handler = SSLSysLogHandler(address, port, use_ssl, cert_name)
         self.handler.setLevel(logging.DEBUG)
         log_format = "%(asctime)s {0} {1}: %(message)s\r\n".format(config.hostname_required(), tag.replace(' ', '_'))
         time_format = "%Y-%m-%dT%H:%M:%SZ"
@@ -607,12 +404,12 @@ class SyslogStreamSender(object):
     Used to send system stats messages to LE service in non-Syslog mode
     e.g. not using DataHub.
     """
-    def __init__(self, tag=SYSTEM_STATS_TAG, endpoint_address=LE_SERVER_STREAM_LOG_RECEIVER,
-                 endpoint_port=LE_DEFAULT_SSL_PORT, endpoint_non_ssl_port=LE_DEFAULT_NON_SSL_PORT, use_ssl=True):
-        self.msg_queue = Queue.Queue()
+
+    def __init__(self, tag=SYSTEM_STATS_TAG, endpoint_address=Domain.STREAM,
+                 port=LE_DEFAULT_SSL_PORT, use_ssl=True):
+        self.msg_queue = deque(maxlen=10000)
         self.endpoint_address = endpoint_address
-        self.endpoint_port = endpoint_port
-        self.endpoint_non_ssl_port = endpoint_non_ssl_port
+        self.endpoint_port = port
         self.tag = tag
 
         name = config.name
@@ -629,18 +426,19 @@ class SyslogStreamSender(object):
             config.system_stats_token_required()
 
         cert_name = None
-        if use_ssl:
-            if not config.use_ca_provided:
-                cert_name = system_cert_file()
-                if cert_name is None:
-                    cert_name = default_cert_file()
-            else:
-                cert_name = default_cert_file()
 
+        if not config.use_ca_provided:
+            cert_name = system_cert_file()
             if cert_name is None:
-                die('Cannot get default certificate file name to provide connection over SSL!')
+                cert_name = default_cert_file(config)
+        else:
+            cert_name = default_cert_file(config)
 
-        self.transport = StreamLogSender(self.tag, self.endpoint_address, self.endpoint_port, self.endpoint_non_ssl_port, cert_name)
+        if use_ssl and not cert_name:
+            die('Cannot get default certificate file name to provide connection over SSL!')
+
+        self.transport = StreamLogSender(self.tag, self.endpoint_address, self.endpoint_port, use_ssl,
+                                         cert_name)
         self.stat_sender_thread = StatisticsSendingWorker(self.transport, self.msg_queue)
         self.stat_sender_thread.setDaemon(True)
         self.stat_sender_thread.start()
@@ -681,16 +479,11 @@ class SyslogStreamSender(object):
         if not self.host_name is None:
             msg = "HostName=" + self.host_name + " " + msg
         if not config.syslog_mode:
-            # Sending directly to Logentries service - token is required
-            self.msg_queue.put(self.token + " " + msg)
+            # Sending directly tod Logentries service - token is required
+            self.msg_queue.append(self.token + " " + msg)
         else:
             # Sending to DataHub - append hostname to the message
-            self.msg_queue.put(msg)
-
-
-def die(cause, exit_code=EXIT_ERR):
-    log.critical(cause)
-    sys.exit(exit_code)
+            self.msg_queue.append(msg)
 
 
 def debug_filters(msg, *args):
@@ -729,7 +522,7 @@ except ImportError:
     no_ssl = True
 
     try:
-        x = httplib.HTTPSConnection
+        _ = httplib.HTTPSConnection
     except AttributeError:
         die('NOTE: Please install Python "ssl" module.')
 
@@ -741,15 +534,6 @@ except ImportError:
 #
 # Custom proctitle
 #
-
-
-def set_proc_title(title):
-    try:
-        import setproctitle
-
-        setproctitle.setproctitle(title)
-    except ImportError:
-        pass
 
 
 #
@@ -783,38 +567,11 @@ def call(command):
     return x
 
 
-def is_uuid(x):
-    """
-    Returns true if the string given appears to be UUID.
-    """
-    return re.match(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', x)
-
-
 def uniq(arr):
     """
     Returns the list with duplicate elements removed.
     """
     return list(set(arr))
-
-
-def rfile(name):
-    """
-    Returns content of the file, without trailing newline.
-    """
-    x = open(name).read()
-    if len(x) != 0 and x[-1] == '\n': x = x[0:len(x) - 1]
-    return x
-
-
-def rm_pidfile():
-    """
-    Removes PID file. Called when the agent exits.
-    """
-    try:
-        if config.pid_file:
-            os.remove(config.pid_file)
-    except OSError:
-        pass
 
 
 def _lock_pid_file_name():
@@ -900,7 +657,7 @@ def _try_daemonize():
             pidfile.write("%s\n" % pid)
             pidfile.close()
     except OSError, e:
-        rm_pidfile()
+        rm_pidfile(config)
         return "Cannot daemonize: %s" % e.strerror
     return None
 
@@ -1297,7 +1054,7 @@ def retrieve_account_key():
         password = getpass.getpass()
 
         try:
-            c = domain_connect(Domain.MAIN)
+            c = domain_connect(config, Domain.MAIN, Domain)
             c.request('POST', ACCOUNT_KEYS_API,
                       urllib.urlencode({'username': username, 'password': password}),
                       {
@@ -1355,24 +1112,28 @@ class Stats:
         self.total['no'] = 0
 
         self.procfilesystem = True
-        if not os.path.exists( CPUSTATS_FILE):
+        if not os.path.exists(CPUSTATS_FILE):
             # store system type for later reference in pulling stats
             # in an alternate manner
             self.procfilesystem = False
             self.uname = platform.uname()
             self.sys = self.uname[0]
-            log.debug( 'sys: %s'%(self.sys))
+            log.debug('sys: %s' % (self.sys))
 
         # for scaling in osx_top_stats -- key is a scale factor (gig,
         # meg, etc), value is what to multiply by to get to kilobytes
-        self.scale2kb = { 'M': 1024, 'G': 1048576 }
+        self.scale2kb = {'M': 1024, 'G': 1048576}
 
         if not config.debug_nostats:
-            if not config.syslog_mode:
-                self.stats_stream = SyslogStreamSender(SYSTEM_STATS_TAG, LE_SERVER_STREAM_LOG_RECEIVER, LE_DEFAULT_SSL_PORT, LE_DEFAULT_NON_SSL_PORT)
-            else:
-                self.stats_stream = SyslogStreamSender(SYSTEM_STATS_TAG, config.datahub_ip, config.datahub_port, LE_DEFAULT_NON_SSL_PORT)
+            PORT = {False: LE_DEFAULT_SSL_PORT, True: LE_DEFAULT_NON_SSL_PORT}
+            hostname = Domain.STREAM
+            port = PORT[config.suppress_ssl]
+            if config.syslog_mode:
+                hostname = config.datahub_ip
+                port = config.datahub_port
 
+            self.stats_stream = SyslogStreamSender(SYSTEM_STATS_TAG, hostname, port,
+                                                   not config.suppress_ssl)
             self.send_stats()
 
 
@@ -1500,27 +1261,27 @@ class Stats:
         We'll get physical memory details from here too
         """
         cpure = re.compile('CPU usage:\s+([\d.]+)\% user, ([\d.]+)\% sys, '
-                   '([\d.]+)\% idle')
+                           '([\d.]+)\% idle')
         memre = re.compile('PhysMem:\s+(\d+\w+) wired, '
-                   '(\d+\w+) active, (\d+\w+) inactive, '
-                   '(\d+\w+) used, (\d+\w+) free.')
+                           '(\d+\w+) active, (\d+\w+) inactive, '
+                           '(\d+\w+) used, (\d+\w+) free.')
         diskre = re.compile('Disks: (\d+)/(\d+\w+) read, '
-                   '(\d+)/(\d+\w+) written.')
+                            '(\d+)/(\d+\w+) written.')
 
         # scaling routine for use in map() later
         def scaletokb(value):
             # take a value like 1209M or 10G and return an integer
             # representing the value in kilobytes
 
-            (size, scale)=re.split('([A-z]+)',value)[:2]
+            (size, scale) = re.split('([A-z]+)', value)[:2]
             size = int(size)
             if scale:
                 if self.scale2kb.has_key(scale):
                     size *= self.scale2kb[scale]
                 else:
-                    log.warning( "Error: value in %s expressed in "
-                        "dimension I can't translate to kb: %s %s"%
-                        (line, size, scale))
+                    log.warning("Error: value in %s expressed in "
+                                "dimension I can't translate to kb: %s %s" %
+                                (line, size, scale))
             return size
 
         # the first set of 'top' headers display average values over
@@ -1532,8 +1293,8 @@ class Stats:
         # if top fails to work.  however, it 'reads' better at this point
         try:
             proc = subprocess.Popen(['top',
-                                     '-i','2','-l','2','-n','0'],
-                                     stdout=subprocess.PIPE)
+                                     '-i', '2', '-l', '2', '-n', '0'],
+                                    stdout=subprocess.PIPE)
         except:
             return
 
@@ -1549,19 +1310,19 @@ class Stats:
                 have is %, multiply that % by the EPOCH and 100.
                 """
                 if cpuresult:
-                    (cu, cs, ci) = map( lambda x: int(float(x)*100*EPOCH),
-                                        cpuresult.group(1,2,3) )
-                    self.save_data( data, 'cu', cu )
-                    self.save_data( data, 'cs', cs )
-                    self.save_data( data, 'ci', ci )
+                    (cu, cs, ci) = map(lambda x: int(float(x) * 100 * EPOCH),
+                                       cpuresult.group(1, 2, 3))
+                    self.save_data(data, 'cu', cu)
+                    self.save_data(data, 'cs', cs)
+                    self.save_data(data, 'ci', ci)
                     # send zero in case all must be present
-                    self.save_data( data, 'cl', 0 )
-                    self.save_data( data, 'cio', 0 )
-                    self.save_data( data, 'cq', 0 )
-                    self.save_data( data, 'csq', 0 )
+                    self.save_data(data, 'cl', 0)
+                    self.save_data(data, 'cio', 0)
+                    self.save_data(data, 'cq', 0)
+                    self.save_data(data, 'csq', 0)
                 else:
-                    log.warning( "Error: could not parse CPU stats "
-                        "in top output line %s"%(line))
+                    log.warning("Error: could not parse CPU stats "
+                                "in top output line %s" % (line))
 
             elif line.startswith('PhysMem: ') and toppass == 2:
                 """
@@ -1579,14 +1340,14 @@ class Stats:
                 memresult = memre.match(line)
                 if memresult:
                     # logentries is expecting values in kilobytes
-                    (wired, active, inactive, used, free) = map (
-                        scaletokb, memresult.group(1,2,3,4,5))
-                    self.save_data( data, 'mt', used + free)
-                    self.save_data( data, 'ma', active)
-                    self.save_data( data, 'mc', 0)
+                    (wired, active, inactive, used, free) = map(
+                        scaletokb, memresult.group(1, 2, 3, 4, 5))
+                    self.save_data(data, 'mt', used + free)
+                    self.save_data(data, 'ma', active)
+                    self.save_data(data, 'mc', 0)
                 else:
-                    log.warning( "Error: could not parse memory stats "
-                        "in top output line %s"%(line))
+                    log.warning("Error: could not parse memory stats "
+                                "in top output line %s" % (line))
 
             elif line.startswith('Disks: ') and toppass == 2:
                 diskresult = diskre.match(line)
@@ -1594,19 +1355,19 @@ class Stats:
                 the data we send to logentries is expected to be in bytes
                 """
                 if diskresult:
-                    (reads, writes) = map ( scaletokb,
-                                            diskresult.group(2,4))
+                    (reads, writes) = map(scaletokb,
+                                          diskresult.group(2, 4))
                     reads *= 1024
                     writes *= 1024
 
-                    self.save_data( data, 'dr',
-                                    reads -self.prev_disk_stats[0])
-                    self.save_data( data, 'dw',
-                                    writes -self.prev_disk_stats[1])
-                    self.prev_disk_stats = [ reads, writes]
+                    self.save_data(data, 'dr',
+                                   reads - self.prev_disk_stats[0])
+                    self.save_data(data, 'dw',
+                                   writes - self.prev_disk_stats[1])
+                    self.prev_disk_stats = [reads, writes]
                 else:
-                    log.warning( "Error: could not parse disk stats "
-                        "in top output line %s"%(line))
+                    log.warning("Error: could not parse disk stats "
+                                "in top output line %s" % (line))
 
     def netstats_stats(self, data):
         """
@@ -1616,7 +1377,7 @@ class Stats:
         """
         try:
             proc = subprocess.Popen(['netstat', '-bi'],
-                                     stdout=subprocess.PIPE)
+                                    stdout=subprocess.PIPE)
         except:
             return
 
@@ -1624,8 +1385,8 @@ class Stats:
         # #7 is input bytes, and #10 is output bytes, but avoid duplicate
         # device lines
 
-        receive=0L
-        transmit=0L
+        receive = 0L
+        transmit = 0L
         netseen = {}
 
         for line in proc.stdout:
@@ -1644,8 +1405,8 @@ class Stats:
             transmit += long(parts[9])
             netseen[parts[0]] = 1
 
-        self.save_data( data, 'ni', receive-self.prev_net_stats[0])
-        self.save_data( data, 'no', transmit-self.prev_net_stats[1])
+        self.save_data(data, 'ni', receive - self.prev_net_stats[0])
+        self.save_data(data, 'no', transmit - self.prev_net_stats[1])
         self.prev_net_stats = [receive, transmit]
 
     def stats(self):
@@ -1733,10 +1494,13 @@ class Follower(object):
         self.log_addr = '/%s/hosts/%s/%s/?realtime=1' % (config.user_key, config.agent_key, log_key)
         self.flush = True
         self.event_filter = event_filter
+
         if not config.syslog_mode:
-            self.syslog_sender = SyslogStreamSender(os.path.basename(name), LE_SERVER_STREAM_LOG_RECEIVER, LE_DEFAULT_SSL_PORT, LE_DEFAULT_NON_SSL_PORT)
+            self.syslog_sender = SyslogStreamSender(os.path.basename(name), Domain.STREAM, config.get_port(),
+                                                    not config.suppress_ssl)
         else:
-            self.syslog_sender = SyslogStreamSender(os.path.basename(name), config.datahub_ip, config.datahub_port, LE_DEFAULT_NON_SSL_PORT)
+            self.syslog_sender = SyslogStreamSender(os.path.basename(name), config.datahub_ip, config.datahub_port,
+                                                    not config.suppress_ssl)
         log.info("Following %s" % name)
         monitoring_thread = threading.Thread(target=monitorlogs, name=self.name)
         monitoring_thread.daemon = True
@@ -1880,7 +1644,7 @@ class Follower(object):
                 time.sleep(SRV_RECON_TIMEOUT)
             retry += 1
             try:
-                self.conn = data_connect()
+                self.conn = data_connect(config, Domain)
                 do_request(self.conn, "PUT", self.log_addr)
                 break
             except socket.error:
@@ -1956,7 +1720,6 @@ class Config:
         # Special options
         self.yes = False
         self.force = False
-        self.ec2eu = False
         self.suppress_ssl = False
         self.use_ca_provided = False
 
@@ -2039,7 +1802,6 @@ class Config:
                 USER_KEY_PARAM: '',
                 AGENT_KEY_PARAM: '',
                 FILTERS_PARAM: '',
-                EC2EU_PARAM: '',
                 SUPPRESS_SSL_PARAM: '',
                 FORCE_DOMAIN_PARAM: '',
                 USE_CA_PROVIDED_PARAM: '',
@@ -2063,12 +1825,9 @@ class Config:
                 new_filters = conf.get(MAIN_SECT, FILTERS_PARAM)
                 if new_filters != '':
                     self.filters = new_filters
-            new_ec2eu = conf.get(MAIN_SECT, EC2EU_PARAM)
-            if new_ec2eu == 'True':
-                self.ec2eu = new_ec2eu
             new_suppress_ssl = conf.get(MAIN_SECT, SUPPRESS_SSL_PARAM)
             if new_suppress_ssl == 'True':
-                self.suppress_ssl = new_suppress_ssl
+                self.suppress_ssl = new_suppress_ssl == 'True'
             new_use_ca_provided = conf.get(MAIN_SECT, USE_CA_PROVIDED_PARAM)
             if new_use_ca_provided == 'True':
                 self.use_ca_provided = new_use_ca_provided
@@ -2106,7 +1865,7 @@ class Config:
         """
         try:
             conf = ConfigParser.SafeConfigParser()
-            create_conf_dir()
+            create_conf_dir(self)
             conf_file = open(self.config_filename, 'wb')
             conf.add_section(MAIN_SECT)
             if self.user_key != NOT_SET:
@@ -2115,8 +1874,6 @@ class Config:
                 conf.set(MAIN_SECT, AGENT_KEY_PARAM, self.agent_key)
             if self.filters != NOT_SET:
                 conf.set(MAIN_SECT, FILTERS_PARAM, self.filters)
-            if self.ec2eu:
-                conf.set(MAIN_SECT, EC2EU_PARAM, 'True')
             if self.suppress_ssl:
                 conf.set(MAIN_SECT, SUPPRESS_SSL_PARAM, 'True')
             if self.use_ca_provided:
@@ -2213,46 +1970,6 @@ class Config:
         if self.datahub_port == NOT_SET:
             die("Datahub port is required. Specify the port with the --datahub_port parameter.")
 
-    def detect_ec2eu(self):
-        """
-        Detects EC2 EU region and tests direct access to api/data instances. If
-        all goes well, the flag ec2eu is set.
-        """
-        # No need to detect if the flag ec2eu is set already
-        if self.ec2eu:
-            return
-
-        # Try to get information about this instance
-        avz = ''
-        socket.setdefaulttimeout(2)
-        try:
-            response = urllib2.urlopen(EC2_AVZ_URL)
-            avz = response.read(16)
-            response.close()
-        except:
-            pass
-        socket.setdefaulttimeout(None)
-
-        # If the response is in EU, set the flag
-        self.ec2eu = avz.startswith(EC2_AVZ_EU_PREFIX)
-
-        if not self.ec2eu:
-            return
-
-        # Secondary test to rule out firewalled EC2 VPN
-        test_resp = ''
-        socket.setdefaulttimeout(3)
-        try:
-            response = urllib2.urlopen('http://%s/' % Domain.API_EC2EU)
-            test_resp = response.read(1024)
-            response.close()
-        except:
-            pass
-        socket.setdefaulttimeout(None)
-
-        # Use EC2 EU region if we got the result correctly
-        self.ec2eu = test_resp.find('Logentries') != -1
-
     # The method gets all parameters of given type from argument list,
     # checks for their format and returns list of values of parameters
     # of specified type. E.g: We have params = ['true', 127.0.0.1, 10000] the call of
@@ -2295,22 +2012,20 @@ class Config:
         return ret_param
 
     def set_syslog_settings(self, value):
-        value = value.replace('[', '', 1)
-        value = value.replace(']', '', 1)
-        values_list = value.split(',', 3)
-        param_count = len(values_list)
-        if param_count < 3 or param_count > 3:
-            die('--syslog-settings expects a list with 3 parameters, but ' + str(param_count) + ' found.')
-        syslog_mode = self.check_and_get_param_by_type(values_list, 'bool')
-        datahub_address = self.check_and_get_param_by_type(values_list, 'ipaddr')
-        datahub_port = self.check_and_get_param_by_type(values_list, 'numeric')
+        if not value:
+            die('--datahub requires an parameter')
+        values = value.split(":")
+        if len(values) > 2:
+            die("Could not parse %s for --datahub. Expected format: hostname:port" % value)
 
-        if len(syslog_mode) != 1 or len(datahub_address) != 1 or len(datahub_port) != 1:
-            die('There is something wrong with parameters list!')
+        self.syslog_mode = True
+        self.datahub_ip = values[0]
+        if len(values) == 2:
+            try:
+                self.datahub_port = int(values[1])
+            except ValueError:
+                die("Could not parse %s as port. Specify a valid --datahub address" % values[1])
 
-        self.syslog_mode = syslog_mode[0]
-        self.datahub_ip = datahub_address[0]
-        self.datahub_port = datahub_port[0]
 
     def process_params(self, params):
         """
@@ -2318,7 +2033,12 @@ class Config:
         """
         try:
             optlist, args = getopt.gnu_getopt(params, '',
-                                              "user-key= account-key= agent-key= host-key= no-timestamps debug-events debug-filters debug-loglist local debug-stats debug-nostats debug-stats-only debug-cmds debug-system help version yes force uuid list std std-all name= hostname= type= pid-file= debug no-defaults ec2eu suppress-ssl use-ca-provided force-api-host= force-domain= system-stat-token= syslog-settings=".split())
+                                              "user-key= account-key= agent-key= host-key= no-timestamps debug-events "
+                                              "debug-filters debug-loglist local debug-stats debug-nostats "
+                                              "debug-stats-only debug-cmds debug-system help version yes force uuid list "
+                                              "std std-all name= hostname= type= pid-file= debug no-defaults"
+                                              "suppress-ssl use-ca-provided force-api-host= force-domain= "
+                                              "system-stat-token= datahub=".split())
         except getopt.GetoptError, err:
             die("Parameter error: " + str(err))
         for name, value in optlist:
@@ -2379,8 +2099,6 @@ class Config:
                 self.debug_requests = True
             elif name == "--debug-system":
                 self.debug_system = True
-            elif name == "--ec2eu":
-                self.ec2eu = True
             elif name == "--suppress-ssl":
                 self.suppress_ssl = True
             elif name == "--force-api-host":
@@ -2393,9 +2111,14 @@ class Config:
                 self.use_ca_provided = True
             elif name == "--system-stat-token":
                 self.set_system_stat_token(value)
-            elif name == "--syslog-settings":
+            elif name == "--datahub":
                 self.set_syslog_settings(value)
 
+        if self.datahub_ip and not self.datahub_port:
+            if self.suppress_ssl:
+                self.datahub_port = LE_DEFAULT_NON_SSL_PORT
+            else:
+                self.datahub_port = LE_DEFAULT_SSL_PORT
 
         if self.debug_local and self.force_api_host:
             die("Do not specify --local and --force-api-host at the same time.")
@@ -2404,211 +2127,17 @@ class Config:
         if self.debug_local and self.force_domain: die("Do not specify --local and --force-domain at the same time.")
         return args
 
+    def get_port(self):
+        PORT = {False: LE_DEFAULT_SSL_PORT, True: LE_DEFAULT_NON_SSL_PORT}
+        port = PORT[config.suppress_ssl]
+        if config.syslog_mode:
+            return config.datahub_port
+        return port
+
 
 config = Config()
 
-
-def default_cert_file_name():
-    """
-    Construct full file name to the default certificate file.
-    """
-    return config.config_dir_name + LE_CERT_NAME
-
-
-def create_conf_dir():
-    """
-    Creates directory for the configuration file.
-    """
-    # Create logentries config
-    try:
-        os.makedirs(config.config_dir_name)
-    except OSError, e:
-        if e.errno != errno.EEXIST:
-            if e.errno == errno.EACCES:
-                die("You don't have permission to create logentries config file. Please run logentries agent as root.")
-            die('Error: %s' % e)
-
-
-def write_default_cert_file():
-    """
-    Writes default certificate file in the configuration directory.
-    """
-    create_conf_dir()
-    cert_filename = default_cert_file_name()
-    f = open(cert_filename, 'wb')
-    f.write(authority_certificate)
-    f.close()
-
-
-def default_cert_file():
-    """
-    Returns location of the default certificate file or None. It tries to write the
-    certificate file if it is not there or it is outdated.
-    """
-    cert_filename = default_cert_file_name()
-    try:
-        # If the certificate file is not there, create it
-        if not os.path.exists(cert_filename):
-            write_default_cert_file()
-            return cert_filename
-
-        # If it is there, check if it is outdated
-        curr_cert = rfile(cert_filename)
-        if curr_cert != authority_certificate:
-            write_default_cert_file()
-    except IOError:
-        # Cannot read/write certificate file, ignore
-        return None
-    return cert_filename
-
-
-def system_cert_file():
-    """
-    Finds the location of our lovely site's certificate on the system or None.
-    """
-    for f in authority_certificate_files:
-        if os.path.exists(f):
-            return f
-    return None
-
-
-def create_connection(host, port):
-    """
-    A simplified version of socket.create_connection from Python 2.6.
-    """
-    for addr_info in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
-        af, stype, proto, cn, sa = addr_info
-        soc = None
-        try:
-            soc = socket.socket(af, stype, proto)
-            soc.connect(sa)
-            return soc
-        except socket.error:
-            if socket:
-                soc.close()
-
-    raise socket.error, "Cannot make connection to %s:%s" % (host, port)
-
-
-class ServerHTTPSConnection(httplib.HTTPSConnection):
-    """
-    A slight modification of HTTPSConnection to verify the certificate
-    """
-
-    def __init__(self, server, cert_file):
-        if no_ssl:
-            httplib.HTTPSConnection.__init__(self, server)
-        else:
-            self.cert_file = cert_file
-            httplib.HTTPSConnection.__init__(self, server, cert_file=cert_file)
-
-    def connect(self):
-        if no_ssl:
-            return httplib.HTTPSConnection.connect(self)
-        sock = create_connection(self.host, self.port)
-        try:
-            if self._tunnel_host:
-                self.sock = sock
-                self._tunnel()
-        except AttributeError:
-            pass
-        self.sock = wrap_socket(sock, ca_certs=self.cert_file, cert_reqs=CERT_REQUIRED)
-
-
-def make_https_connection(s):
-    """
-    Makes HTTPS connection. Tried all available certificates.
-    """
-    if not config.use_ca_provided:
-        # Try to connect with system certificate
-        try:
-            cert_file = system_cert_file()
-            if cert_file:
-                return ServerHTTPSConnection(s, cert_file)
-        except socket.error:
-            pass
-
-    # Try to connect with our default certificate
-    cert_file = default_cert_file()
-    if not cert_file:
-        die('Error: Cannot find suitable CA certificate.')
-    return ServerHTTPSConnection(s, cert_file)
-
-
 # Pass the exception
-
-
-def data_connect():
-    # Choose server address
-    if config.force_domain:
-        s = config.force_domain
-    elif config.force_data_host:
-        s = config.force_data_host
-    elif config.ec2eu:
-        # If on EC2 EU, use shorter path
-        s = Domain.DATA_EC2EU
-    else:
-        s = Domain.DATA
-
-    # Special case for local debugging
-    if config.debug_local:
-        s = Domain.API_LOCAL
-
-    # Connect to server with SSL in untrusted network
-    log.debug('Connecting to %s', s)
-
-    # Determine if to use SSL for connection
-    # Never use SSL for debugging, always use SSL with main server
-    use_ssl = not config.suppress_ssl and not config.debug_local
-
-    # Pass the connection
-    if use_ssl:
-        return make_https_connection(s)
-    else:
-        return httplib.HTTPConnection(s)
-
-
-def domain_connect(domain):
-    """
-    Connects to the domain specified.
-    """
-    # Find the correct server address
-    s = domain
-    if domain == Domain.API:
-        if config.force_domain:
-            s = config.force_domain
-        elif config.force_api_host:
-            s = config.force_api_host
-        elif config.ec2eu:
-            # If on EC2 EU, use shorter path
-            s = Domain.API_EC2EU
-        else:
-            s = Domain.API
-
-    # Special case for local debugging
-    if config.debug_local:
-        if domain == Domain.API:
-            s = Domain.API_LOCAL
-        else:
-            s = Domain.MAIN_LOCAL
-
-    # Connect to server with SSL in untrusted network
-    log.debug('Connecting to %s', s)
-
-    # Determine if to use SSL for connection
-    # Never use SSL for debugging, always use SSL with main server
-    use_ssl = True
-    if config.debug_local:
-        use_ssl = False
-    elif domain == Domain.API:
-        use_ssl = not config.suppress_ssl
-
-    # Pass the connection
-    if use_ssl:
-        return make_https_connection(s)
-    else:
-        return httplib.HTTPConnection(s)
-
 
 def do_request(conn, operation, addr, data=None, headers={}):
     log.debug('Domain request: %s %s %s %s' % (operation, addr, data, headers))
@@ -2625,7 +2154,7 @@ def get_response(operation, addr, data=None, headers={}, silent=False, die_on_er
     response = None
     conn = None
     try:
-        conn = domain_connect(domain)
+        conn = domain_connect(config, domain, Domain)
         do_request(conn, operation, addr, data, headers)
         response = conn.getresponse()
         return response, conn
@@ -2722,7 +2251,7 @@ def push_request(ilog, data_size, where, params):
     # Obtain response
     addr = '/%s/%s/?%s' % (config.user_key, urllib.quote(where), urllib.urlencode(params))
     try:
-        conn = data_connect()
+        conn = data_connect(config, Domain)
         do_request(conn, "PUT", addr, headers={CONTENT_LENGTH: '%s' % data_size})
 
         # Push the file
@@ -2794,14 +2323,6 @@ def request(request, required=False, check_status=False, rtype='GET', retry=Fals
     return d_response
 
 
-def no_more_args(args):
-    """
-    Exits if there are any arguments given.
-    """
-    if len(args) != 0:
-        die("No more than one argument is expected.")
-
-
 def _startup_info():
     """
     Prints correct startup information based on OS
@@ -2851,74 +2372,6 @@ def request_hosts(logs=False):
     return response['hosts']
 
 
-def expr_match(expr, text):
-    """
-    Returns True if the text matches with expression. If the expression
-    starts with / it is a regular expression.
-    """
-    if expr[0] == '/':
-        if re.match(expr[1:], text):
-            return True
-    else:
-        if expr[0:2] == '\/':
-            return text == expr[1:]
-        else:
-            return text == expr
-    return False
-
-
-def uuid_match(uuid, text):
-    """
-    Returns True if the uuid given is uuid and it matches to the text.
-    """
-    return is_uuid(uuid) and uuid == text
-
-
-def find_hosts(expr, hosts):
-    """
-    Finds host name among hosts.
-    """
-    result = []
-    for host in hosts:
-        if uuid_match(expr, host['key']) or expr_match(expr, host['name']) or expr_match(expr, host['hostname']):
-            result.append(host)
-    return result
-
-
-def log_match(expr, log_item):
-    """
-    Returns true if the expression given matches the log. Expression is either
-    a simple word or a regular expression if it starts with '/'.
-
-    We perform the test on UUID, log name, and file name.
-    """
-    return uuid_match(expr, log_item['key']) or expr_match(expr, log_item['name']) or expr_match(expr,
-                                                                                                 log_item['filename'])
-
-
-def find_logs(expr, hosts):
-    """
-    Finds log name among hosts. The searching expresion have to parts: host
-    name and logs name. Both parts are divided by :.
-    """
-    # Decode expression
-    l = expr.find(':')
-    if l != -1:
-        host_expr = expr[0:l]
-        log_expr = expr[l + 1:]
-    else:
-        host_expr = '/.*'
-        log_expr = expr
-
-    adepts = find_hosts(host_expr, hosts)
-    logs = []
-    for host in adepts:
-        for xlog in host['logs']:
-            if log_match(log_expr, xlog):
-                logs.append(xlog)
-    return logs
-
-
 #
 # Commands
 #
@@ -2931,7 +2384,6 @@ def cmd_init(args):
     """
     no_more_args(args)
     config.user_key_required()
-    config.detect_ec2eu()
     config.save()
     log.info("Initialized")
 
@@ -2943,7 +2395,6 @@ def cmd_reinit(args):
     """
     no_more_args(args)
     config.load()
-    config.detect_ec2eu()
     config.save()
     log.info("Reinitialized")
 
@@ -2960,7 +2411,6 @@ def cmd_register(args):
     config.user_key_required()
     config.hostname_required()
     config.name_required()
-    config.detect_ec2eu()
 
     si = system_detect(True)
 
@@ -3074,7 +2524,7 @@ def cmd_monitor(args):
     no_more_args(args)
     config.load()
     if config.agent_key == NOT_SET:
-        die('Please register the host first with command `le register\'')
+        die('Please register the host first with command `le.py register\'')
     config.agent_key_required()
     config.user_key_required()
 
@@ -3091,7 +2541,7 @@ def cmd_monitor(args):
 
         # Park this thread
         while True:
-            time.sleep(600) # FIXME: is there a better way?
+            time.sleep(600)  # FIXME: is there a better way?
     except KeyboardInterrupt:
         if stats: stats.cancel()
         set_shutdown()
@@ -3111,30 +2561,27 @@ def cmd_follow(args):
     """
     if len(args) == 0:
         die("Error: Specify the file name of the log to follow.")
-    if len(args) != 1:
-        print >> sys.stderr, "You've specified more than one file to follow which is not allowed. A common mistake is to specify a wildcard (*) in file name, but forgot to disable shell expansion. To avoid shell expansion, enclose the file name in quotes, i.e.:"
-        print >> sys.stderr, "le follow '/some/path/file*'"
 
-        die("Error: Too many arguments.")
     config.load()
     config.agent_key_required()
 
-    filename = os.path.abspath(args[0])
-    name = config.name
-    if name == NOT_SET:
-        name = os.path.basename(filename)
-    type_opt = config.type_opt
-    if type_opt == NOT_SET:
-        type_opt = ""
+    for arg in args:
+        filename = os.path.abspath(arg)
+        name = config.name
+        if name == NOT_SET:
+            name = os.path.basename(filename)
+        type_opt = config.type_opt
+        if type_opt == NOT_SET:
+            type_opt = ""
 
-    # Check that we don't follow that file already
-    if not config.force and is_followed(filename):
-        die('Already following %s' % filename, EXIT_OK)
+        # Check that we don't follow that file already
+        if not config.force and is_followed(filename):
+            log.warning('Already following %s' % filename)
 
-    if len(glob.glob(filename)) == 0:
-        log.warning('\nWARNING: File %s does not exist' % filename)
+        if len(glob.glob(filename)) == 0:
+            log.warning('\nWARNING: File %s does not exist' % filename)
 
-    request_follow(filename, name, type_opt)
+        request_follow(filename, name, type_opt)
 
 
 def cmd_followed(args):
@@ -3144,7 +2591,7 @@ def cmd_followed(args):
     if len(args) == 0:
         die("Error: Specify the file name of the log to test.")
     if len(args) != 1:
-        die("Error: Too many arguments. Only file name needed.")
+        die("Error: Too many arguments. Only one file name allowed.")
     config.load()
     config.agent_key_required()
 
