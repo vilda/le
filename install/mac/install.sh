@@ -15,10 +15,14 @@ if [ "$(id -u)" != "0" ]; then
     exit 1
 fi
 
-LE_LOCATION="https://raw.githubusercontent.com/logentries/le/master/le"
+TMP_DIR=$(mktemp -d -t logentries.XXXXX)
+trap "rm -rf "$TMP_DIR"" EXIT
 
+FILES="le.py backports.py utils.py"
+LE_PARENT="https://raw.githubusercontent.com/logentries/le/master/src/"
 CURL="/usr/bin/env curl -O"
 
+INSTALL_DIR="/usr/share/logentries"
 LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
 DAEMON="com.logentries.agent.plist"
 DAEMON_DL_LOC="https://raw.githubusercontent.com/logentries/le/master/install/mac/$DAEMON"
@@ -31,15 +35,24 @@ LE_FOLLOW="$INSTALL_PATH follow"
 printf "Welcome to the Logentries Install Script\n"
 
 printf "Downloading dependencies...\n"
-$CURL $LE_LOCATION
+
+cd "$TMP_DIR"
+for file in $FILES ; do
+  $CURL $LE_PARENT/$file
+done
+
 $CURL $DAEMON_DL_LOC
+sed -i -e 's/python2/python/' *.py
 
 printf "Copying files...\n"
-chmod +x le
-chown root:wheel le
+mkdir -p "$INSTALL_DIR"/logentries || true
+mv *.py "$INSTALL_DIR"/logentries
+chown -R root:wheel "$INSTALL_DIR"
+chmod +x "$INSTALL_DIR"/logentries/le.py
 chown root:wheel $DAEMON
-mv le $INSTALL_PATH
 mv $DAEMON $DAEMON_PATH
+rm -f "$INSTALL_PATH" || true
+ln -s "$INSTALL_DIR"/logentries/le.py "$INSTALL_PATH" 2>/dev/null || true
 
 $REGISTER_CMD
 $LE_FOLLOW "/var/log/system.log"
