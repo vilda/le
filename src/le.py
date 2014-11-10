@@ -9,7 +9,7 @@
 #
 from utils import *
 
-VERSION = "1.3.2"
+VERSION = "1.4.0"
 
 NOT_SET = None
 
@@ -323,9 +323,14 @@ class SSLSysLogHandler(logging.handlers.SysLogHandler):
 
     def connect_ssl(self, plain_socket):
         try:
-            self.socket = ssl.wrap_socket(plain_socket, ca_certs=self.certs, cert_reqs=ssl.CERT_REQUIRED,
-                                          ssl_version=ssl.PROTOCOL_TLSv1,
-                                          ciphers="HIGH:-aNULL:-eNULL:-PSK:RC4-SHA:RC4-MD5")
+            try:
+                self.socket = ssl.wrap_socket(socket, ca_certs=self.certs, cert_reqs=ssl.CERT_REQUIRED,
+                                              ssl_version=ssl.PROTOCOL_TLSv1,
+                                              ciphers="HIGH:-aNULL:-eNULL:-PSK:RC4-SHA:RC4-MD5")
+            except TypeError:
+                self.socket = ssl.wrap_socket(socket, ca_certs=self.certs, cert_reqs=ssl.CERT_REQUIRED,
+                                              ssl_version=ssl.PROTOCOL_TLSv1)
+
             self.socket.connect((self.address, self.port))
 
             try:

@@ -1,0 +1,773 @@
+logentries (1.4.0) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
+
+  * Update debian packaging
+  * Require signed SSL certificates
+  * Add support for datahub
+  * Send systemstats to logentries
+
+ -- Logentries Team <hello@logentries.com>  Mon, 10 Nov 2014 12:10:44 +0000
+
+logentries (1.3.2) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Bumping up version
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 21 Oct 2014 12:11:26 +0200
+
+
+logentries (1.3.1) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * fix missing send_stat fn call
+    * Bumping up version
+    * remove stats logging, dh forwarding
+    [Stephen Hynes]
+    * fix missing send_stat fn call
+
+ -- Viliam Holub <vilda@logentries.com>  Fri, 3 Oct 2014 00:13:43 +0200
+
+
+logentries (1.3.0) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Win remove
+    * Fixing whitespaces
+    * Removing support for Windows
+    * Writing an OK message to stdout instead of stderr
+    * [fix] boolean capitalization
+    * Fixing true to True
+    * Not supressing SSL in EC2
+    * Writing an OK message to stdout instead of stderr
+    * Not supressing SSL in EC2
+    * Reviewed, merging
+    * Simplifying even queue in StatisticsSendingWorker
+    * Removing ill-fated information
+    * Changing name to comform to PEP8 and Python style in general
+    * Applying original patch after conflict fix
+    * Applying original patch after conflict cleanup
+    * Applying changes to fit PEP8, fixing minor issues with tab/space mix
+    * Bumping up version to 1.3.0
+    [Chris Mowforth]
+    * Additional data/stats for OS-X
+    [StephenHynes7]
+    * change identifier to use standard LE identifier
+    * add identifier when agent first starts, log CPU, IO, N/W stats to a log file
+    * remove seeding data from Agent Install
+    [Charles Phillips]
+    * ```
+    [Stephen Hynes]
+    * remove stats logging, dh forwarding
+    * fix syntax error, fix system stat format
+    * fix syntax error, fix system stat format
+    * remove seeding data from Agent Install, add identifier, log CPU, I/O, N/W stats to a log file
+    * Updated download link
+    * Fixed second broken download location
+    * Fix broken download link
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 2 Apr 2014 14:23:04 +0200
+
+
+logentries (1.2.18) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Organizing domains, using pull now
+    * Removing obsolete distributions, add Ubuntu Trusty Tahr
+    * Bumping up version
+    * Merge branch 'master' of github.com:logentries/le
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 18 Mar 2014 15:12:41 +0000
+
+
+logentries (1.2.17) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Adding pull domain
+    [Mark Lacomber]
+    * Add optional parameter to force a certain api domain
+    [Pedro Sland]
+    * Merge branch 'master' of ssh://github.com/logentries/le
+    * Use python2 executable for compatibility
+    [Chris Mowforth]
+    * Switch to python2 for compatibility
+    [Stephen Hynes]
+    * Change api endpoint
+
+ -- Mark Lacomber <marklacomber@gmail.com>  Tue, 25 Feb 2014 15:28:37 +0000
+
+
+logentries (1.2.16) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Disabling gpg in repo for SuSE
+    * Changing repo names
+    * Adding helper repo from SLE11
+    * Merge branch 'master' of github.com:logentries/le
+    * Adjusting error message
+    * Merge branch 'master' of github.com:logentries/le
+    * Adding filter debugging
+    * Added startup information for le follow
+    * Adding instructions for CentOS 6
+    * Adding CentOS helper repo
+    * Updating installation instructions for Fedora 20
+    * Adding helpers for Fedora20
+    * Adding installation instructions for Wheezy, Jessie, Saucy
+    [StephenHynes7]
+    * upgraded seeding data to v2
+    * added correct exit code for le follow
+    * added correct exit code when already following a file
+    [Mark Lacomber]
+    * Bumped to version 1.2.17
+    * Only use root CA in agent
+    * Add parameter to use provided ca cert
+    * Add wildcard cert for api servers
+    * Imply string with bool check
+    * Check optional domain in data_connect and domain_connect
+    * add --force-domain to Config optlist
+    * Add force_domain parameter for specific destination
+    * Update filename in error usage
+    * Remove old linux install script, use logentries_install.sh instead
+    * added correct exit code for le follow
+    * added correct exit code when already following a file
+    [Joe Heung]
+    * Added startup information for le follow, moved INSTALL to INSTALL.md due to mac filesystem issue
+    [Stephen Hynes]
+    * upgraded seeding data to v2
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 18 Dec 2013 17:45:26 +0000
+
+
+logentries (1.2.15) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Removing notice about missing ssl module, bumping version
+    * Bumping up version to 1.2.15
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 18 Dec 2013 16:16:17 +0000
+
+
+logentries (1.2.14) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Changing local port ro 8081
+    * Removing trailing ;
+    * Adding support for filtering filenames
+    [StephenHynes7]
+    * Fixed Tag Names not being correct
+    * Removed "Sample" from Tag Names
+    * Seeding entries limited to one pass.
+    * fixed merge conflicts
+    * updated graph api calls, alerted users how long it will take to for redirect to happen, inform the user when doing le register that they require to give their Logentries credentials
+    * Updated tag names to make it obvious they are sample tags
+    * Updated download link for seeding.py and
+    * misc text typos + whitespace stripping
+    * Fixed typo
+    * Fixed typo
+    * added user prompt
+    * Fixed Daemon not properly being loaded.
+    * added download for seeding.py, added prompt for user to add seeding
+    * merged code with latest from le
+    * added seeding data ability to install script
+    * changed path on mac daemon & read me
+    * Agent was not included in the path on the last commit
+    * Automatically register an account if enviroment var LE_ACCOUNT_KEY set
+    * Added ability to automatically register an account passed on whether enviroment LE_ACCOUNT_KEY is set to a valid key
+    [Mark Lacomber]
+    * Change linux install script to logentries_install.sh to avoid duplicates on client machine
+    * Handle import errors in seeding.py
+    * Dont run yum update
+    * Dont run apt-get update silently
+    * Removed redhat package update, not necessary
+    * changed install text
+    * Updated text on linux install script
+    * Fixed Tag Names not being correct
+    * more cleanup
+    * Removed "Sample" from Tag Names
+    * Use win32 API for I/O on windows
+    * Catch pywintype errors if log_rename candidate is not found on windows
+    * Use win32 API for I/O on windows
+    * Updated download link for seeding.py and
+    * Use printf instead of echo as \n is being printed currently
+    * Fixed typo
+    * Fix typo, strip trailing whitespace
+    * Fixed Daemon not properly being loaded.
+    * Add debug message if mit keyserver fails
+    * Add space between filename and question mark in linux install prompt
+    * Prompt for each default log followed and allow user to follow custom logs in install script on linux
+    * Restart the agent after following the new files
+    * Added warning to message to wipe config in linux install script
+    * Add prompt to follow more default files in linux install script
+    * Prompt to wipe config if agent already installed in linux install script
+    * Use /usr/bin instead also fixed the no file/directory errors on the mv commands
+    * Bumped to Version 1.0.3
+    * Automatically register an account if enviroment var LE_ACCOUNT_KEY set
+    * Removed old linux install script
+    * Automatically register an account if enviroment var LE_ACCOUNT_KEY set
+    * Fixed typo
+    * increase number of test log events
+    * Only follow syslog, clean up text output
+    * Merge branch 'master' of https://github.com/logentries/le
+    * Update linux script for consistency
+    * rename loop variable x => l
+    * fixed text in mac install script, send 100 sample events
+    * Updates to OS X installer
+    * Added better info at the end, send more sample events
+    * restart daemon before sample events are sent and give daemon 1 second to start
+    * Added SmartOS script
+    * Added osx script and separated folders
+    * Don't suppress output when updating packages
+    * Updated linux install script to follow syslog by default and log an event
+    [Chris Mowforth]
+    * rm apicall
+    * remove shebang from seeding.py + fix typo
+    * Seeding entries limited to one pass.
+    * Updated graph api calls, and user feedack
+    * Updated tag names to make it obvious they are sample tags
+    * fix merge conflicts w/ upstream
+    * merge typo fixes + stephen url amend
+    * remove trailing whitespace + typos
+    * updates
+    * add Stephen's latest changes
+    * clean up seeding.py imports
+    * fix typo
+    * Seeding data
+    * changed path on mac daemon & read me
+    * Re-added the location of the agent
+    * increase number of test log events
+    * Only follow syslog, clean up text output
+    * rename loop variable x => l
+    * update dl link in readme
+    * add readme for OS X
+    * * minor refactoring
+    * fix run path in launch daemon plist
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 14 Aug 2013 01:45:57 +0100
+
+
+logentries (1.2.13) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Adding list of OSes to certificate path
+    * Adding installation instructions for Ubuntu Raring Ringtail
+    * Swithing data domain to api.logentries.com
+
+ -- Viliam Holub <vilda@logentries.com>  Thu, 4 Jul 2013 13:36:17 +0200
+
+
+logentries (1.2.12) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Using data.logentries.com, bumping up version number
+    * Removing now obsolete push command
+    * Bumping up version number
+    [Mark Lacomber]
+    * Improve instructions after install
+    * Improve final instructions after install
+    * Updated linux install script
+    * Fallback to ubuntu keyserver if mit fails, determine debian distro automatically, check for agent in /usr/bin
+    * Check if Windows Event Log is already followed
+    * Added linux install script for the agent
+    * Fix indentation
+    * already being followed
+
+ -- Viliam Holub <vilda@logentries.com>  Sun, 16 Jun 2013 02:17:19 +0100
+
+
+logentries (1.2.11) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Adding content type in POST
+    [Daniel Fiala]
+    * Set version 1.2.11 .
+
+ -- Daniel Fiala <danfiala@ucw.cz>  Thu, 16 May 2013 10:37:02 +0200
+
+
+logentries (1.2.10) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Daniel Fiala]
+    * Fixed returning of error message.
+    * Set version 1.2.10 .
+    [Tim Hunter]
+    * ...surely that's necessary?
+    * first pass at adding stats for OS-X to the Stats class -- incomplete
+
+ -- Daniel Fiala <danfiala@ucw.cz>  Mon, 29 Apr 2013 08:07:14 +0200
+
+
+logentries (1.2.9) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Daniel Fiala]
+    * Merge branch 'hagrid/daemonize'
+    * Fixed version.
+
+ -- Daniel Fiala <danfiala@ucw.cz>  Fri, 26 Apr 2013 17:14:04 +0200
+
+
+logentries (1.2.8) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Daniel Fiala]
+    * Put "Marge Messages" to debian changelog. It seems that tag v.1.2.7 belongs to Merge Message...
+
+ -- Daniel Fiala <danfiala@ucw.cz>  Fri, 26 Apr 2013 16:53:00 +0200
+
+
+logentries (1.2.7) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Daniel Fiala]
+    * Supressed creation of other instance of le daemon.
+    [Viliam Holub]
+    * Merge branch 'master' of github.com:logentries/le
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 24 Apr 2013 17:13:48 +0200
+
+
+logentries (1.2.6) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Multi-account support, detecting EC2 VPN
+    * Setting version to 1.2.6
+    [Mark Lacomber]
+    * Updated INSTALL instructions
+    [Mika Marttila]
+    * Update INSTALL with instructions to Amazon Linux AMI
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 5 Mar 2013 22:43:17 +0100
+
+
+logentries (1.2.5) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Print Token as well when displaying information about a log with 'le ls'
+    * Fixing disk stats
+    [Mark Lacomber]
+    * Fixed typo
+    * print token as well when listing log info with 'le ls' command
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 12 Feb 2013 13:30:23 +0100
+
+
+logentries (1.2.4) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Extending the list of network interfaces
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 30 Jan 2013 02:06:43 +0100
+
+
+logentries (1.2.3) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Merge branch 'master' of github.com:logentries/le
+    * Improving warning message about the certificate verification
+    [Daniel Fiala]
+    * It is possible to specify address of the api server as a command-line argument.
+    * Setting version 1.2.3 .
+
+ -- Daniel Fiala <danfiala@ucw.cz>  Tue, 8 Jan 2013 18:54:35 +0100
+
+
+logentries (1.2.2) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Daniel Fiala]
+    * Package python-setproctitle marked as a suggested package.
+    * Setting version 1.2.2 .
+
+ -- Daniel Fiala <danfiala@ucw.cz>  Fri, 21 Dec 2012 23:24:54 +0100
+
+
+logentries (1.2.1) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Daniel Fiala]
+    * Updated copyright string.
+    * Removed dependency on python-proctitle in rpm packages. Fedore sometimes does not know about this package.
+    * Added dependency on python-proctitle.
+    * Supressed query about username and password in monitor command.
+    * Setting custom proctitle in daemon mode.
+    * Fixed destination directories while building debian packages.
+    * Fixed typo in changelog.
+    * Added script for conversion of git log to debian changelog.
+    * Moved commands from Makefile to debian/rules.
+    * Added warning message that is written when file for follower does not exist.
+    [Viliam Holub]
+    * Setting version 1.2.1
+    [Mark Lacomber]
+    * Fixed 'satus' typo for error msg in get_response
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 5 Nov 2012 23:54:14 +0100
+
+
+logentries (1.2.0) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * New certificate tested
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 31 Oct 2012 15:34:31 +0100
+
+
+logentries (1.1.1) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Ignoring ram* and md* devices
+    * Adjusting terminology: account and host key
+    * Adding usage info in readme
+    * Using system certificate first
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 7 Aug 2012 17:18:14 +0200
+
+
+logentries (1.0.9) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Updating external CA file
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 7 Aug 2012 16:48:37 +0200
+
+
+logentries (1.0.8) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Adding new certificate and automatic update
+    * Fixing Amazon AMI cert path
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 25 Jul 2012 17:25:42 +0200
+
+
+logentries (1.0.6) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Disabling SSL for API communication inside EC2
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 25 Jul 2012 17:03:34 +0200
+
+
+logentries (1.0.5) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Adding path to Amazon certificate bundle
+    * Supporting old Python version
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 24 Jul 2012 02:49:47 +0200
+
+
+logentries (1.0.4) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Minor change to support Python 2.5
+
+ -- Viliam Holub <vilda@logentries.com>  Fri, 13 Jul 2012 01:50:13 +0200
+
+
+logentries (1.0.3) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * EC2 EU region autodetection
+
+ -- Viliam Holub <vilda@logentries.com>  Thu, 12 Jul 2012 14:57:51 +0200
+
+
+logentries (1.0.2) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Polishing
+
+ -- Viliam Holub <vilda@logentries.com>  Thu, 12 Jul 2012 03:38:00 +0200
+
+
+logentries (0.8.26) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Updating .gitignore
+    * Adding support for ec2eu/nossl connection domain requests
+    * Renaming domain_request to api_request, it's more specific
+    * Adding ec2eu option
+    * Adding support for filtering per log
+    [Trevor Parsons]
+    * updated winservice patch usage
+    * updated windows usage commands and patch
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 11 Jun 2012 01:55:28 +0200
+
+
+logentries (0.8.25) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Thread initialization fix
+    * Minor cleanup
+
+ -- Viliam Holub <vilda@logentries.com>  Sat, 19 May 2012 01:02:36 +0100
+
+
+logentries (0.8.20) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * New followed command
+    * Check that the file to follow is not folloew already
+    * Improving stability
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 16 Jan 2012 23:58:51 +0100
+
+
+logentries (0.8.19) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Removing debug messages
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 16 Jan 2012 16:26:31 +0100
+
+
+logentries (0.8.18) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Proper address quoting
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 16 Jan 2012 16:16:34 +0100
+
+
+logentries (0.8.17) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Improving stability
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 16 Jan 2012 15:29:20 +0100
+
+
+logentries (0.8.16) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Properly encoding
+
+ -- Viliam Holub <vilda@logentries.com>  Sat, 14 Jan 2012 01:52:14 +0100
+
+
+logentries (0.8.15) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * New instructions for Ubuntu installation
+    * Improving support for LSB systems
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 27 Dec 2011 17:10:34 +0100
+
+
+logentries (0.8.14) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * New certificates
+    * Adding a certificate
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 12 Dec 2011 16:58:31 +0100
+
+
+logentries (0.8.12) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Outboud network metrics fix
+    * Fixing resource monitoring
+    [Trevor Parsons]
+    * fixed logtype for windows, added custom win event logs
+
+ -- Trevor Parsons <trevor.parsons@logentries.com>  Sun, 27 Nov 2011 18:49:52 +0000
+
+
+logentries (0.8.11) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Displaying logtype shortcut for log listing
+
+ -- Viliam Holub <vilda@logentries.com>  Sat, 26 Nov 2011 20:49:10 +0000
+
+
+logentries (0.8.10) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Checks for metrics overflow
+    * Converting Unicode characters to UTF-8
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 3 Oct 2011 11:15:10 +0100
+
+
+logentries (0.8.6) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Updating intermediate certificate
+
+ -- Viliam Holub <vilda@logentries.com>  Sat, 20 Aug 2011 01:03:39 +0200
+
+
+logentries (0.8.4) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Adding gitignore to avoid git complaining about perfectly ok files
+    * Setting following thread as daemon to speed up agent shutdown in case of network failure
+    * Removing the logtypes command
+
+ -- Viliam Holub <vilda@logentries.com>  Thu, 4 Aug 2011 01:14:27 +0200
+
+
+logentries (0.8.3) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Switch off chunked transfer
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 2 Aug 2011 15:36:01 +0200
+
+
+logentries (0.8) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Avoiding repetitive cycle
+    * Adding support for log type listings
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 12 Jul 2011 13:04:25 +0200
+
+
+logentries (0.7.2) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Displaying response for push command
+    * Allowing full path for push and pull commands
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 11 Jul 2011 23:30:02 +0200
+
+
+logentries (0.7.1) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Extending valid path with root dir
+
+ -- Viliam Holub <vilda@logentries.com>  Mon, 11 Jul 2011 23:07:57 +0200
+
+
+logentries (0.7) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Adding user-defined filtering
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 6 Jul 2011 00:33:11 +0200
+
+
+logentries (0.6.8) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * IAA token
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 5 Jul 2011 22:23:50 +0200
+
+
+logentries (0.6.7) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Merge branch 'master' of github.com:logentries/le
+    * Limit log reload cycle
+
+ -- Viliam Holub <vilda@logentries.com>  Thu, 30 Jun 2011 14:57:24 +0200
+
+
+logentries (0.6.6) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Trevor Parsons]
+    * License Update
+    * Updated version number
+
+ -- Trevor Parsons <trevor.parsons@logentries.com>  Mon, 16 May 2011 22:14:51 +0100
+
+
+logentries (0.6.5) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Set version
+    [Trevor Parsons]
+    * Updated win log type key
+
+ -- Viliam Holub <vilda@logentries.com>  Fri, 13 May 2011 21:09:41 +0200
+
+
+logentries (0.6.4) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Fixing api reference
+    * Fixing API folder
+
+ -- Viliam Holub <vilda@logentries.com>  Thu, 12 May 2011 17:30:04 +0200
+
+
+logentries (0.6.3) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Fixing API URL
+    * Improving cyclic request attempts
+
+ -- Viliam Holub <vilda@logentries.com>  Wed, 4 May 2011 00:19:04 +0200
+
+
+logentries (0.6.2) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Trevor Parsons]
+    * "Updated win exe patch - fixed not monitoring win events issue"
+
+ -- Trevor Parsons <trevor.parsons@logentries.com>  Fri, 22 Apr 2011 14:21:08 +0100
+
+
+logentries (0.5.4) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Fixing deprecated calls and not-required import
+    * Merging windows monitoring code
+    * Extending the number of errors lscheck displays
+    * Fixing api name
+    * New command whoami
+    [Trevor Parsons]
+    * "Adding README for win exe generation"
+    * "Adding Win source and patches for creating exes"
+    * "Adding Windows EXEs and Files for creating them"
+    * Added Computer Name and Event Category to Win Event Logs
+
+ -- Viliam Holub <vilda@logentries.com>  Fri, 15 Apr 2011 01:56:40 +0100
+
+
+logentries (0.5.2) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Cleanup - removing old rpm specs
+
+ -- Viliam Holub <vilda@logentries.com>  Tue, 29 Mar 2011 14:32:23 +0200
+
+
+logentries (0.4.34) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Packaging, certificates
+    * Addind dependence on CA certificates
+    * RPM update
+    * Adding new CA certificate
+    * Packaging
+    * Debian init script fix
+    * Daemon mode fixes
+    * Enabling multiple login attempts and small init script fix
+    * Deamon mode
+
+ -- Viliam Holub <vilda@logentries.com>  Thu, 24 Mar 2011 00:59:57 +0100
+
+
+logentries (0.4.30) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Resilience againts invalid response
+    * Check script
+    * Extending installation platforms
+    * Small changes in installation instructions
+    * Support for Ubuntu
+    * Adding proper Debian rules
+
+ -- Viliam Holub <vilda@logentries.com>  Sun, 13 Mar 2011 01:33:37 +0000
+
+
+logentries (0.4.25) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+    [Viliam Holub]
+    * Debian packaging
+    * Moving Debian installation instructions down the code
+    * Version 0.4.25
+
+ -- Viliam Holub <vilda@logentries.com>  Fri, 11 Mar 2011 16:02:30 +0000
+
+

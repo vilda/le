@@ -25,9 +25,12 @@ A command line utility for a convenient access to logentries logging infrastruct
 %build
 
 %install
+python setup.py install --root $RPM_BUILD_ROOT --install-lib=/usr/share/logentries --install-scripts=/usr/share/logentries
 mkdir -p $RPM_BUILD_ROOT/usr/bin
-cp le $RPM_BUILD_ROOT/usr/bin
-ln -s le $RPM_BUILD_ROOT/usr/bin/le-init
+mkdir -p $RPM_BUILD_ROOT/etc/.le
+cp ca-certs.pem $RPM_BUILD_ROOT/etc/.le
+ln -s /usr/share/logentries/le $RPM_BUILD_ROOT/usr/bin
+ln -s le  $RPM_BUILD_ROOT/usr/bin/le-init
 ln -s le $RPM_BUILD_ROOT/usr/bin/le-reinit
 ln -s le $RPM_BUILD_ROOT/usr/bin/le-register
 ln -s le $RPM_BUILD_ROOT/usr/bin/le-monitor
@@ -41,4 +44,5 @@ ln -s le $RPM_BUILD_ROOT/usr/bin/le-pull
 %files
 %defattr(-,root,root)
 /usr/bin/*
-
+/usr/share/logentries/*
+/etc/.le

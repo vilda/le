@@ -1,17 +1,16 @@
 Source: logentries
 Section: admin
 Priority: extra
-Maintainer: Viliam Holub <vilda@logentries.com>
+Maintainer: Logentries Team <hello@logentries.com>
 Standards-Version: 3.9.1
-Build-Depends: debhelper (>= 9), dh-python, python-all-dev (>= 2.3.5-11)
+Build-Depends: debhelper (>= 9), dh-python, python-setuptools, python-all-dev (>= 2.3.5-11)
 Homepage: https://logentries.com/
 X-Python-Version: >= 2.4
 
 Package: logentries
 Architecture: all
-Recommends: python-simplejson
-Depends: ${misc:Depends}, ${python:Depends}, ca-certificates, python-pkg-resources
-Suggests: python-setproctitle
+Recommends: python-simplejson, python-setproctitle
+Depends: ${misc:Depends}, python, ca-certificates, python-pkg-resources
 Description: Agent for logentries.com
  Logentries is a log management and analysis service (https://logentries.com/).
  This package provides a command line utility for a convenient access to
