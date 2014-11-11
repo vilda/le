@@ -1,3 +1,11 @@
+logentries (1.4.1) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
+
+  * Change config option for datahub
+  * Fix regression with suppressing ssl
+  * Add notification about beta status
+
+ -- Logentries Team <hello@logentries.com>  Tue, 11 Nov 2014 14:56:00 +0000
+
 logentries (1.4.0) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
 
   * Update debian packaging
