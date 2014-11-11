@@ -31,9 +31,7 @@ FILTERS_PARAM = 'filters'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
 USE_CA_PROVIDED_PARAM = 'use_ca_provided'
 FORCE_DOMAIN_PARAM = 'force_domain'
-SYSLOG_MODE_PARAM = 'syslog-mode'
-DATAHUB_IP_PARAM = 'datahub-ip'
-DATAHUB_PORT_PARAM = 'datahub-port'
+DATAHUB_PARAM = 'datahub'
 SYSSTAT_TOKEN_PARAM = 'system-stat-token'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
@@ -423,7 +421,7 @@ class SyslogStreamSender(object):
             self.host_name = os.path.basename(name)
 
         # Initialize token value if we're working in Direct mode.
-        if not config.syslog_mode:
+        if not config.datahub:
             self.token = ''
             self.token = self.try_load_token_from_config()
             if (self.token is None) or (self.token == ''):
@@ -483,7 +481,7 @@ class SyslogStreamSender(object):
         # Prefix the message with host name
         if not self.host_name is None:
             msg = "HostName=" + self.host_name + " " + msg
-        if not config.syslog_mode:
+        if not config.datahub:
             # Sending directly tod Logentries service - token is required
             self.msg_queue.append(self.token + " " + msg)
         else:
@@ -1133,7 +1131,7 @@ class Stats:
             PORT = {False: LE_DEFAULT_SSL_PORT, True: LE_DEFAULT_NON_SSL_PORT}
             hostname = Domain.STREAM
             port = PORT[config.suppress_ssl]
-            if config.syslog_mode:
+            if config.datahub:
                 hostname = config.datahub_ip
                 port = config.datahub_port
 
@@ -1451,7 +1449,7 @@ class Stats:
             log.info(results)
         if not self.first:
             # Send data
-            if not config.syslog_mode:
+            if not config.datahub:
                 self.new_request(results)
             self.stats_stream.push(self.stats_to_string(results))
         else:
@@ -1500,7 +1498,7 @@ class Follower(object):
         self.flush = True
         self.event_filter = event_filter
 
-        if not config.syslog_mode:
+        if not config.datahub:
             self.syslog_sender = SyslogStreamSender(os.path.basename(name), Domain.STREAM, config.get_port(),
                                                     not config.suppress_ssl)
         else:
@@ -1638,7 +1636,7 @@ class Follower(object):
         return events
 
     def open_connection(self):
-        if config.syslog_mode:
+        if config.datahub:
             return
         """ Opens a push connection to logentries. """
         log.debug("Opening connection %s", self.log_addr)
@@ -1662,11 +1660,11 @@ class Follower(object):
             if not events:
                 return
         else:
-            if config.syslog_mode:
+            if config.datahub:
                 return
             else:
                 events = IAA_TOKEN
-        if config.syslog_mode:
+        if config.datahub:
             eventsArray = events.splitlines()
             for event in eventsArray:
                 self.syslog_sender.push(event)
@@ -1728,8 +1726,7 @@ class Config:
         self.suppress_ssl = False
         self.use_ca_provided = False
 
-        # Syslog options
-        self.syslog_mode = NOT_SET
+        self.datahub = NOT_SET
         self.datahub_ip = NOT_SET
         self.datahub_port = NOT_SET
 
@@ -1810,9 +1807,7 @@ class Config:
                 SUPPRESS_SSL_PARAM: '',
                 FORCE_DOMAIN_PARAM: '',
                 USE_CA_PROVIDED_PARAM: '',
-                SYSLOG_MODE_PARAM: '',
-                DATAHUB_IP_PARAM: '',
-                DATAHUB_PORT_PARAM: '',
+                DATAHUB_PARAM: '',
                 SYSSTAT_TOKEN_PARAM: ''
             })
             conf.read(self.config_filename)
@@ -1839,19 +1834,8 @@ class Config:
             new_force_domain = conf.get(MAIN_SECT, FORCE_DOMAIN_PARAM)
             if new_force_domain:
                 self.force_domain = new_force_domain
-            if self.syslog_mode == NOT_SET:
-                if conf.get(MAIN_SECT, SYSLOG_MODE_PARAM) == 'True':
-                    self.syslog_mode = True
-                else:
-                    self.syslog_mode = False
-            if self.datahub_ip == NOT_SET:
-                self.datahub_ip = conf.get(MAIN_SECT, DATAHUB_IP_PARAM)
-                if (self.datahub_ip == ''):
-                    self.datahub_ip = NOT_SET
-            if self.datahub_port == NOT_SET:
-                datahub_port_str = conf.get(MAIN_SECT, DATAHUB_PORT_PARAM)
-                if datahub_port_str != '':
-                    self.datahub_port = int(datahub_port_str)
+            if self.datahub == NOT_SET:
+                self.set_datahub_settings(conf.get(MAIN_SECT, DATAHUB_PARAM), should_die=False)
             if self.system_stats_token == NOT_SET:
                 system_stats_token_str = conf.get(MAIN_SECT, SYSSTAT_TOKEN_PARAM)
                 if system_stats_token_str != '':
@@ -1885,12 +1869,8 @@ class Config:
                 conf.set(MAIN_SECT, USE_CA_PROVIDED_PARAM, 'True')
             if self.force_domain:
                 conf.set(MAIN_SECT, FORCE_DOMAIN_PARAM, self.force_domain)
-            if self.syslog_mode != NOT_SET:
-                conf.set(MAIN_SECT, SYSLOG_MODE_PARAM, str(self.syslog_mode))
-            if self.datahub_ip != NOT_SET:
-                conf.set(MAIN_SECT, DATAHUB_IP_PARAM, self.datahub_ip)
-            if self.datahub_port != NOT_SET:
-                conf.set(MAIN_SECT, DATAHUB_PORT_PARAM, str(self.datahub_port))
+            if self.datahub != NOT_SET:
+                conf.set(MAIN_SECT, DATAHUB_PARAM, self.datahub)
             if self.system_stats_token != NOT_SET:
                 conf.set(MAIN_SECT, SYSSTAT_TOKEN_PARAM, self.system_stats_token)
             conf.write(conf_file)
@@ -2004,20 +1984,23 @@ class Config:
 
         return ret_param
 
-    def set_syslog_settings(self, value):
-        if not value:
+    def set_datahub_settings(self, value, should_die=True):
+        if not value and should_die:
             die('--datahub requires a parameter')
+        elif not value and not should_die:
+            return
+
         values = value.split(":")
         if len(values) > 2:
             die("Cannot parse %s for --datahub. Expected format: hostname:port" % value)
 
-        self.syslog_mode = True
         self.datahub_ip = values[0]
         if len(values) == 2:
             try:
                 self.datahub_port = int(values[1])
             except ValueError:
                 die("Cannot parse %s as port. Specify a valid --datahub address" % values[1])
+        self.datahub = value
 
 
     def process_params(self, params):
@@ -2105,7 +2088,7 @@ class Config:
             elif name == "--system-stat-token":
                 self.set_system_stat_token(value)
             elif name == "--datahub":
-                self.set_syslog_settings(value)
+                self.set_datahub_settings(value)
 
         if self.datahub_ip and not self.datahub_port:
             if self.suppress_ssl:
@@ -2123,7 +2106,7 @@ class Config:
     def get_port(self):
         PORT = {False: LE_DEFAULT_SSL_PORT, True: LE_DEFAULT_NON_SSL_PORT}
         port = PORT[config.suppress_ssl]
-        if config.syslog_mode:
+        if self.datahub:
             return config.datahub_port
         return port
 
