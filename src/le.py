@@ -2012,7 +2012,7 @@ class Config:
                                               "user-key= account-key= agent-key= host-key= no-timestamps debug-events "
                                               "debug-filters debug-loglist local debug-stats debug-nostats "
                                               "debug-stats-only debug-cmds debug-system help version yes force uuid list "
-                                              "std std-all name= hostname= type= pid-file= debug no-defaults"
+                                              "std std-all name= hostname= type= pid-file= debug no-defaults "
                                               "suppress-ssl use-ca-provided force-api-host= force-domain= "
                                               "system-stat-token= datahub=".split())
         except getopt.GetoptError, err:
