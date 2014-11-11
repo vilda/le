@@ -173,7 +173,7 @@ Where parameters are:
   --yes                always respond yes
   --datahub            send logs to the specified data hub address
                        the format is address:port with port being optional
-  --system-stat-token= set the token for system stats log
+  --system-stat-token= set the token for system stats log (beta)
 """
 
 
@@ -1963,18 +1963,6 @@ class Config:
             self.name = self.hostname_required().split('.')[0]
         return self.name
 
-    def syslog_options_required(self):
-        """
-        Exits with error message if the datahub-ip or datahub-port isn't set.
-        """
-        if not self.syslog_mode:
-            return
-
-        if self.datahub_ip == NOT_SET:
-            die("Datahub ip is required. Specify the datahub ip or host name with the --datahub-ip parameter.")
-        if self.datahub_port == NOT_SET:
-            die("Datahub port is required. Specify the port with the --datahub_port parameter.")
-
     # The method gets all parameters of given type from argument list,
     # checks for their format and returns list of values of parameters
     # of specified type. E.g: We have params = ['true', 127.0.0.1, 10000] the call of
@@ -2018,10 +2006,10 @@ class Config:
 
     def set_syslog_settings(self, value):
         if not value:
-            die('--datahub requires an parameter')
+            die('--datahub requires a parameter')
         values = value.split(":")
         if len(values) > 2:
-            die("Could not parse %s for --datahub. Expected format: hostname:port" % value)
+            die("Cannot parse %s for --datahub. Expected format: hostname:port" % value)
 
         self.syslog_mode = True
         self.datahub_ip = values[0]
@@ -2029,7 +2017,7 @@ class Config:
             try:
                 self.datahub_port = int(values[1])
             except ValueError:
-                die("Could not parse %s as port. Specify a valid --datahub address" % values[1])
+                die("Cannot parse %s as port. Specify a valid --datahub address" % values[1])
 
 
     def process_params(self, params):
