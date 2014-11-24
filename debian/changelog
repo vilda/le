@@ -1,3 +1,12 @@
+logentries (1.4.3) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Ulrich Dangel ]
+  * Update setup.py version
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Mon, 24 Nov 2014 18:33:37 +0000
+
 logentries (1.4.2) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
 
   * Update spec file

@@ -9,7 +9,7 @@
 #
 from utils import *
 
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 NOT_SET = None
 
