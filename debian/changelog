@@ -1,3 +1,9 @@
+logentries (1.4.2) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
+
+  * Update spec file
+
+ -- Logentries Team <hello@logentries.com>  Mon, 24 Nov 2014 17:43:57 +0000
+
 logentries (1.4.1) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
 
   * Change config option for datahub
