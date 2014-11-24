@@ -13,7 +13,7 @@ mkdir -p /opt/local/lib/svc/manifest/system
 
 echo "Downloading files..."
 #Download files
-wget --no-check-certificate -q -O /opt/local/bin/le https://raw.github.com/logentries/le/master/le
+wget --no-check-certificate -q -O /opt/local/bin/le https://raw.githubusercontent.com/logentries/le/b88308c21c3182084020f8fb2413aefac93c172a/le
 wget --no-check-certificate -q -O /opt/local/lib/svc/method/svc-logentries https://raw.github.com/logentries/le/master/install/smartos/svc-logentries
 wget --no-check-certificate -q -O /opt/local/lib/svc/manifest/system/logentries.xml https://raw.github.com/logentries/le/master/install/smartos/logentries.xml
 
