@@ -1657,13 +1657,8 @@ class Follower(object):
         """ Sends a block of new lines. """
         if events:
             events = self.event_filter(events)
-            if not events:
-                return
-        else:
-            if config.datahub:
-                return
-            else:
-                events = IAA_TOKEN
+        if not events:
+            return
         if config.datahub:
             eventsArray = events.splitlines()
             for event in eventsArray:
