@@ -1710,7 +1710,7 @@ class LogFollower(Follower):
             self.send_events(events)
 
 
-class Config:
+class Config(Object):
     def __init__(self):
         self.config_dir_name = self.get_config_dir()
         self.config_filename = self.config_dir_name + LE_CONFIG
@@ -2155,7 +2155,7 @@ class Config:
         return port
 
 
-class LocalConfigHolder:
+class LocalConfigHolder(object):
     """
     LocalConfigHolder is the class that deals with local config (config.json) file.
     Functions: loading values from the config, saving data to the config, updating data in the config.
