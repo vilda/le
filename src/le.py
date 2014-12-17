@@ -22,6 +22,10 @@ CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
 LE_CONFIG = 'config'
 
+LOCAL_CONFIG_DIR_USER = '.le'
+LOCAL_CONFIG_DIR_SYSTEM = '/etc/le'
+LOCAL_CONFIG_JSON_FILE = 'config.json'
+
 PID_FILE = '/var/run/logentries.pid'
 
 MAIN_SECT = 'Main'
@@ -33,6 +37,7 @@ USE_CA_PROVIDED_PARAM = 'use_ca_provided'
 FORCE_DOMAIN_PARAM = 'force_domain'
 DATAHUB_PARAM = 'datahub'
 SYSSTAT_TOKEN_PARAM = 'system-stat-token'
+USE_CONFIG_LOG_PATHS_PARAM = 'use-config-log-paths'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
@@ -161,17 +166,18 @@ Where command is one of:
   pull      Pull log file: <path> <when> <filter> <limit>
 
 Where parameters are:
-  --help               show usage help and exit
-  --version            display version number and exit
-  --account-key=       set account key and exit
-  --host-key=          set local host key and exit, generate key if key is empty
-  --no-timestamps      no timestamps in agent reportings
-  --force              force given operation
-  --suppress-ssl       do not use SSL with API server
-  --yes                always respond yes
-  --datahub            send logs to the specified data hub address
-                       the format is address:port with port being optional
-  --system-stat-token= set the token for system stats log (beta)
+  --help                  show usage help and exit
+  --version               display version number and exit
+  --account-key=          set account key and exit
+  --host-key=             set local host key and exit, generate key if key is empty
+  --no-timestamps         no timestamps in agent reportings
+  --force                 force given operation
+  --suppress-ssl          do not use SSL with API server
+  --yes                   always respond yes
+  --datahub               send logs to the specified data hub address
+                          the format is address:port with port being optional
+  --system-stat-token=    set the token for system stats log (beta)
+  --use-config-log-paths= if set to 'true' the Agent will follow logs from list in local config file
 """
 
 
@@ -390,10 +396,19 @@ class StreamLogSender(object):
         self.logger.setLevel(logging.INFO)
         self.handler = SSLSysLogHandler(address, port, use_ssl, cert_name)
         self.handler.setLevel(logging.DEBUG)
-        log_format = "%(asctime)s {0} {1}: %(message)s\r\n".format(config.hostname_required(), tag.replace(' ', '_'))
-        time_format = "%Y-%m-%dT%H:%M:%SZ"
-        log_formatter = logging.Formatter(log_format, time_format)
-        log_formatter.converter = time.gmtime
+
+        if config.datahub:
+            # DataHub mode - message should be formatted to Syslog format.
+            log_format = "%(asctime)s {0} {1}: %(message)s\r\n".format(config.hostname_required(),
+                                                                       tag.replace(' ', '_'))
+            time_format = "%Y-%m-%dT%H:%M:%SZ"
+            log_formatter = logging.Formatter(log_format, time_format)
+            log_formatter.converter = time.gmtime
+        else:
+            # Direct mode - message goes "as is".
+            log_format = "%(message)s\r\n"
+            log_formatter = logging.Formatter(log_format)
+
         self.handler.setFormatter(log_formatter)
         self.logger.addHandler(self.handler)
 
@@ -408,25 +423,26 @@ class SyslogStreamSender(object):
     e.g. not using DataHub.
     """
 
-    def __init__(self, tag=SYSTEM_STATS_TAG, endpoint_address=Domain.STREAM,
-                 port=LE_DEFAULT_SSL_PORT, use_ssl=True):
+    def __init__(self, token, tag=SYSTEM_STATS_TAG, endpoint_address=Domain.STREAM,
+                 port=LE_DEFAULT_SSL_PORT, use_ssl=True, is_system_stats=False):
         self.msg_queue = deque(maxlen=10000)
         self.endpoint_address = endpoint_address
         self.endpoint_port = port
         self.tag = tag
+        self.token = token
 
         name = config.name
         self.host_name = None
         if not name is None:
             self.host_name = os.path.basename(name)
 
-        # Initialize token value if we're working in Direct mode.
-        if not config.datahub:
-            self.token = ''
-            self.token = self.try_load_token_from_config()
-            if (self.token is None) or (self.token == ''):
-                self.token = self.try_obtain_token()
-            config.system_stats_token_required()
+        if is_system_stats:
+            # Initialize token value if we're working in Direct mode.
+            if not config.datahub:
+                self.token = self.try_load_token_from_config()
+                if (self.token is None) or (self.token == ''):
+                    self.token = self.try_obtain_token()
+                config.system_stats_token_required()
 
         cert_name = None
 
@@ -1135,8 +1151,8 @@ class Stats:
                 hostname = config.datahub_ip
                 port = config.datahub_port
 
-            self.stats_stream = SyslogStreamSender(SYSTEM_STATS_TAG, hostname, port,
-                                                   not config.suppress_ssl)
+            self.stats_stream = SyslogStreamSender('', SYSTEM_STATS_TAG, hostname, port,
+                                                   not config.suppress_ssl, True)
             self.send_stats()
 
 
@@ -1490,19 +1506,20 @@ class Follower(object):
     The follower keeps an eye on the file specified and sends new events to the logentries infrastructure.
     """
 
-    def __init__(self, name, log_key, monitorlogs, event_filter):
+    def __init__(self, name, log_key, monitorlogs, event_filter, token=''):
         """ Initializes the follower. """
         self.name = name
         self.log_key = log_key
         self.log_addr = '/%s/hosts/%s/%s/?realtime=1' % (config.user_key, config.agent_key, log_key)
         self.flush = True
         self.event_filter = event_filter
+        self.token = token
 
         if not config.datahub:
-            self.syslog_sender = SyslogStreamSender(os.path.basename(name), Domain.STREAM, config.get_port(),
+            self.syslog_sender = SyslogStreamSender(token, os.path.basename(name), Domain.STREAM, config.get_port(),
                                                     not config.suppress_ssl)
         else:
-            self.syslog_sender = SyslogStreamSender(os.path.basename(name), config.datahub_ip, config.datahub_port,
+            self.syslog_sender = SyslogStreamSender(token, os.path.basename(name), config.datahub_ip, config.datahub_port,
                                                     not config.suppress_ssl)
         log.info("Following %s" % name)
         monitoring_thread = threading.Thread(target=monitorlogs, name=self.name)
@@ -1659,7 +1676,7 @@ class Follower(object):
             events = self.event_filter(events)
         if not events:
             return
-        if config.datahub:
+        if config.datahub or self.token != '':
             eventsArray = events.splitlines()
             for event in eventsArray:
                 self.syslog_sender.push(event)
@@ -1676,8 +1693,8 @@ class Follower(object):
 
 
 class LogFollower(Follower):
-    def __init__(self, name, log_key, event_filter):
-        super(LogFollower, self).__init__(name, log_key, self.monitorlogs, event_filter)
+    def __init__(self, name, log_key, event_filter, token=''):
+        super(LogFollower, self).__init__(name, log_key, self.monitorlogs, event_filter, token)
 
     def monitorlogs(self):
         """ Opens the log file and starts to collect new events. """
@@ -1693,7 +1710,7 @@ class LogFollower(Follower):
             self.send_events(events)
 
 
-class Config:
+class Config(Object):
     def __init__(self):
         self.config_dir_name = self.get_config_dir()
         self.config_filename = self.config_dir_name + LE_CONFIG
@@ -1727,6 +1744,11 @@ class Config:
 
         # System stats. token
         self.system_stats_token = NOT_SET
+
+        # Source of followed logs.
+        # If it is False then the Agent will get logs to follow from
+        # LE server, otherwise - will use log list stored in local config (config.json)
+        self.use_config_log_paths = NOT_SET
 
         # Debug options
 
@@ -1803,7 +1825,8 @@ class Config:
                 FORCE_DOMAIN_PARAM: '',
                 USE_CA_PROVIDED_PARAM: '',
                 DATAHUB_PARAM: '',
-                SYSSTAT_TOKEN_PARAM: ''
+                SYSSTAT_TOKEN_PARAM: '',
+                USE_CONFIG_LOG_PATHS_PARAM: ''
             })
             conf.read(self.config_filename)
 
@@ -1835,6 +1858,14 @@ class Config:
                 system_stats_token_str = conf.get(MAIN_SECT, SYSSTAT_TOKEN_PARAM)
                 if system_stats_token_str != '':
                     self.system_stats_token = system_stats_token_str
+
+            if self.use_config_log_paths is None:
+                conf_log_paths_raw = conf.get(MAIN_SECT, USE_CONFIG_LOG_PATHS_PARAM)
+                if conf_log_paths_raw == '':
+                    self.use_config_log_paths = False
+                else:
+                    self.use_config_log_paths = conf_log_paths_raw == 'True'
+
 
         except ConfigParser.NoSectionError:
             return False
@@ -1868,6 +1899,12 @@ class Config:
                 conf.set(MAIN_SECT, DATAHUB_PARAM, self.datahub)
             if self.system_stats_token != NOT_SET:
                 conf.set(MAIN_SECT, SYSSTAT_TOKEN_PARAM, self.system_stats_token)
+            if self.use_config_log_paths != NOT_SET:
+                use_config_log_paths_value = str(self.use_config_log_paths)
+            else:
+                use_config_log_paths_value = 'False'  # By default this should be false if undefined
+            conf.set(MAIN_SECT, USE_CONFIG_LOG_PATHS_PARAM, use_config_log_paths_value)
+
             conf.write(conf_file)
         except IOError, e:
             die("Error: IO error when writing to config file: %s" % e)
@@ -1888,9 +1925,12 @@ class Config:
         Exits with error message if the user key is not defined.
         """
         if self.user_key == NOT_SET:
-            log.info(
+            if not config.use_config_log_paths:
+                log.info(
                 "Account key is required. Enter your Logentries login credentials or specify the account key with --account-key parameter.")
-            self.user_key = retrieve_account_key()
+                self.user_key = retrieve_account_key()
+            else:
+                die("Account key is required. Enter your account key with --account-key parameter.")
             config.save()
 
     def set_system_stat_token(self, value):
@@ -2009,7 +2049,7 @@ class Config:
                                               "debug-stats-only debug-cmds debug-system help version yes force uuid list "
                                               "std std-all name= hostname= type= pid-file= debug no-defaults "
                                               "suppress-ssl use-ca-provided force-api-host= force-domain= "
-                                              "system-stat-token= datahub=".split())
+                                              "system-stat-token= datahub= use-config-log-paths=".split())
         except getopt.GetoptError, err:
             die("Parameter error: " + str(err))
         for name, value in optlist:
@@ -2084,6 +2124,15 @@ class Config:
                 self.set_system_stat_token(value)
             elif name == "--datahub":
                 self.set_datahub_settings(value)
+            elif name == "--use-config-log-paths":
+                param = value.lower()
+                if param == "true":
+                    self.use_config_log_paths = True
+                elif param == "false":
+                    self.use_config_log_paths = False
+                else:
+                    report("Please specify \"true\" or \"false\" as value for --use-config-log-paths option."
+                           "Current state of log paths source was not altered.")
 
         if self.datahub_ip and not self.datahub_port:
             if self.suppress_ssl:
@@ -2106,7 +2155,191 @@ class Config:
         return port
 
 
+class LocalConfigHolder(object):
+    """
+    LocalConfigHolder is the class that deals with local config (config.json) file.
+    Functions: loading values from the config, saving data to the config, updating data in the config.
+    In current implementation local config stores followed logs data.
+    """
+    def __init__(self):
+        try:
+            # Check whether config.json is in the right place.
+            # If not - create new one.
+            self.conf_file = get_or_create_local_config()
+        except IOError, e:
+            die(e)
+
+        # Local lonfig (config.json) parts go here.
+        # Currently only followed logs list is stored here.
+        self.logs_list = []
+
+    def construct_local_config_json_object(self):
+        """
+        Constructs a dictionary which contains persistence fields of
+        LocalConfigHolder instance that need to be serialized and stored to config.json
+        :return dict:
+        """
+        # Here may be not only logs list but any other objects that may be added in next stories.
+        return {
+            'logs': self.logs_list
+        }
+
+    def parse_local_config_json_object(self, object):
+        """
+        Extracts persistence data from JSON object which comes from json_loads and puts extracted data
+        to corresponding fields of LocalConfigHolder instance.
+
+        :param dict:
+        :return None:
+        """
+        # Here may be not only logs list but any other objects that may be added in next stories.
+        if not object.get('logs') is None:
+            self.logs_list = object['logs']
+
+    @staticmethod
+    def create_empty_local_config_json_object():
+        """
+        Constructs empty structure that represents empty config.json with valid structure. LocalConfigHolder
+        instance is initialized with this object. This method is used if config.json was absent and been created
+        by get_or_create_local_config() routine and contains no JSON structures.
+
+        :return dict:
+        """
+        # Here may be not only logs list but any other objects that may be added in next stories.
+        return {
+            'logs': []
+        }
+
+    @staticmethod
+    def construct_log_item(log_path, log_name, token):
+        """
+        Constructs a dictionary which represents log item. This items are placed to LocalConfigHolder log list
+        field to be then serialized and stored to config.json
+
+        :param str, str, str:
+        :return dict:
+        """
+        return {'path': log_path, 'name': log_name, 'token': token}
+
+    def add_log(self, log_path, log_name, token):
+        """
+        Constructs log item from given log path (followed file path), log name (if not stated explicitly -
+        file name of followed file) and token (GUID received from LE server after file following) and inserts
+        it to log list of LocalConfigHolder instance
+
+        :param str, str, str:
+        :return None:
+        """
+        if log_name == '':
+            return
+        self.logs_list.append(LocalConfigHolder.construct_log_item(log_path, log_name, token))
+
+    def remove_log(self, log_path, log_name, token):
+        """
+        Removes a log item from log list of LocalConfigHolder instance. Uses all three properties of the item
+        for comparison: log path (followed file path), log name (if not stated explicitly -
+        file name of followed file) and token (GUID received from LE server after file following).
+
+        :param str, str, str:
+        :return None:
+        """
+        if log_name == '':
+            return
+        self.logs_list.remove(LocalConfigHolder.construct_log_item(log_path, log_name, token))
+
+    def save_local_config(self):
+        """
+        Gets data of persistent fields of LocalConfigHolder instance, serializes that data (which is
+        a dictionary) and writes it to local config (config.json)
+
+        :return None:
+        """
+        try:
+            output = open(self.conf_file, 'wb')
+            serialized_logs = json_dumps(self.construct_local_config_json_object(),
+                                         sort_keys=True, indent=1)
+            output.write(serialized_logs)
+            output.close()
+        except IOError, e:
+            report('Cannot save local config object to %s. I/O error:' % self.conf_file)
+            die(e)
+        except Exception, e:
+            report('Cannot save local config object to %s. Error:' % self.conf_file)
+            die(e)
+
+    def load_local_config(self):
+        """
+        Loads serialized data from config.json, parses it to a dictionary and then - extracts values of
+        persistent fields of LocalConfigHolder instance and initializes that fields with extracted values.
+
+        :return None:
+        """
+        try:
+            input = open(self.conf_file, 'rb')
+            serialized_logs = input.read()
+            self.parse_local_config_json_object(json_loads(serialized_logs))
+        except IOError, e:
+            report('Cannot load local config object from %s. I/O error:' % self.conf_file)
+            die(e)
+        except Exception, e:
+            if not serialized_logs == '':
+                # Malformed local config - nothing to do but to die.
+                report('Cannot load local config object from %s. Error:' % self.conf_file)
+                die(e)
+            else:
+                # If config is just created and empty - construct empty object and pass it to the local config
+                self.parse_local_config_json_object(LocalConfigHolder.create_empty_local_config_json_object())
+
 config = Config()
+
+def get_local_config_dir_path():
+    """
+    Depending on UID of the user that had invoked the Agent returns
+    corresponding path to local config (config.json) file.
+
+    :return str:
+    """
+    if os.geteuid() == 0:
+        # Invoked by root or using sudo
+        local_c_dir = LOCAL_CONFIG_DIR_SYSTEM
+    else:
+        local_c_dir = os.path.expanduser('~') + '/' + LOCAL_CONFIG_DIR_USER
+    return local_c_dir + '/'
+
+def get_local_config_file_path():
+    """
+    Returns full path to local config (config.json) file.
+
+    :return str:
+    """
+    conf_dir = get_local_config_dir_path()
+    return conf_dir + LOCAL_CONFIG_JSON_FILE
+
+def get_or_create_local_config():
+    """
+    Checks whether local config (config.json) file exists and if not -
+    creates it alongside with creating parent directory for it if
+    that directory does not exist too.
+    Returns full path to local config (config.json).
+
+    :return str:
+    """
+    conf_file = get_local_config_file_path()
+    if os.path.exists(conf_file) and os.path.isfile(conf_file):
+        return conf_file
+    else:
+        try:
+            report('%s not found. Trying to create.' % conf_file)
+            dir = get_local_config_dir_path()
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            open(conf_file, 'a').close()
+            report('%s created.' % conf_file)
+        except IOError:
+            raise IOError('Cannot create %s:' % conf_file)
+    return conf_file
+
+local_config = LocalConfigHolder()
 
 # Pass the exception
 
@@ -2316,16 +2549,17 @@ def request_follow(filename, name, type_opt):
     """
     config.agent_key_required()
     request = {"request": "new_log",
-               "user_key": config.user_key,
-               "host_key": config.agent_key,
-               "name": name,
-               "filename": filename,
-               "type": type_opt,
-               "follow": "true"}
-    api_request(request, True, True)
+           "user_key": config.user_key,
+           "host_key": config.agent_key,
+           "name": name,
+           "filename": filename,
+           "type": type_opt,
+           "follow": "true"}
+    followed_log = api_request(request, True, True)
     print "Will follow %s as %s" % (filename, name)
     log.info("Don't forget to restart the daemon")
     _startup_info()
+    return followed_log
 
 
 def request_hosts(logs=False):
@@ -2383,30 +2617,40 @@ def cmd_register(args):
     config.hostname_required()
     config.name_required()
 
-    si = system_detect(True)
+    if not config.use_config_log_paths:
+        si = system_detect(True)
 
-    request = {"request": "register",
-               'user_key': config.user_key,
-               'name': config.name,
-               'hostname': config.hostname,
-               'system': si['system'],
-               'distname': si['distname'],
-               'distver': si['distver']
-    }
-    response = api_request(request, True, True)
+        request = {"request": "register",
+                   'user_key': config.user_key,
+                   'name': config.name,
+                   'hostname': config.hostname,
+                   'system': si['system'],
+                   'distname': si['distname'],
+                   'distver': si['distver']
+        }
+        response = api_request(request, True, True)
 
-    config.agent_key = response['host_key']
-    config.save()
+        config.agent_key = response['host_key']
+        config.save()
 
-    log.info("Registered %s (%s)" % (config.name, config.hostname))
+        log.info("Registered %s (%s)" % (config.name, config.hostname))
 
-    # Registering logs
-    logs = []
-    if config.std or config.std_all:
-        logs = collect_log_names(si)
-    for logx in logs:
-        if config.std_all or logx['default'] == '1':
-            request_follow(logx['filename'], logx['name'], logx['type'])
+        # Registering logs
+        logs = []
+        if config.std or config.std_all:
+            logs = collect_log_names(si)
+        for logx in logs:
+            if config.std_all or logx['default'] == '1':
+                request_follow(logx['filename'], logx['name'], logx['type'])
+    else:
+        log.info("Registered %s (%s)" % (config.name, config.hostname))
+        config.save()
+
+# The function checks for 2 things: 1) that the path is not empty;
+# 2) the path starts with '/' character which indicates that the log has
+# a "physical" path which starts from filesystem root.
+def check_file_name(file_name):
+    return file_name.startswith('/')
 
 
 def load_logs():
@@ -2415,18 +2659,40 @@ def load_logs():
     """
     noticed = False
     logs = None
-    while not logs:
-        resp = request('hosts/%s/' % config.agent_key, False, False, retry=True)
-        if resp['response'] != 'ok':
-            if not noticed:
-                log.error('Error retrieving list of logs: %s, retrying in %ss intervals' % (
-                    resp['reason'], SRV_RECON_TIMEOUT))
-                noticed = True
-            time.sleep(SRV_RECON_TIMEOUT)
-            continue
-        logs = resp['list']
-        if not logs:
-            time.sleep(SRV_RECON_TIMEOUT)
+
+    if config.use_config_log_paths:
+        report("The Agent will use log list from %s. If you wish to use followed logs list from\n"
+               "Logentries' server please run the Agent with specifying option --use-config-log-paths=false"
+               % get_local_config_file_path())
+
+    if not config.use_config_log_paths:
+        # Use LE server as the source for list of followed logs
+        while not logs:
+           resp = request('hosts/%s/' % config.agent_key, False, False, retry=True)
+           if resp['response'] != 'ok':
+               if not noticed:
+                   log.error('Error retrieving list of logs: %s, retrying in %ss intervals' % (
+                       resp['reason'], SRV_RECON_TIMEOUT))
+                   noticed = True
+               time.sleep(SRV_RECON_TIMEOUT)
+               continue
+           logs = resp['list']
+           if not logs:
+               time.sleep(SRV_RECON_TIMEOUT)
+    else:
+        #  We're working in 'local' mode, so we will try to use the list of followed files that is stored locally.
+        logs = []
+        local_config.load_local_config()
+        local_logs_list = local_config.logs_list
+
+        for log in local_logs_list:
+            # Unpack log dictionary
+            log_path = log['path']
+            log_name = log['name']
+            log_token = log['token']
+            # Construct response-like item which has the same structure as ones returned by LE Server.
+            logs.append({'type': 'token', 'name': log_name, 'filename': log_path, 'key': '', 'token': log_token,
+                         'follow': 'true'})
 
     available_filters = {}
     filter_filenames = default_filter_filenames
@@ -2446,10 +2712,15 @@ def load_logs():
 
     # Start followers
     for l in logs:
-        if l['follow'] == 'true':
+        # Note! Token-type logs have follow param == false by default, so we need to
+        # check also the type of the log.
+        if l['follow'] == 'true' or l['type'] == 'token':
             log_name = l['name']
             log_filename = l['filename']
             log_key = l['key']
+            log_token = ''
+            if l['type'] == 'token':
+                log_token = l['token']
 
             debug_filters("Log name=%s key=%s filename=%s", log_name, log_key, log_filename)
 
@@ -2473,7 +2744,16 @@ def load_logs():
                 debug_filters(" Using filter %s", event_filter)
 
             # Instantiate the follower
-            LogFollower(log_filename, log_key, event_filter)
+            if check_file_name(log_filename): # Do not start a follower for a log with absent filepath.
+                LogFollower(log_filename, log_key, event_filter, log_token)
+
+            if l['type'] == 'token':  # Add only token logs to the list
+                # Push log to the local list
+                if not config.use_config_log_paths:
+                    local_config.add_log(log_filename, log_name, log_token)
+
+    if not config.use_config_log_paths:
+        local_config.save_local_config()
 
 
 def is_followed(filename):
@@ -2494,17 +2774,18 @@ def cmd_monitor(args):
     """
     no_more_args(args)
     config.load()
-    if config.agent_key == NOT_SET:
-        die('Please register the host first with command `le.py register\'')
-    config.agent_key_required()
+    stats = None
+    if not config.use_config_log_paths:
+        if config.agent_key == NOT_SET:
+            die('Please register the host first with command `le.py register\'')
+        config.agent_key_required()
+            # Register resource monitoring
+        stats = Stats()
+
     config.user_key_required()
 
     if config.daemon:
         daemonize()
-
-    # Register resource monitoring
-    stats = Stats()
-
     try:
         # Load logs to follow
         if not config.debug_stats_only:
@@ -2535,6 +2816,12 @@ def cmd_follow(args):
 
     config.load()
     config.agent_key_required()
+    local_config.load_local_config()
+
+    if config.use_config_log_paths:
+        report("The Agent will save new log entry to list to %s. If you wish to use followed logs list from\n"
+               "Logentries' server please run the Agent with specifying option --use-config-log-paths=false"
+               % get_local_config_file_path())
 
     for arg in args:
         filename = os.path.abspath(arg)
@@ -2553,7 +2840,16 @@ def cmd_follow(args):
         if len(glob.glob(filename)) == 0:
             log.warning('\nWARNING: File %s does not exist' % filename)
 
-        request_follow(filename, name, type_opt)
+        # Do not request LE server to follow a log if the agent is in
+        # 'local' mode.
+        if not config.use_config_log_paths:
+            request_follow(filename, name, type_opt)
+        else:
+            # Add a log to config.json only if the Agent is in 'local' mode, because by
+            # default followed files have 'agent' type, not 'token'
+            local_config.add_log(filename, name, '')
+
+    local_config.save_local_config()
 
 
 def cmd_followed(args):
