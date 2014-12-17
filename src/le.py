@@ -2548,6 +2548,7 @@ def cmd_follow(args):
         # Check that we don't follow that file already
         if not config.force and is_followed(filename):
             log.warning('Already following %s' % filename)
+            return
 
         if len(glob.glob(filename)) == 0:
             log.warning('\nWARNING: File %s does not exist' % filename)
