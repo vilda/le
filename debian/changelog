@@ -1,3 +1,12 @@
+logentries (1.4.4) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Fixing follow idempotence
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Wed, 17 Dec 2014 15:24:10 +0000
+
 logentries (1.4.3) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Ulrich Dangel ]
