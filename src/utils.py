@@ -12,7 +12,7 @@ import logging
 
 __author__ = 'uli'
 
-__all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
+__all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "EXIT_TERMINATED", "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
            "default_cert_file", "system_cert_file",
            "data_connect", "domain_connect", "no_more_args", "find_hosts", "find_logs", "die", "rfile", 'TCP_TIMEOUT',
            "rm_pidfile", "set_proc_title", "is_uuid"]
@@ -22,6 +22,7 @@ EXIT_OK = 0
 EXIT_NO = 1
 EXIT_ERR = 3
 EXIT_HELP = 4
+EXIT_TERMINATED = 5 # Terminated by user (Ctrl+C)
 
 LE_CERT_NAME = 'ca-certs.pem'
 

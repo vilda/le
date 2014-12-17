@@ -146,7 +146,7 @@ LSB_RELEASE = '/etc/lsb-release'
 PULL_USAGE = "pull <path> <when> <filter> <limit>"
 PUSH_USAGE = "push <file> <path> <log-type>"
 USAGE = "Logentries agent version " + VERSION + """
-usage: le.py COMMAND [ARGS]
+usage: le COMMAND [ARGS]
 
 Where command is one of:
   init      Write local configuration file
@@ -1069,10 +1069,9 @@ def retrieve_account_key():
     Retrieves account keys from the web server.
     """
     while True:
-        username = raw_input('Email: ')
-        password = getpass.getpass()
-
         try:
+            username = raw_input('Email: ')
+            password = getpass.getpass()
             c = domain_connect(config, Domain.MAIN, Domain)
             c.request('POST', ACCOUNT_KEYS_API,
                       urllib.urlencode({'username': username, 'password': password}),
@@ -1710,7 +1709,7 @@ class LogFollower(Follower):
             self.send_events(events)
 
 
-class Config(Object):
+class Config(object):
     def __init__(self):
         self.config_dir_name = self.get_config_dir()
         self.config_filename = self.config_dir_name + LE_CONFIG
@@ -1920,14 +1919,13 @@ class Config(Object):
             die('Error: User key does not look right.')
         self.user_key = value
 
-    def user_key_required(self):
+    def user_key_required(self, ask_for_it):
         """
         Exits with error message if the user key is not defined.
         """
         if self.user_key == NOT_SET:
-            if not config.use_config_log_paths:
-                log.info(
-                "Account key is required. Enter your Logentries login credentials or specify the account key with --account-key parameter.")
+	    if ask_for_it:
+                log.info("Account key is required. Enter your Logentries login credentials or specify the account key with --account-key parameter.")
                 self.user_key = retrieve_account_key()
             else:
                 die("Account key is required. Enter your account key with --account-key parameter.")
@@ -2124,15 +2122,14 @@ class Config(Object):
                 self.set_system_stat_token(value)
             elif name == "--datahub":
                 self.set_datahub_settings(value)
-            elif name == "--use-config-log-paths":
+            elif name == "--use-config-log-paths": #XXX
                 param = value.lower()
                 if param == "true":
                     self.use_config_log_paths = True
                 elif param == "false":
                     self.use_config_log_paths = False
                 else:
-                    report("Please specify \"true\" or \"false\" as value for --use-config-log-paths option."
-                           "Current state of log paths source was not altered.")
+                    die("Please specify \"true\" or \"false\" as value for --use-config-log-paths option.")
 
         if self.datahub_ip and not self.datahub_port:
             if self.suppress_ssl:
@@ -2588,7 +2585,7 @@ def cmd_init(args):
     The configuration directory is created if it does not exit.
     """
     no_more_args(args)
-    config.user_key_required()
+    config.user_key_required(True)
     config.save()
     log.info("Initialized")
 
@@ -2613,7 +2610,7 @@ def cmd_register(args):
     config.load()
     if config.agent_key != NOT_SET and not config.force:
         die("Server already registered. Use --force to override current registration.")
-    config.user_key_required()
+    config.user_key_required(True)
     config.hostname_required()
     config.name_required()
 
@@ -2775,14 +2772,14 @@ def cmd_monitor(args):
     no_more_args(args)
     config.load()
     stats = None
-    if not config.use_config_log_paths:
+    if not config.use_config_log_paths: # XXX
         if config.agent_key == NOT_SET:
-            die('Please register the host first with command `le.py register\'')
+            die('Please register the host first with command `le register\'')
         config.agent_key_required()
             # Register resource monitoring
         stats = Stats()
 
-    config.user_key_required()
+    config.user_key_required(not config.daemon)
 
     if config.daemon:
         daemonize()
@@ -2995,7 +2992,7 @@ def cmd_clusters(args):
     """
     no_more_args(args)
     config.load()
-    config.user_key_required()
+    config.user_key_required(True)
     clusters = get_all_clusters()
 
     if config.xlist:
@@ -3024,7 +3021,7 @@ def get_cluster_params(args):
     if re.search(r' ', args[0]):
         die("Error: Name must not contain space.")
     config.load()
-    config.user_key_required()
+    config.user_key_required(True)
     skeys = []
     if len(args) > 1:
         hosts = request_hosts()
@@ -3105,7 +3102,7 @@ def cmd_apps(args):
     """
     no_more_args(args)
     config.load()
-    config.user_key_required()
+    config.user_key_required(True)
     apps = get_all_apps()
 
     if config.xlist:
@@ -3140,7 +3137,7 @@ def get_app_params(args):
     if re.search(r' ', args[0]):
         die("Error: Name must not contain space.")
     config.load()
-    config.user_key_required()
+    config.user_key_required(True)
     skeys = []
     if len(args) > 1:
         hosts = request_hosts(logs=True)
@@ -3231,7 +3228,7 @@ def cmd_ls(args):
     if len(args) == 0:
         args = ['/']
     config.load()
-    config.user_key_required()
+    config.user_key_required(True)
 
     addr = args[0]
     if addr.startswith('/'):
@@ -3252,7 +3249,7 @@ def cmd_rm(args):
     if len(args) == 0:
         args = ['/']
     config.load()
-    config.user_key_required()
+    config.user_key_required(True)
 
     addr = args[0]
     if addr.startswith('/'):
@@ -3270,7 +3267,7 @@ def cmd_pull(args):
     if len(args) == 0:
         die(PULL_USAGE)
     config.load()
-    config.user_key_required()
+    config.user_key_required(True)
 
     params = {}
 
@@ -3304,7 +3301,7 @@ def cmd_push(args):
     if len(args) < 2:
         die(PUSH_USAGE)
     config.load()
-    config.user_key_required()
+    config.user_key_required(True)
 
     filename = args[0]
 
@@ -3369,8 +3366,7 @@ def main():
         # Filesystem operations
         'ls': cmd_ls,
         'rm': cmd_rm,
-        'pull': cmd_pull,  # Shortcuts  #'nc': cmd_new_cluster,  #'sc': cmd_set_cluster,  #'na': cmd_new_app,
-        # 'sa': cmd_set_app,
+        'pull': cmd_pull,
     }
     for cmd, func in commands.items():
         if cmd == args[0]:
@@ -3382,10 +3378,5 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        log.info("Interrupted")
+        die("Terminated", EXIT_TERMINATED)
 
-
-# For Debian Lenny you will need to install ssl:
-# aptitude install python-dev libbluetooth-dev
-# http://pypi.python.org/pypi/ssl#downloads
-# python setup install.py
