@@ -2893,23 +2893,6 @@ def cmd_whoami(args):
     list_object(request('hosts/%s/' % config.agent_key, True, True))
 
 
-def get_all_list(what):
-    return api_request({"request": "list_" + what,
-                        "user_key": config.user_key}, True, True)['list']
-
-
-def get_all_clusters():
-    return get_all_list('clusters')
-
-
-def get_all_apps():
-    return get_all_list('apps')
-
-
-def get_all_salogs():
-    return get_all_list('salogs')
-
-
 def logtype_name(logtype_uuid):
     response = request('logtypes', True, True)
     all_logtypes = response['list']
@@ -2963,12 +2946,6 @@ def list_object(request, hostnames=False):
     elif t == 'loglist':
         item_name = 'log'
         pass
-    elif t == 'applist':
-        item_name = 'app'
-        pass
-    elif t == 'clusterlist':
-        item_name = 'cluster'
-        pass
     elif t == 'logtypelist':
         item_name = 'logtype'
         index_name = 'shortcut'
@@ -2986,188 +2963,6 @@ def list_object(request, hostnames=False):
     print_total(ilist, item_name)
 
 
-def cmd_clusters(args):
-    """
-    Lists all available clusters.
-    """
-    no_more_args(args)
-    config.load()
-    config.user_key_required(True)
-    clusters = get_all_clusters()
-
-    if config.xlist:
-        hosts = request_hosts()
-        key2host = {}
-        for host in hosts:
-            key2host[host['key']] = host
-        for cluster in clusters:
-            chosts = (key2host[chost]['name'] for chost in cluster['list'])
-            print "%s  %s" % (cluster['name'], ', '.join(chosts))
-    else:
-        print ', '.join(cluster['name'] for cluster in clusters)
-
-    print_total(clusters, 'cluster')
-
-
-def get_cluster_params(args):
-    """
-    Common code for new and set cluster commands. First parameter is
-    a cluster name. Following parameters are host uuids, names, or
-    hostnames identifying host to assign. Host names or hostnames
-    are converted to uuid.
-    """
-    if len(args) == 0:
-        die("Error: Specify the cluster name.")
-    if re.search(r' ', args[0]):
-        die("Error: Name must not contain space.")
-    config.load()
-    config.user_key_required(True)
-    skeys = []
-    if len(args) > 1:
-        hosts = request_hosts()
-        log.debug("Matching hosts to the cluster:")
-        for name in args[1:]:
-            if len(name) == 0:
-                die("Error: Host name is empty.")
-            if is_uuid(name):
-                skeys.append(name)
-                log.debug('\t%s as UUID' % name)
-            else:
-                # Find name among servers
-                matches = find_hosts(name, hosts)
-                if len(matches) == 0:
-                    die("Error: No host matches '%s'." % name)
-                else:
-                    log.debug("\t%s:" % name)
-                    for h in matches:
-                        skeys.append(h['key'])
-                        log.debug('\t%s / %s, %s' % (h['key'], h['name'], h['hostname']))
-        skeys = uniq(skeys)
-        if config.debug:
-            log.debug("Adding following hosts:")
-            for key in skeys:
-                log.debug('\t' + key)
-    result = [args[0]]
-    result.extend(skeys)
-    return result
-
-
-def cmd_new_cluster(args):
-    """
-    Creates a new cluster.
-    """
-    argv = get_cluster_params(args)
-    response = api_request({
-                               'request': 'new_clusters',
-                               'user_key': config.user_key,
-                               'names': argv[0]}, True, True)
-    cluster_key = response['clusters'][0]['key']
-    if len(argv) > 1:
-        api_request({
-                        'request': 'set_cluster',
-                        'cluster_key': cluster_key,
-                        'list': ' '.join(argv[1:])}, True, True)
-    report("%s cluster registered" % argv[0])
-
-
-def cmd_set_cluster(args):
-    """
-    Sets cluster attributes.
-    """
-    argv = get_cluster_params(args)
-    name = argv[0]
-    cluster_key = None
-    for cluster in get_all_clusters():
-        if cluster['name'] == name:
-            cluster_key = cluster['key']
-            break
-    if cluster_key == None:
-        die('Error: Cluster with name "%s" not found' % name)
-
-    request = {
-        'request': 'set_cluster',
-        'cluster_key': cluster_key}
-    if config.name:
-        name = request['name'] = config.name
-    if len(argv) > 1:
-        request['list'] = ' '.join(argv[1:])
-    api_request(request, True, True)
-
-    report("%s cluster set" % name)
-
-
-def cmd_apps(args):
-    """
-    Lists all available apps.
-    """
-    no_more_args(args)
-    config.load()
-    config.user_key_required(True)
-    apps = get_all_apps()
-
-    if config.xlist:
-        hosts = request_hosts(logs=True)
-        key2hostlog = {}
-        for host in hosts:
-            for xlog in host['logs']:
-                key2hostlog[xlog['key']] = host['name'] + ':' + xlog['name']
-        for app in apps:
-            alogs = (key2hostlog[clog] for clog in app['list'])
-            if config.uuid:
-                print app['key'],
-            print "%s  %s" % (app['name'], ', '.join(alogs))
-    else:
-        if config.uuid:
-            for app in apps:
-                print app['key'] + ' ' + app['name']
-        else:
-            print ', '.join(app['name'] for app in apps)
-
-    print_total(apps, 'app')
-
-
-def get_app_params(args):
-    """
-    Common code for new and set app commands. First parameter is an app
-    name. Following parameters are log uuids, or server+log names, or
-    hostnames identifying log to assign.
-    """
-    if len(args) == 0:
-        die("Error: Specify the app name.")
-    if re.search(r' ', args[0]):
-        die("Error: Name must not contain space.")
-    config.load()
-    config.user_key_required(True)
-    skeys = []
-    if len(args) > 1:
-        hosts = request_hosts(logs=True)
-        log.debug("Matching logs to the app:")
-        for name in args[1:]:
-            if len(name) == 0:
-                die("Error: Log name is empty.")
-            if is_uuid(name):
-                skeys.append(name)
-                log.debug('\t%s as UUID' % name)
-            else:
-                # Find name among servers
-                matches = find_logs(name, hosts)
-                if len(matches) == 0:
-                    die("Error: No log matches '%s'." % name)
-                else:
-                    log.debug("\t%s:" % name)
-                    for l in matches:
-                        skeys.append(l['key'])
-                        log.debug('\t%s / %s, %s' % (l['key'], l['name'], l['filename']))
-        skeys = uniq(skeys)
-        if config.debug:
-            log.debug("Adding following logs:")
-            for key in skeys:
-                log.debug('\t' + key)
-    result = [args[0]]
-    result.extend(skeys)
-    return result
-
-
 def is_log_fs(addr):
     log_addrs = [r'(logs|apps)/.*/',
                  r'host(name)?s/.*/.*/']
@@ -3175,50 +2970,6 @@ def is_log_fs(addr):
         if re.match(la, addr):
             return True
     return False
-
-
-def cmd_new_app(args):
-    """
-    Creates a new application.
-    """
-    argv = get_app_params(args)
-    response = api_request({
-                               'request': 'new_apps',
-                               'user_key': config.user_key,
-                               'names': argv[0]}, True, True)
-    app_key = response['apps'][0]['key']
-    if len(argv) > 1:
-        api_request({
-                        'request': 'set_app',
-                        'app_key': app_key,
-                        'list': ' '.join(argv[1:])}, True, True)
-    report("%s app registered" % argv[0])
-
-
-def cmd_set_app(args):
-    """
-    Sets app attributes.
-    """
-    argv = get_app_params(args)
-    name = argv[0]
-    app_key = None
-    for app in get_all_apps():
-        if app['name'] == name:
-            app_key = app['key']
-            break
-    if app_key == None:
-        die('Error: App with name "%s" not found' % name)
-
-    request = {
-        'request': 'set_app',
-        'app_key': app_key}
-    if config.name:
-        name = request['name'] = config.name
-    if len(argv) > 1:
-        request['list'] = ' '.join(argv[1:])
-    api_request(request, True, True)
-
-    report("%s app set" % name)
 
 
 def cmd_ls(args):
