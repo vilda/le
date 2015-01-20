@@ -1,28 +1,34 @@
+
+# coding: utf-8
+# ex: set tabstop=4 shiftwidth=4 expandtab
+
 import errno
 import httplib
 import os
 import re
 import socket
-import sys
 import ssl
+import sys
+import uuid
 from backports import match_hostname, CertificateError
 
 import logging
 
 
-__author__ = 'uli'
+__author__ = 'Logentries'
 
-__all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "EXIT_TERMINATED", "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
-           "default_cert_file", "system_cert_file",
-           "data_connect", "domain_connect", "no_more_args", "find_hosts", "find_logs", "die", "rfile", 'TCP_TIMEOUT',
-           "rm_pidfile", "set_proc_title", "is_uuid"]
+__all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "EXIT_TERMINATED",
+           "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
+           "default_cert_file", "system_cert_file", "data_connect", "domain_connect",
+           "no_more_args", "find_hosts", "find_logs", "die", "rfile", 'TCP_TIMEOUT',
+           "rm_pidfile", "set_proc_title", "uuid_parse"]
 
 # Return codes
 EXIT_OK = 0
 EXIT_NO = 1
 EXIT_ERR = 3
 EXIT_HELP = 4
-EXIT_TERMINATED = 5 # Terminated by user (Ctrl+C)
+EXIT_TERMINATED = 5  # Terminated by user (Ctrl+C)
 
 LE_CERT_NAME = 'ca-certs.pem'
 
@@ -42,6 +48,7 @@ log = logging.getLogger(LOG_LE_AGENT)
 
 
 class ServerHTTPSConnection(httplib.HTTPSConnection):
+
     """
     A slight modification of HTTPSConnection to verify the certificate
     """
@@ -264,13 +271,6 @@ def expr_match(expr, text):
     return False
 
 
-def uuid_match(uuid, text):
-    """
-    Returns True if the uuid given is uuid and it matches to the text.
-    """
-    return is_uuid(uuid) and uuid == text
-
-
 def find_hosts(expr, hosts):
     """
     Finds host name among hosts.
@@ -326,7 +326,8 @@ def rfile(name):
     Returns content of the file, without trailing newline.
     """
     x = open(name).read()
-    if len(x) != 0 and x[-1] == '\n': x = x[0:len(x) - 1]
+    if len(x) != 0 and x[-1] == '\n':
+        x = x[0:len(x) - 1]
     return x
 
 
@@ -350,11 +351,27 @@ def set_proc_title(title):
         pass
 
 
+def uuid_match(uuid, text):
+    """
+    Returns True if the uuid given is uuid and it matches to the text.
+    """
+    return is_uuid(uuid) and uuid == text
+
+
 def is_uuid(x):
     """
     Returns true if the string given appears to be UUID.
     """
     return re.match(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', x)
+
+
+def uuid_parse(text):
+    """Returns uuid given or None in case of syntax error.
+    """
+    try:
+        return uuid.UUID(text).__str__()
+    except ValueError:
+        return None
 
 
 #
