@@ -1,6 +1,6 @@
 
 # coding: utf-8
-# ex: set tabstop=4 shiftwidth=4 expandtab
+# vim: set ts=4 sw=4 et:
 
 import errno
 import httplib
@@ -19,7 +19,7 @@ __author__ = 'Logentries'
 
 __all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "EXIT_TERMINATED",
            "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
-           "default_cert_file", "system_cert_file", "data_connect", "domain_connect",
+           "default_cert_file", "system_cert_file", "domain_connect",
            "no_more_args", "find_hosts", "find_logs", "die", "rfile", 'TCP_TIMEOUT',
            "rm_pidfile", "set_proc_title", "uuid_parse"]
 
@@ -37,8 +37,10 @@ TCP_TIMEOUT = 10  # TCP timeout for the socket in seconds
 wrap_socket = ssl.wrap_socket
 
 authority_certificate_files = [  # Debian 5.x, 6.x, 7.x, Ubuntu 9.10, 10.4, 13.0
-                                 "/etc/ssl/certs/ca-certificates.crt",  # Fedora 12, Fedora 13, CentOS 5
-                                 "/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem",  # Amazon AMI
+                                 "/etc/ssl/certs/ca-certificates.crt",
+                                 # Fedora 12, Fedora 13, CentOS 5
+                                 "/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem",
+                                 # Amazon AMI
                                  "/etc/pki/tls/certs/ca-bundle.crt",
 ]
 
@@ -71,11 +73,13 @@ class ServerHTTPSConnection(httplib.HTTPSConnection):
                 self._tunnel()
         except AttributeError:
             pass
-        self.sock = wrap_socket(sock, ca_certs=self.cert_file, cert_reqs=ssl.CERT_REQUIRED)
+        self.sock = wrap_socket(
+            sock, ca_certs=self.cert_file, cert_reqs=ssl.CERT_REQUIRED)
         try:
             match_hostname(self.sock.getpeercert(), self.host)
         except CertificateError, ce:
-            die("Could not validate SSL certificate for {0}: {1}".format(self.host, ce.message))
+            die("Could not validate SSL certificate for {0}: {1}".format(
+                self.host, ce.message))
 
 
 def default_cert_file_name(config):
@@ -181,33 +185,6 @@ def make_https_connection(config, s):
     return ServerHTTPSConnection(config, s, cert_file)
 
 
-def data_connect(config, Domain):
-    # Choose server address
-    if config.force_domain:
-        s = config.force_domain
-    elif config.force_data_host:
-        s = config.force_data_host
-    else:
-        s = Domain.DATA
-
-    # Special case for local debugging
-    if config.debug_local:
-        s = Domain.API_LOCAL
-
-    # Connect to server with SSL in untrusted network
-    log.debug('Connecting to %s', s)
-
-    # Determine if to use SSL for connection
-    # Never use SSL for debugging, always use SSL with main server
-    use_ssl = not config.suppress_ssl and not config.debug_local
-
-    # Pass the connection
-    if use_ssl:
-        return make_https_connection(config, s)
-    else:
-        return httplib.HTTPConnection(s)
-
-
 def domain_connect(config, domain, Domain):
     """
     Connects to the domain specified.
@@ -229,9 +206,6 @@ def domain_connect(config, domain, Domain):
         else:
             s = Domain.MAIN_LOCAL
 
-    # Connect to server with SSL in untrusted network
-    log.debug('Connecting to %s', s)
-
     # Determine if to use SSL for connection
     # Never use SSL for debugging, always use SSL with main server
     use_ssl = True
@@ -239,6 +213,16 @@ def domain_connect(config, domain, Domain):
         use_ssl = False
     elif Domain == Domain.API:
         use_ssl = not config.suppress_ssl
+
+    # Connect to server with SSL in untrusted network
+    if use_ssl:
+        port = 443
+    else:
+        port = 80
+    if config.debug_local:
+        port = 8000
+    s = '%s:%s' % (s, port)
+    log.debug('Connecting to %s', s)
 
     # Pass the connection
     if use_ssl:
@@ -289,8 +273,9 @@ def log_match(expr, log_item):
 
     We perform the test on UUID, log name, and file name.
     """
-    return uuid_match(expr, log_item['key']) or expr_match(expr, log_item['name']) or expr_match(expr,
-                                                                                                 log_item['filename'])
+    return uuid_match(
+        expr, log_item['key']) or expr_match(expr, log_item['name']) or expr_match(expr,
+                                                                                   log_item['filename'])
 
 
 def find_logs(expr, hosts):

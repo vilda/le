@@ -1,12 +1,15 @@
 #!/usr/bin/env python2
 # coding: utf-8
+# vim: set ts=4 sw=4 et:
 
 #
-# Logentries agent <https://logentries.com/>.
+# Logentries Agent <https://logentries.com/>.
+#
 
 #
 # Constants
 #
+
 from utils import *
 
 VERSION = "1.4.4"
@@ -24,7 +27,6 @@ LE_CONFIG = 'config'
 
 LOCAL_CONFIG_DIR_USER = '.le'
 LOCAL_CONFIG_DIR_SYSTEM = '/etc/le'
-LOCAL_CONFIG_JSON_FILE = 'config.json'
 
 PID_FILE = '/var/run/logentries.pid'
 
@@ -37,11 +39,16 @@ USE_CA_PROVIDED_PARAM = 'use_ca_provided'
 FORCE_DOMAIN_PARAM = 'force_domain'
 DATAHUB_PARAM = 'datahub'
 SYSSTAT_TOKEN_PARAM = 'system-stat-token'
-USE_CONFIG_LOG_PATHS_PARAM = 'use-config-log-paths'
+HOSTNAME_PARAM = 'hostname'
+TOKEN_PARAM = 'token'
+PATH_PARAM = 'path'
+PULL_SERVER_SIDE_CONFIG_PARAM = 'pull-server-side-config'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
 
+# Maximal queue size for events sent
+SEND_QUEUE_SIZE = 32000
 
 # Logentries server details
 LE_SERVER_API = '/'
@@ -54,17 +61,19 @@ SYSTEM_STATS_LOG_FILE = SYSTEM_STATS_TAG + '.log'
 
 
 class Domain(object):
+
     """ Logentries domains. """
     # General domains
     MAIN = 'logentries.com'
     API = 'api.logentries.com'
-    DATA = 'api.logentries.com'  # TODO
+    DATA = 'data.logentries.com'
     PULL = 'pull.logentries.com'
     STREAM = 'data.logentries.com'
     # Local debugging
-    MAIN_LOCAL = 'localhost:8000'
-    API_LOCAL = 'localhost:8081'
-    DATA_LOCAL = 'localhost:8081'
+    MAIN_LOCAL = '127.0.0.1'
+    API_LOCAL = '127.0.0.1'
+    DATA_LOCAL = '127.0.0.1'
+    LOCAL = '127.0.0.1'
 
 
 CONTENT_LENGTH = 'content-length'
@@ -75,6 +84,8 @@ LOG_ROOT = '/var/log'
 # Timeout after server connection fail. Might be a temporary network
 # failure.
 SRV_RECON_TIMEOUT = 10  # in seconds
+SRV_RECON_TO_MIN = 1   # in seconds
+SRV_RECON_TO_MAX = 10  # in seconds
 
 # Timeout after invalid server response. Might be a version mishmash or
 # temporary server/network failure
@@ -138,7 +149,6 @@ RQ_WORKLOAD = 'push_wl'
 LSB_RELEASE = '/etc/lsb-release'
 
 
-
 #
 # Usage help
 #
@@ -177,18 +187,7 @@ Where parameters are:
   --datahub               send logs to the specified data hub address
                           the format is address:port with port being optional
   --system-stat-token=    set the token for system stats log (beta)
-  --use-config-log-paths= if set to 'true' the Agent will follow logs from list in local config file
 """
-
-
-# Global indicator of monitoring interruption
-shutdown = False
-
-
-def set_shutdown():
-    global shutdown
-    shutdown = True
-    print >> sys.stderr, "Shutting down"
 
 
 def report(what):
@@ -210,6 +209,8 @@ def print_usage(version_only=False):
 
 import string
 import re
+import Queue
+import random
 import ConfigParser
 import fileinput
 import getopt
@@ -226,13 +227,15 @@ import threading
 import time
 import datetime
 import urllib
-import urllib2
 import httplib
 import getpass
 import atexit
 import logging.handlers
 from collections import deque
 from backports import CertificateError, match_hostname
+
+import formatters
+
 #
 # Start logging
 #
@@ -248,261 +251,6 @@ stream_handler = logging.StreamHandler()
 stream_handler.setLevel(logging.DEBUG)
 stream_handler.setFormatter(logging.Formatter("%(message)s"))
 log.addHandler(stream_handler)
-
-
-class StatisticsSendingWorker(threading.Thread):
-    """
-    Class that is used for sending statistics over TCP stream (Token-based).
-    Must receive message queue reference in constructor
-    and reference to transport provider. Works as separate thread
-    just grabbing a message from the queue and pushing it to transport provider.
-    """
-
-    def __init__(self, stats_tcp_transport, msg_queue):
-        threading.Thread.__init__(self)
-        self.msg_queue = msg_queue
-        self.transport = stats_tcp_transport
-
-    def run(self):
-        while True:
-            try:
-                msg = self.msg_queue.popleft()
-                self.transport.send(msg)
-            except IndexError:
-                time.sleep(QUEUE_WAIT_TIME)
-
-
-# Logic of SSLSysLogHandler class is based on code from
-# https://raw.githubusercontent.com/lhl/python-syslogssl/master/syslogssl.py
-# with several modifications.
-
-class SSLSysLogHandler(logging.handlers.SysLogHandler):
-    def __init__(self, address, port, use_ssl=True, certs=None,
-                 facility=logging.handlers.SysLogHandler.LOG_USER):
-        logging.handlers.SysLogHandler.__init__(self)
-        self.address = address
-        self.facility = facility
-        self.port = port
-        self.use_ssl = use_ssl
-        self.certs = certs
-        self.socket = NOT_SET
-
-        try:
-            self.reconnect()
-        except Exception, e:
-            report("Encountered unexpected exception: %s - continuing" % e.message)
-            raise e
-
-    def close(self):
-        if not self.socket is None:
-            self.socket.close()
-        logging.handlers.SysLogHandler.close(self)
-
-    def emit(self, record):
-        msg = self.format(record)
-        prio = '<%d>' % self.encodePriority(self.facility,
-                                            self.mapPriority(record.levelname))
-        if type(msg) is unicode:
-            msg = msg.encode('utf-8')
-        msg = prio + msg
-        try:
-            self.socket.sendall(msg)
-        except (IOError, AttributeError):
-            report("Unable to send message to %s:%s. Make sure the service is available." % (self.address,
-                                                                                                self.port))
-            report("Trying to reconnect...")
-
-            try:
-                self.reconnect()
-                self.socket.send(msg)
-                report("Reconnection was successful, the message has been sent.")
-            except (AttributeError, ValueError, IOError):
-                pass
-        except(KeyboardInterrupt, SystemExit):
-            raise
-        except IOError:
-            pass
-        except:
-            self.handleError(record)
-
-    def connect_ssl(self, plain_socket):
-        try:
-            try:
-                self.socket = ssl.wrap_socket(plain_socket, ca_certs=self.certs, cert_reqs=ssl.CERT_REQUIRED,
-                                              ssl_version=ssl.PROTOCOL_TLSv1,
-                                              ciphers="HIGH:-aNULL:-eNULL:-PSK:RC4-SHA:RC4-MD5")
-            except TypeError:
-                self.socket = ssl.wrap_socket(plain_socket, ca_certs=self.certs, cert_reqs=ssl.CERT_REQUIRED,
-                                              ssl_version=ssl.PROTOCOL_TLSv1)
-
-            self.socket.connect((self.address, self.port))
-
-            try:
-                match_hostname(self.socket.getpeercert(), self.address)
-            except CertificateError, ce:
-                die("Could not validate SSL certificate for %s: %s" % (self.address, ce.message))
-
-
-        except IOError, e:
-            cause = e.strerror
-            if not cause:
-                cause = ""
-            report("Can't connect to %s via SSL at port %s. Make sure that the host and port are reachable "
-                   "and speak SSL: %s" % (self.address, self.port, cause))
-
-            self.socket.close()
-            self.socket = None
-
-    def connect_insecure(self, plain_socket):
-        try:
-            self.socket = plain_socket
-            self.socket.connect((self.address, self.port))
-        except IOError, e:
-            cause = e.strerror
-            if not cause:
-                cause = ""
-            report("Can't connect to %s via plaintext at port %s. Make sure that the host and port are reachable\n"
-                   "Error message: %s" % (self.address, self.port, e.strerror))
-
-            self.socket.close()
-            self.socket = None
-
-
-    def reconnect(self):
-        try:
-            if not self.socket is None:
-                self.socket.close()
-                self.socket = None
-        except:
-            pass
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(TCP_TIMEOUT)
-
-        if self.use_ssl:
-            self.connect_ssl(s)
-        else:
-            self.connect_insecure(s)
-
-
-class StreamLogSender(object):
-    """
-    Class that is used to format system stats messages to Syslog format
-    and send to LE service using TCP stream handler
-    """
-
-    def __init__(self, tag, address, port, use_ssl, cert_name):
-        self.logger = logging.getLogger(tag)
-        self.logger.setLevel(logging.INFO)
-        self.handler = SSLSysLogHandler(address, port, use_ssl, cert_name)
-        self.handler.setLevel(logging.DEBUG)
-
-        if config.datahub:
-            # DataHub mode - message should be formatted to Syslog format.
-            log_format = "%(asctime)s {0} {1}: %(message)s\r\n".format(config.hostname_required(),
-                                                                       tag.replace(' ', '_'))
-            time_format = "%Y-%m-%dT%H:%M:%SZ"
-            log_formatter = logging.Formatter(log_format, time_format)
-            log_formatter.converter = time.gmtime
-        else:
-            # Direct mode - message goes "as is".
-            log_format = "%(message)s\r\n"
-            log_formatter = logging.Formatter(log_format)
-
-        self.handler.setFormatter(log_formatter)
-        self.logger.addHandler(self.handler)
-
-    def send(self, msg):
-        self.logger.info(msg)
-
-
-class SyslogStreamSender(object):
-    """
-    Class that encapsulates both transport and message sending worker.
-    Used to send system stats messages to LE service in non-Syslog mode
-    e.g. not using DataHub.
-    """
-
-    def __init__(self, token, tag=SYSTEM_STATS_TAG, endpoint_address=Domain.STREAM,
-                 port=LE_DEFAULT_SSL_PORT, use_ssl=True, is_system_stats=False):
-        self.msg_queue = deque(maxlen=10000)
-        self.endpoint_address = endpoint_address
-        self.endpoint_port = port
-        self.tag = tag
-        self.token = token
-
-        name = config.name
-        self.host_name = None
-        if not name is None:
-            self.host_name = os.path.basename(name)
-
-        if is_system_stats:
-            # Initialize token value if we're working in Direct mode.
-            if not config.datahub:
-                self.token = self.try_load_token_from_config()
-                if (self.token is None) or (self.token == ''):
-                    self.token = self.try_obtain_token()
-                config.system_stats_token_required()
-
-        cert_name = None
-
-        if not config.use_ca_provided:
-            cert_name = system_cert_file()
-            if cert_name is None:
-                cert_name = default_cert_file(config)
-        else:
-            cert_name = default_cert_file(config)
-
-        if use_ssl and not cert_name:
-            die('Cannot get default certificate file name to provide connection over SSL!')
-
-        self.transport = StreamLogSender(self.tag, self.endpoint_address, self.endpoint_port, use_ssl,
-                                         cert_name)
-        self.stat_sender_thread = StatisticsSendingWorker(self.transport, self.msg_queue)
-        self.stat_sender_thread.setDaemon(True)
-        self.stat_sender_thread.start()
-
-    @staticmethod
-    def try_load_token_from_config():
-        return config.system_stats_token
-
-    @staticmethod
-    def get_log_token(name, filename, type_opt):
-        config.agent_key_required()
-        log_request = {"request": "new_log",
-                       "user_key": config.user_key,
-                       "host_key": config.agent_key,
-                       "name": name,
-                       "filename": filename,
-                       "type": type_opt,
-                       "source": "token",
-                       "retention": -1}
-        log_response = api_request(log_request, True, True)
-        token = NOT_SET
-        try:
-            log_set = log_response['log']
-            token = log_set['token']
-        except KeyError:
-            die("Cannot obtain token for " + filename + " log file. The response is corrupted.")
-
-        return token
-
-    @staticmethod
-    def try_obtain_token(name=SYSTEM_STATS_LOG_FILE, filename=SYSTEM_STATS_LOG_FILE, type_opt=''):
-        config.system_stats_token = SyslogStreamSender.get_log_token(name, filename, type_opt)
-        config.save()
-        return config.system_stats_token
-
-    def push(self, msg):
-        # Prefix the message with host name
-        if not self.host_name is None:
-            msg = "HostName=" + self.host_name + " " + msg
-        if not config.datahub:
-            # Sending directly tod Logentries service - token is required
-            self.msg_queue.append(self.token + " " + msg)
-        else:
-            # Sending to DataHub - append hostname to the message
-            self.msg_queue.append(msg)
 
 
 def debug_filters(msg, *args):
@@ -530,6 +278,7 @@ except ImportError:
     json_loads = simplejson.loads
     json_dumps = simplejson.dumps
 
+# FIXME
 no_ssl = False
 try:
     import ssl
@@ -580,9 +329,12 @@ def call(command):
     """
     Calls the given command in OS environment.
     """
-    x = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True).stdout.read()
-    if len(x) == 0: return ''
-    if x[-1] == '\n': x = x[0:len(x) - 1]
+    x = subprocess.Popen(
+        command, stdout=subprocess.PIPE, shell=True).stdout.read()
+    if len(x) == 0:
+        return ''
+    if x[-1] == '\n':
+        x = x[0:len(x) - 1]
     return x
 
 
@@ -611,7 +363,7 @@ def _lock_pid():
         fd = os.open(file_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
     except OSError:
         return None
-    if -1 == fd:
+    if fd == -1:
         return None
     os.close(fd)
     return True
@@ -690,7 +442,8 @@ def daemonize():
     If not then it daemonizes itself, otherwise it dies.
     """
     if not _lock_pid():
-        die("Daemon already running. If you are sure it isn't please remove %s" % _lock_pid_file_name())
+        die("Daemon already running. If you are sure it isn't please remove %s" %
+            _lock_pid_file_name())
     err = _try_daemonize()
     _unlock_pid()
     if err:
@@ -727,7 +480,7 @@ def collect_log_names(system_info):
     logs = []
     for root, dirs, files in os.walk(LOG_ROOT):
         for name in files:
-            if name[-3:] != '.gz' and re.match(r'.*\.\d+$', name) == None:
+            if name[-3:] != '.gz' and re.match(r'.*\.\d+$', name) is None:
                 logs.append(os.path.join(root, name))
 
     log.debug("Collected logs: %s" % logs)
@@ -742,7 +495,8 @@ def collect_log_names(system_info):
         c.request('post', ID_LOGS_API, urllib.urlencode(request), {})
         response = c.getresponse()
         if not response or response.status != 200:
-            die('Error: Unexpected response from logentries (%s).' % response.status)
+            die('Error: Unexpected response from logentries (%s).' %
+                response.status)
         data = json_loads(response.read())
         log_data = data['logs']
 
@@ -761,7 +515,8 @@ def lsb_release(system_info):
     # General LSB system
     if os.path.isfile(LSB_RELEASE):
         try:
-            fields = dict((a.split('=') for a in rfile(LSB_RELEASE).split('\n') if len(a.split('=')) == 2))
+            fields = dict((a.split('=')
+                          for a in rfile(LSB_RELEASE).split('\n') if len(a.split('=')) == 2))
             system_info['distname'] = fields['DISTRIB_ID']
             system_info['distver'] = fields['DISTRIB_RELEASE']
             return True
@@ -796,7 +551,8 @@ def system_detect(details):
     system_info = dict(system=sys, hostname=socket.getfqdn(),
                        kernel='', distname='', distver='')
 
-    if not details: return system_info
+    if not details:
+        return system_info
 
     if sys == "SunOS":
         pass
@@ -853,7 +609,8 @@ def system_detect(details):
         # Check for general LSB system
         if os.path.isfile(LSB_RELEASE):
             try:
-                fields = dict((a.split('=') for a in rfile(LSB_RELEASE).split('\n') if len(a.split('=')) == 2))
+                fields = dict((a.split('=')
+                              for a in rfile(LSB_RELEASE).split('\n') if len(a.split('=')) == 2))
                 system_info['distname'] = fields['DISTRIB_ID']
                 system_info['distver'] = fields['DISTRIB_RELEASE']
             except ValueError:
@@ -930,9 +687,8 @@ def timestamp_patterns(sample):
 
 
 def timestamp_group(text):
-    """
-    Returns a tuple [timestamp, range] which corresponds to the date and time given. Exists on parse error.
-    """
+    """Returns a tuple [timestamp, range] which corresponds to the date and
+    time given. Exists on parse error.  """
     timep = re.sub(r' +', ' ', re.sub(r'[-,./]', ' ', text)).strip()
     start_tuple = None
     for p in timestamp_patterns(timep):
@@ -957,9 +713,8 @@ def timestamp_group(text):
 
 
 def timestamp_range(text):
-    """
-    Identifies range in the text given. Returns -1 if the range has not been identified.
-    """
+    """Identifies range in the text given. Returns -1 if the range has not been
+    identified.  """
 
     # Parse range
     m = re.match(r'^(last)?\s*(\d+)?\s*(s|sec|second|m|min|minute|h|hour|d|day|mon|month|y|year)s?$', text.strip())
@@ -988,8 +743,7 @@ def timestamp_range(text):
 
 
 def parse_timestamp_range(text):
-    """
-    Parses the time range given and return start-end pair of timestamps.
+    """Parses the time range given and return start-end pair of timestamps.
 
     Recognized structures are:
     t|today
@@ -1013,7 +767,8 @@ def parse_timestamp_range(text):
         return [today, today + DAY]
     if text in ['y', 'yesterday']:
         yesterday = int(time.mktime(
-            (datetime.datetime(now.year, now.month, now.day) - datetime.timedelta(days=1)).timetuple())) * 1000
+            (datetime.datetime(now.year, now.month, now.day) -
+                datetime.timedelta(days=1)).timetuple())) * 1000
         return [yesterday, yesterday + DAY]
 
     # Range spec
@@ -1052,7 +807,8 @@ def choose_account_key(accounts):
 
     for i in range(0, len(accounts)):
         account = accounts[i]
-        print >> sys.stderr, '[%s] %s %s' % (i, account['account_key'][:8], account['name'])
+        print >> sys.stderr, '[%s] %s %s' % (
+            i, account['account_key'][:8], account['name'])
 
     while True:
         try:
@@ -1102,11 +858,11 @@ def retrieve_account_key():
 
 
 class Stats:
-    """
-    Collects statistics about the system work load.
+
+    """Collects statistics about the system work load.
     """
 
-    def __init__(self):
+    def __init__(self, default_transport):
         self.timer = None
         self.to_remove = False
         self.first = True
@@ -1114,7 +870,8 @@ class Stats:
         # Memory fields we are looking for in /proc/meminfo
         self.MEM_FIELDS = ['MemTotal:', 'Active:', 'Cached:']
         # Block devices in the system
-        all_devices = [os.path.basename(filename) for filename in glob.glob(SYS_BLOCK_DEV + '/*')]
+        all_devices = [os.path.basename(filename)
+                       for filename in glob.glob(SYS_BLOCK_DEV + '/*')]
         # Monitored devices (all devices except loop)
         self.our_devices = frozenset([device_name for device_name in all_devices if
                                       not device_name.startswith("loop") and not device_name.startswith(
@@ -1143,17 +900,8 @@ class Stats:
         self.scale2kb = {'M': 1024, 'G': 1048576}
 
         if not config.debug_nostats:
-            PORT = {False: LE_DEFAULT_SSL_PORT, True: LE_DEFAULT_NON_SSL_PORT}
-            hostname = Domain.STREAM
-            port = PORT[config.suppress_ssl]
-            if config.datahub:
-                hostname = config.datahub_ip
-                port = config.datahub_port
-
-            self.stats_stream = SyslogStreamSender('', SYSTEM_STATS_TAG, hostname, port,
-                                                   not config.suppress_ssl, True)
-            self.send_stats()
-
+            pass
+            # New stats will go here
 
     @staticmethod
     def save_data(data, name, value):
@@ -1294,7 +1042,7 @@ class Stats:
             (size, scale) = re.split('([A-z]+)', value)[:2]
             size = int(size)
             if scale:
-                if self.scale2kb.has_key(scale):
+                if scale in self.scale2kb:
                     size *= self.scale2kb[scale]
                 else:
                     log.warning("Error: value in %s expressed in "
@@ -1414,7 +1162,7 @@ class Stats:
             parts = line.split()
             if len(parts) != 11:
                 continue
-            if netseen.has_key(parts[1]):
+            if parts[1] in netseen:
                 continue
             if not parts[6].isdigit():
                 continue
@@ -1445,7 +1193,8 @@ class Stats:
     @staticmethod
     def new_request(rq):
         try:
-            response = api_request(rq, silent=not config.debug, die_on_error=False)
+            response = api_request(
+                rq, silent=not config.debug, die_on_error=False)
             if config.debug_stats:
                 log.info(response)
         except socket.error, (err_no, err_str):
@@ -1466,7 +1215,6 @@ class Stats:
             # Send data
             if not config.datahub:
                 self.new_request(results)
-            self.stats_stream.push(self.stats_to_string(results))
         else:
             self.first = False
 
@@ -1477,23 +1225,6 @@ class Stats:
             self.timer.daemon = True
             self.timer.start()
 
-    def stats_to_string(self, data):
-        total = data['cu'] + data['cl'] + data['cs'] + data['ci'] + data['cio'] + data['cq'] + data['csq']
-        cu = data['cu'] * 100 / total
-        cl = data['cl'] * 100 / total
-        cs = data['cs'] * 100 / total
-        ci = data['ci'] * 100 / total
-        cio = data['cio'] * 100 / total
-        cq = data['cq'] * 100 / total
-        csq = data['csq'] * 100 / total
-        stat_cpu_string = "CPU.user={0}% CPU.nice={1}% CPU.system={2}% CPU.idle={3}% CPU.wait={4}% CPU.irq={5}% CPU.softirq={6}% ".format(
-            cu, cl, cs, ci, cio, cq, csq)
-        stat_mem_string = "Mem.total={0} Mem.active={1} Mem.cached={2} ".format(data['mt'], data['ma'], data['mc'])
-        stat_disk_string = "Disk.write={0} Disk.read={1} ".format(self.total['dw'], self.total['dr'])
-        stat_net_string = "Net.send={0} Net.resv={1} ".format(self.total['no'], self.total['ni'])
-        host_string = "HostName={0} ".format(config.hostname_required())
-        return host_string + stat_cpu_string + stat_mem_string + stat_disk_string + stat_net_string
-
     def cancel(self):
         self.to_remove = True
         if self.timer:
@@ -1501,31 +1232,27 @@ class Stats:
 
 
 class Follower(object):
-    """
-    The follower keeps an eye on the file specified and sends new events to the logentries infrastructure.
-    """
 
-    def __init__(self, name, log_key, monitorlogs, event_filter, token=''):
+    """
+    The follower keeps an eye on the file specified and sends new events to the
+    logentries infrastructure.  """
+
+    def __init__(self, name, event_filter, transport, formatter):
         """ Initializes the follower. """
         self.name = name
-        self.log_key = log_key
-        self.log_addr = '/%s/hosts/%s/%s/?realtime=1' % (config.user_key, config.agent_key, log_key)
         self.flush = True
         self.event_filter = event_filter
-        self.token = token
+        self.formatter = formatter
+        self.transport = transport
 
-        if not config.datahub:
-            self.syslog_sender = SyslogStreamSender(token, os.path.basename(name), Domain.STREAM, config.get_port(),
-                                                    not config.suppress_ssl)
-        else:
-            self.syslog_sender = SyslogStreamSender(token, os.path.basename(name), config.datahub_ip, config.datahub_port,
-                                                    not config.suppress_ssl)
-        log.info("Following %s" % name)
-        monitoring_thread = threading.Thread(target=monitorlogs, name=self.name)
-        monitoring_thread.daemon = True
-        monitoring_thread.start()
+        self._file = None
+        self._shutdown = False
+        self._worker = threading.Thread(
+            target=self.monitorlogs, name=self.name)
+        self._worker.daemon = True
+        self._worker.start()
 
-    def file_candidate(self):
+    def _file_candidate(self):
         """
         Returns list of file names which corresponds to the specified template.
         """
@@ -1535,48 +1262,58 @@ class Follower(object):
             if len(candidates) == 0:
                 return None
 
-            candidate_times = [[os.path.getmtime(name), name] for name in candidates]
+            candidate_times = [[os.path.getmtime(name), name]
+                               for name in candidates]
             candidate_times.sort()
             candidate_times.reverse()
             return candidate_times[0][1]
         except os.error:
             return None
 
-    def open_log(self):
-        """
-        Keeps trying to re-open the log file. Returns when the file has been opened or when requested to remove.
-        """
+    def _open_log(self):
+        """Keeps trying to re-open the log file. Returns when the file has been
+        opened or when requested to remove.  """
         error_info = True
         self.real_name = None
 
-        while not shutdown:
-            candidate = self.file_candidate()
+        while not self._shutdown:
+            candidate = self._file_candidate()
 
             if candidate:
                 self.real_name = candidate
                 try:
-                    self.file = None
-                    self.file = open(self.real_name)
+                    self._close_log()
+                    self._file = open(self.real_name)
                     break
                 except IOError:
                     pass
 
             if error_info:
-                log.info("Cannot open file '%s', re-trying in %ss intervals" % (self.name, REOPEN_INT))
+                log.info("Cannot open file '%s', re-trying in %ss intervals" %
+                         (self.name, REOPEN_INT))
                 error_info = False
             time.sleep(REOPEN_TRY_INTERVAL)
 
-    def log_rename(self):
+    def _close_log(self):
+        if self._file:
+            try:
+                self._file.close()
+            except IOError:
+                pass
+            self._file = None
+
+    def _log_rename(self):
         """Detects file rename."""
 
         # Get file candidates
-        candidate = self.file_candidate()
-        if not candidate: return False
+        candidate = self._file_candidate()
+        if not candidate:
+            return False
 
         try:
-            ctime1 = os.fstat(self.file.fileno()).st_mtime
+            ctime1 = os.fstat(self._file.fileno()).st_mtime
             ctime_new = os.path.getmtime(candidate)
-            ctime2 = os.fstat(self.file.fileno()).st_mtime
+            ctime2 = os.fstat(self._file.fileno()).st_mtime
         except os.error:
             pass
 
@@ -1586,168 +1323,356 @@ class Follower(object):
 
         return False
 
-    def read_log_line(self):
+    def _read_log_line(self):
         """ Reads a line from the log. Checks maximal line size. """
-        buff = self.file.read(MAX_EVENTS)
+        buff = self._file.read(MAX_EVENTS)
         return buff
 
-    def set_file_position(self, offset, start=FILE_BEGIN):
+    def _set_file_position(self, offset, start=FILE_BEGIN):
         """ Move the position of filepointers."""
-        self.file.seek(offset, start)
+        self._file.seek(offset, start)
 
-    def get_file_position(self):
+    def _get_file_position(self):
         """ Returns the position filepointers."""
-        pos = self.file.tell()
+        pos = self._file.tell()
         return pos
 
-    def get_events(self):
+    def _get_line(self):
         """
-        Returns a block of newly detected events from the log. Returns None in case of timeout.
+        Returns a block of newly detected line from the log. Returns None in case of timeout.
         """
-
         # Moves at the end of the log file
         if self.flush:
-            self.set_file_position(0, FILE_END)
+            self._set_file_position(0, FILE_END)
             self.flush = False
 
         # TODO: investigate select-like approach?
         idle_cnt = 0
         iaa_cnt = 0
-        events = ''
-        while iaa_cnt != IAA_INTERVAL and not shutdown:
-            # Collect lines
-            events = self.read_log_line()
-            # ####  print type(events) ##DEBUG
-            if len(events) != 0:
+        line = None
+        while iaa_cnt != IAA_INTERVAL and not self._shutdown:
+            # Collect line
+            line = self._read_log_line()
+            if len(line) != 0:
                 break
 
-            # No more events, wait
+            # No line, wait
             time.sleep(TAIL_RECHECK)
 
             # Log rename check
             idle_cnt += 1
             if idle_cnt == NAME_CHECK:
-                if self.log_rename():
-                    self.open_log()
+                if self._log_rename():
+                    self._open_log()
                     iaa_cnt = 0
                 else:
                     # Recover from external file modification
-                    position = self.get_file_position()
-                    self.set_file_position(0, FILE_END)
-                    file_size = self.get_file_position()
+                    position = self._get_file_position()
+                    self._set_file_position(0, FILE_END)
+                    file_size = self._get_file_position()
                     if file_size < position:
                         # File has been externaly modified
                         position = file_size
-                    self.set_file_position(position)
+                    self._set_file_position(position)
                 idle_cnt = 0
             else:
                 # To reset end-of-line error
-                self.set_file_position(self.get_file_position())
+                self._set_file_position(self._get_file_position())
             iaa_cnt += 1
 
         # Send IAA packet if required
-        if iaa_cnt == IAA_INTERVAL:
-            return None
+        #if iaa_cnt == IAA_INTERVAL:
+        #    return None
+        return line
 
-        return events
-
-    def open_connection(self):
-        if config.datahub:
+    def _send_line(self, line):
+        """ Sends the line. """
+        if line:
+            line = self.event_filter(line)
+        if not line:
             return
-        """ Opens a push connection to logentries. """
-        log.debug("Opening connection %s", self.log_addr)
-        retry = 1
-        while True:
-            if retry % 3 == 0:
-                self.flush = True
-                time.sleep(SRV_RECON_TIMEOUT)
-            retry += 1
-            try:
-                self.conn = data_connect(config, Domain)
-                do_request(self.conn, "PUT", self.log_addr)
-                break
-            except socket.error:
-                if shutdown: return
-
-    def send_events(self, events):
-        """ Sends a block of new lines. """
-        if events:
-            events = self.event_filter(events)
-        if not events:
-            return
-        if config.datahub or self.token != '':
-            eventsArray = events.splitlines()
-            for event in eventsArray:
-                self.syslog_sender.push(event)
-        else:
-            while not shutdown:
-                try:
-                    self.conn.send(events)
-                    break
-                except socket.error, (err_no, err_str):
-                    self.open_connection()
-
         if config.debug_events:
-            print >> sys.stderr, events,
+            print >> sys.stderr, line,
+        self.transport.send(self.formatter.format_line(line))
 
-
-class LogFollower(Follower):
-    def __init__(self, name, log_key, event_filter, token=''):
-        super(LogFollower, self).__init__(name, log_key, self.monitorlogs, event_filter, token)
+    def close(self):
+        """Closes the follower by setting the shutdown flag and waiting for the
+        worker thread to stop."""
+        self._shutdown = True
+        self._worker.join(1.0)
 
     def monitorlogs(self):
         """ Opens the log file and starts to collect new events. """
-        self.open_connection()
-        self.open_log()
-        while not shutdown:
+        self._open_log()
+        while not self._shutdown:
             try:
-                events = self.get_events()
+                line = self._get_line()
             except IOError, e:
                 if config.debug:
                     log.debug("IOError: %s", e)
-                self.open_log()
-            self.send_events(events)
+                self._open_log()
+            if line:
+                self._send_line(line)
+        self._close_log()
+
+
+class Transport(object):
+
+    """Encapsulates simple connection to a remote host. The connection may be
+    encrypted. Each communication is started with the preamble."""
+
+    def __init__(self, endpoint, port, use_ssl, preamble, debug_transport_events):
+        # Copy transport configuration
+        self.endpoint = endpoint
+        self.port = port
+        self.use_ssl = use_ssl
+        self.preamble = preamble
+        self._entries = Queue.Queue(SEND_QUEUE_SIZE)
+        self._socket = None
+        self._debug_transport_events = debug_transport_events
+
+        self._shutdown = False
+
+        # Get certificate name
+        cert_name = None
+        if not config.use_ca_provided:
+            cert_name = system_cert_file()
+            if cert_name is None:
+                cert_name = default_cert_file(config)
+        else:
+            cert_name = default_cert_file(config)
+
+        if use_ssl and not cert_name:
+            die('Cannot get default certificate file name to provide connection over SSL!')
+            # XXX Do we need to die here?
+        self._certs = cert_name
+
+        # Start asynchronous worker
+        self._worker = threading.Thread(target=self.run)
+        self._worker.daemon = True
+        self._worker.start()
+
+    def _get_address(self):
+        """Returns an IP address of the endpoint. If the endpoint resolves to
+        multiple addresses, a random one is selected. This works better than
+        default selection."""
+        return random.choice(
+            socket.getaddrinfo(self.endpoint, self.port))[4][0]
+
+    def _connect_ssl(self, plain_socket):
+        """Connects the socket and wraps in SSL. Returns the wrapped socket
+        or None in case of IO or other errors."""
+        self._socket = None
+        try:
+            address = self._get_address()
+            s = plain_socket
+            s.connect((address, self.port))
+
+            try:
+                s = ssl.wrap_socket(
+                    plain_socket, ca_certs=self._certs,
+                    cert_reqs=ssl.CERT_REQUIRED, ssl_version=ssl.PROTOCOL_TLSv1,
+                    ciphers="HIGH:-aNULL:-eNULL:-PSK:RC4-SHA:RC4-MD5")
+            except TypeError:
+                s = ssl.wrap_socket(
+                    plain_socket, ca_certs=self._certs, cert_reqs=ssl.CERT_REQUIRED,
+                    ssl_version=ssl.PROTOCOL_TLSv1)
+
+            try:
+                match_hostname(s.getpeercert(), self.endpoint)
+            except CertificateError, ce:
+                report("Could not validate SSL certificate for %s: %s" %
+                       (self.endpoint, ce.message))
+                return None
+            return s
+
+        except IOError, e:
+            cause = e.strerror
+            if not cause:
+                cause = "(No reason given)"
+            report("Can't connect to %s/%s via SSL at port %s. Make sure that the host and port are reachable "
+                   "and speak SSL: %s" % (self.endpoint, address, self.port, cause))
+        return None
+
+    def _connect_plain(self, plain_socket):
+        """Connects the socket with the socket given. Returns the socket or None in case of IO errors."""
+        self._socket = None
+        address = self._get_address()
+        try:
+            plain_socket.connect((address, self.port))
+        except IOError, e:
+            cause = e.strerror
+            if not cause:
+                cause = ""
+            report("Can't connect to %s/%s at port %s. Make sure that the host and port are reachable\n"
+                   "Error message: %s" % (self.endpoint, address, self.port, e.strerror))
+            return None
+        return plain_socket
+
+    def _open_connection(self):
+        """ Opens a push connection to logentries. """
+        log.debug("Opening connection %s:%s %s",
+                  self.endpoint, self.port, self.preamble.strip())
+        self._close_connection()
+        retry = 0
+        delay = SRV_RECON_TO_MIN
+        # Keep trying to open the connection
+        while not self._shutdown:
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(TCP_TIMEOUT)
+                if self.use_ssl:
+                    self._socket = self._connect_ssl(s)
+                else:
+                    self._socket = self._connect_plain(s)
+
+                # If the socket is open, send preamble and leave
+                if self._socket:
+                    if self.preamble:
+                        self._socket.send(self.preamble)
+                    break
+            except socket.error:
+                if self._shutdown:
+                    return  # XXX
+
+            # Wait between attempts
+            time.sleep(delay)
+            retry += 1
+            delay *= 2
+            if delay > SRV_RECON_TO_MAX:
+                delay = SRV_RECON_TO_MAX
+
+    def _close_connection(self):
+        if self._socket:
+            try:
+                self._socket.close()
+            except socket.error:
+                pass
+            self._socket = None
+
+    def _send_entry(self, entry):
+        """Sends the entry. If the connection fails it will re-open it and try
+        again."""
+        # Keep sending data until successful
+        while not self._shutdown:
+            try:
+                self._socket.send(entry)
+                if self._debug_transport_events:
+                    print >> sys.stderr, entry,
+                break
+            except socket.error, (err_no, err_str):
+                self._open_connection()
+
+    def send(self, entry):
+        """Sends the entry given. Depending on transport configuration it will
+        block until the entry is sent or it will queue the entry for async
+        send.
+
+        Note: entry must end with a new line
+        """
+        while True:
+            try:
+                self._entries.put_nowait(entry)
+                break
+            except Queue.Full:
+                try:
+                    self._entries.get_nowait()
+                except Queue.Empty:
+                    pass
+
+    def close(self):
+        self._shutdown = True
+        self._worker.join(1.5)
+
+    def run(self):
+        """When run with backgroud thread it collects entries from internal
+        queue and sends them to destination."""
+        self._open_connection()
+        while not self._shutdown:
+            try:
+                entry = self._entries.get(True, 1)
+                self._send_entry(entry)
+            except Queue.Empty:
+                pass
+        self._close_connection()
+
+
+class DefaultTransport(object):
+
+    def __init__(self, xconfig):
+        self._transport = None
+        self._config = xconfig
+
+    def get(self):
+        if not self._transport:
+            use_ssl = not self._config.suppress_ssl
+            if self._config.datahub:
+                endpoint = self._config.datahub_ip
+                port = self._config.datahub_port
+            else:
+                endpoint = Domain.DATA
+                if use_ssl:
+                    port = 443
+                else:
+                    port = 80
+            if config.force_domain:
+                endpoint = self._config.force_domain
+            elif self._config.force_data_host:
+                endpoint = self._config.force_data_host
+            if self._config.debug_local:
+                endpoint = Domain.LOCAL
+                port = 10000
+                use_ssl = False
+            self._transport = Transport(
+                endpoint, port, use_ssl, '', self._config.debug_transport_events)
+        return self._transport
+
+    def close(self):
+        if self._transport:
+            self._transport.close()
+
+
+class ConfiguredLog(object):
+
+    def __init__(self, name, token, path):
+        self.name = name
+        self.token = token
+        self.path = path
 
 
 class Config(object):
+
     def __init__(self):
         self.config_dir_name = self.get_config_dir()
         self.config_filename = self.config_dir_name + LE_CONFIG
 
         # Configuration variables
-        self.user_key = DEFAULT_USER_KEY
         self.agent_key = NOT_SET
-        self.filters = NOT_SET
-        self.name = NOT_SET
-        self.hostname = NOT_SET
-        self.no_timestamps = False
-        self.std = False
-        self.std_all = False
-        self.type_opt = NOT_SET
-        self.xlist = False
-        self.uuid = False
-        self.daemon = False
-        self.winservice = False
-        self.pid_file = PID_FILE
-        self.system_stats_token = NOT_SET
-
-        # Special options
-        self.yes = False
-        self.force = False
         self.suppress_ssl = False
         self.use_ca_provided = False
-
+        self.user_key = DEFAULT_USER_KEY
         self.datahub = NOT_SET
         self.datahub_ip = NOT_SET
         self.datahub_port = NOT_SET
-
-        # System stats. token
         self.system_stats_token = NOT_SET
+        self.pull_server_side_config = True
+        self.configured_logs = []
 
-        # Source of followed logs.
-        # If it is False then the Agent will get logs to follow from
-        # LE server, otherwise - will use log list stored in local config (config.json)
-        self.use_config_log_paths = NOT_SET
+        # Special options
+        self.daemon = False
+        self.filters = NOT_SET
+        self.force = False
+        self.hostname = NOT_SET
+        self.name = NOT_SET
+        self.no_timestamps = False
+        self.pid_file = PID_FILE
+        self.std = False
+        self.std_all = False
+        self.system_stats_token = NOT_SET
+        self.type_opt = NOT_SET
+        self.uuid = False
+        self.xlist = False
+        self.yes = False
 
         # Debug options
 
@@ -1755,6 +1680,8 @@ class Config(object):
         self.debug = False
         # All recognized events are logged
         self.debug_events = False
+        # All transported events are logged
+        self.debug_transport_events = False
         # All filtering actions are logged
         self.debug_filters = False
         # Adapter connects to locahost
@@ -1800,10 +1727,10 @@ class Config(object):
             os.remove(self.config_filename)
         except OSError, e:
             if e.errno != 2:
-                log.warning("Error: %s: %s" % (self.config_filename, e.strerror))
+                log.warning("Error: %s: %s" %
+                            (self.config_filename, e.strerror))
                 return False
         return True
-
 
     def basic_setup(self):
         pass
@@ -1825,7 +1752,8 @@ class Config(object):
                 USE_CA_PROVIDED_PARAM: '',
                 DATAHUB_PARAM: '',
                 SYSSTAT_TOKEN_PARAM: '',
-                USE_CONFIG_LOG_PATHS_PARAM: ''
+                HOSTNAME_PARAM: '',
+                PULL_SERVER_SIDE_CONFIG_PARAM: 'True'
             })
             conf.read(self.config_filename)
 
@@ -1842,40 +1770,51 @@ class Config(object):
                 new_filters = conf.get(MAIN_SECT, FILTERS_PARAM)
                 if new_filters != '':
                     self.filters = new_filters
+            if self.hostname == NOT_SET:
+                self.hostname = conf.get(MAIN_SECT, HOSTNAME_PARAM)
+                if not self.hostname:
+                    self.hostname = NOT_SET
+            new_pull_server_side_config = conf.get(
+                MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM)
+            self.pull_server_side_config = new_pull_server_side_config == 'True'
             new_suppress_ssl = conf.get(MAIN_SECT, SUPPRESS_SSL_PARAM)
             if new_suppress_ssl == 'True':
                 self.suppress_ssl = new_suppress_ssl == 'True'
-            new_use_ca_provided = conf.get(MAIN_SECT, USE_CA_PROVIDED_PARAM)
-            if new_use_ca_provided == 'True':
-                self.use_ca_provided = new_use_ca_provided
             new_force_domain = conf.get(MAIN_SECT, FORCE_DOMAIN_PARAM)
             if new_force_domain:
                 self.force_domain = new_force_domain
             if self.datahub == NOT_SET:
-                self.set_datahub_settings(conf.get(MAIN_SECT, DATAHUB_PARAM), should_die=False)
+                self.set_datahub_settings(
+                    conf.get(MAIN_SECT, DATAHUB_PARAM), should_die=False)
             if self.system_stats_token == NOT_SET:
-                system_stats_token_str = conf.get(MAIN_SECT, SYSSTAT_TOKEN_PARAM)
+                system_stats_token_str = conf.get(
+                    MAIN_SECT, SYSSTAT_TOKEN_PARAM)
                 if system_stats_token_str != '':
                     self.system_stats_token = system_stats_token_str
 
-            if self.use_config_log_paths is None:
-                conf_log_paths_raw = conf.get(MAIN_SECT, USE_CONFIG_LOG_PATHS_PARAM)
-                if conf_log_paths_raw == '':
-                    self.use_config_log_paths = False
-                else:
-                    self.use_config_log_paths = conf_log_paths_raw == 'True'
-
+            self.configured_logs = []
+            for name in conf.sections():
+                if name != MAIN_SECT:
+                    token = uuid_parse(conf.get(name, TOKEN_PARAM))
+                    if not token:
+                        # TODO: Warning
+                        continue
+                    path = conf.get(name, PATH_PARAM)
+                    self.configured_logs.append(
+                        ConfiguredLog(name, token, path))
 
         except ConfigParser.NoSectionError:
+            # TODO: Warning
             return False
         except ConfigParser.NoOptionError:
+            # TODO: Warning
             return False
         return True
 
     def save(self):
         """
         Saves configuration parameters into the configuration file.
-        The certification file added as well.
+        The file with certificates is added as well.
         """
         try:
             conf = ConfigParser.SafeConfigParser()
@@ -1888,21 +1827,26 @@ class Config(object):
                 conf.set(MAIN_SECT, AGENT_KEY_PARAM, self.agent_key)
             if self.filters != NOT_SET:
                 conf.set(MAIN_SECT, FILTERS_PARAM, self.filters)
+            if self.hostname != NOT_SET:
+                conf.set(MAIN_SECT, HOSTNAME_PARAM, self.hostname)
             if self.suppress_ssl:
                 conf.set(MAIN_SECT, SUPPRESS_SSL_PARAM, 'True')
             if self.use_ca_provided:
                 conf.set(MAIN_SECT, USE_CA_PROVIDED_PARAM, 'True')
             if self.force_domain:
                 conf.set(MAIN_SECT, FORCE_DOMAIN_PARAM, self.force_domain)
+            if not self.pull_server_side_config:
+                conf.set(MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM, "%s" %
+                         self.pull_server_side_config)
             if self.datahub != NOT_SET:
                 conf.set(MAIN_SECT, DATAHUB_PARAM, self.datahub)
             if self.system_stats_token != NOT_SET:
-                conf.set(MAIN_SECT, SYSSTAT_TOKEN_PARAM, self.system_stats_token)
-            if self.use_config_log_paths != NOT_SET:
-                use_config_log_paths_value = str(self.use_config_log_paths)
-            else:
-                use_config_log_paths_value = 'False'  # By default this should be false if undefined
-            conf.set(MAIN_SECT, USE_CONFIG_LOG_PATHS_PARAM, use_config_log_paths_value)
+                conf.set(
+                    MAIN_SECT, SYSSTAT_TOKEN_PARAM, self.system_stats_token)
+
+            for clog in self.configured_logs:
+                conf.set(clog.name, TOKEN_PARAM, clog.token)
+                conf.set(clog.name, PATH_PARAM, clog.path)
 
             conf.write(conf_file)
         except IOError, e:
@@ -1924,8 +1868,11 @@ class Config(object):
         Exits with error message if the user key is not defined.
         """
         if self.user_key == NOT_SET:
-	    if ask_for_it:
-                log.info("Account key is required. Enter your Logentries login credentials or specify the account key with --account-key parameter.")
+            if ask_for_it:
+                log.info(
+                    "Account key is required. Enter your Logentries login "
+                    "credentials or specify the account key with "
+                    "--account-key parameter.")
                 self.user_key = retrieve_account_key()
             else:
                 die("Account key is required. Enter your account key with --account-key parameter.")
@@ -2025,29 +1972,31 @@ class Config(object):
 
         values = value.split(":")
         if len(values) > 2:
-            die("Cannot parse %s for --datahub. Expected format: hostname:port" % value)
+            die("Cannot parse %s for --datahub. Expected format: hostname:port" %
+                value)
 
         self.datahub_ip = values[0]
         if len(values) == 2:
             try:
                 self.datahub_port = int(values[1])
             except ValueError:
-                die("Cannot parse %s as port. Specify a valid --datahub address" % values[1])
+                die("Cannot parse %s as port. Specify a valid --datahub address" %
+                    values[1])
         self.datahub = value
-
 
     def process_params(self, params):
         """
         Parses command line parameters and updates config parameters accordingly
         """
+        PARAM_LIST = """user-key= account-key= agent-key= host-key= no-timestamps debug-events
+                    debug-transport-events
+                    debug-filters debug-loglist local debug-stats debug-nostats
+                    debug-stats-only debug-cmds debug-system help version yes force uuid list
+                    std std-all name= hostname= type= pid-file= debug no-defaults
+                    suppress-ssl use-ca-provided force-api-host= force-domain=
+                    system-stat-token= datahub= pull-server-side-config= config="""
         try:
-            optlist, args = getopt.gnu_getopt(params, '',
-                                              "user-key= account-key= agent-key= host-key= no-timestamps debug-events "
-                                              "debug-filters debug-loglist local debug-stats debug-nostats "
-                                              "debug-stats-only debug-cmds debug-system help version yes force uuid list "
-                                              "std std-all name= hostname= type= pid-file= debug no-defaults "
-                                              "suppress-ssl use-ca-provided force-api-host= force-domain= "
-                                              "system-stat-token= datahub= use-config-log-paths=".split())
+            optlist, args = getopt.gnu_getopt(params, '', PARAM_LIST.split())
         except getopt.GetoptError, err:
             die("Parameter error: " + str(err))
         for name, value in optlist:
@@ -2055,6 +2004,8 @@ class Config(object):
                 print_usage()
             if name == "--version":
                 print_usage(True)
+            if name == "--config":
+                self.config_filename = value
             if name == "--yes":
                 self.yes = True
             elif name == "--user-key":
@@ -2092,6 +2043,8 @@ class Config(object):
                 self.debug = True
             elif name == "--debug-events":
                 self.debug_events = True
+            elif name == "--debug-transport-events":
+                self.debug_transport_events = True
             elif name == "--debug-filters":
                 self.debug_filters = True
             elif name == "--local":
@@ -2111,25 +2064,20 @@ class Config(object):
             elif name == "--suppress-ssl":
                 self.suppress_ssl = True
             elif name == "--force-api-host":
-                if value and value != '': self.force_api_host = value
+                if value and value != '':
+                    self.force_api_host = value
             elif name == "--force-data-host":
-                if value and value != '': self.force_data_host = value
+                if value and value != '':
+                    self.force_data_host = value
             elif name == "--force-domain":
-                if value and value != '': self.force_domain = value
+                if value and value != '':
+                    self.force_domain = value
             elif name == "--use-ca-provided":
                 self.use_ca_provided = True
             elif name == "--system-stat-token":
                 self.set_system_stat_token(value)
             elif name == "--datahub":
                 self.set_datahub_settings(value)
-            elif name == "--use-config-log-paths": #XXX
-                param = value.lower()
-                if param == "true":
-                    self.use_config_log_paths = True
-                elif param == "false":
-                    self.use_config_log_paths = False
-                else:
-                    die("Please specify \"true\" or \"false\" as value for --use-config-log-paths option.")
 
         if self.datahub_ip and not self.datahub_port:
             if self.suppress_ssl:
@@ -2141,7 +2089,8 @@ class Config(object):
             die("Do not specify --local and --force-api-host at the same time.")
         if self.debug_local and self.force_data_host:
             die("Do not specify --local and --force-data-host at the same time.")
-        if self.debug_local and self.force_domain: die("Do not specify --local and --force-domain at the same time.")
+        if self.debug_local and self.force_domain:
+            die("Do not specify --local and --force-domain at the same time.")
         return args
 
     def get_port(self):
@@ -2151,194 +2100,8 @@ class Config(object):
             return config.datahub_port
         return port
 
-
-class LocalConfigHolder(object):
-    """
-    LocalConfigHolder is the class that deals with local config (config.json) file.
-    Functions: loading values from the config, saving data to the config, updating data in the config.
-    In current implementation local config stores followed logs data.
-    """
-    def __init__(self):
-        try:
-            # Check whether config.json is in the right place.
-            # If not - create new one.
-            self.conf_file = get_or_create_local_config()
-        except IOError, e:
-            die(e)
-
-        # Local lonfig (config.json) parts go here.
-        # Currently only followed logs list is stored here.
-        self.logs_list = []
-
-    def construct_local_config_json_object(self):
-        """
-        Constructs a dictionary which contains persistence fields of
-        LocalConfigHolder instance that need to be serialized and stored to config.json
-        :return dict:
-        """
-        # Here may be not only logs list but any other objects that may be added in next stories.
-        return {
-            'logs': self.logs_list
-        }
-
-    def parse_local_config_json_object(self, object):
-        """
-        Extracts persistence data from JSON object which comes from json_loads and puts extracted data
-        to corresponding fields of LocalConfigHolder instance.
-
-        :param dict:
-        :return None:
-        """
-        # Here may be not only logs list but any other objects that may be added in next stories.
-        if not object.get('logs') is None:
-            self.logs_list = object['logs']
-
-    @staticmethod
-    def create_empty_local_config_json_object():
-        """
-        Constructs empty structure that represents empty config.json with valid structure. LocalConfigHolder
-        instance is initialized with this object. This method is used if config.json was absent and been created
-        by get_or_create_local_config() routine and contains no JSON structures.
-
-        :return dict:
-        """
-        # Here may be not only logs list but any other objects that may be added in next stories.
-        return {
-            'logs': []
-        }
-
-    @staticmethod
-    def construct_log_item(log_path, log_name, token):
-        """
-        Constructs a dictionary which represents log item. This items are placed to LocalConfigHolder log list
-        field to be then serialized and stored to config.json
-
-        :param str, str, str:
-        :return dict:
-        """
-        return {'path': log_path, 'name': log_name, 'token': token}
-
-    def add_log(self, log_path, log_name, token):
-        """
-        Constructs log item from given log path (followed file path), log name (if not stated explicitly -
-        file name of followed file) and token (GUID received from LE server after file following) and inserts
-        it to log list of LocalConfigHolder instance
-
-        :param str, str, str:
-        :return None:
-        """
-        if log_name == '':
-            return
-        self.logs_list.append(LocalConfigHolder.construct_log_item(log_path, log_name, token))
-
-    def remove_log(self, log_path, log_name, token):
-        """
-        Removes a log item from log list of LocalConfigHolder instance. Uses all three properties of the item
-        for comparison: log path (followed file path), log name (if not stated explicitly -
-        file name of followed file) and token (GUID received from LE server after file following).
-
-        :param str, str, str:
-        :return None:
-        """
-        if log_name == '':
-            return
-        self.logs_list.remove(LocalConfigHolder.construct_log_item(log_path, log_name, token))
-
-    def save_local_config(self):
-        """
-        Gets data of persistent fields of LocalConfigHolder instance, serializes that data (which is
-        a dictionary) and writes it to local config (config.json)
-
-        :return None:
-        """
-        try:
-            output = open(self.conf_file, 'wb')
-            serialized_logs = json_dumps(self.construct_local_config_json_object(),
-                                         sort_keys=True, indent=1)
-            output.write(serialized_logs)
-            output.close()
-        except IOError, e:
-            report('Cannot save local config object to %s. I/O error:' % self.conf_file)
-            die(e)
-        except Exception, e:
-            report('Cannot save local config object to %s. Error:' % self.conf_file)
-            die(e)
-
-    def load_local_config(self):
-        """
-        Loads serialized data from config.json, parses it to a dictionary and then - extracts values of
-        persistent fields of LocalConfigHolder instance and initializes that fields with extracted values.
-
-        :return None:
-        """
-        try:
-            input = open(self.conf_file, 'rb')
-            serialized_logs = input.read()
-            self.parse_local_config_json_object(json_loads(serialized_logs))
-        except IOError, e:
-            report('Cannot load local config object from %s. I/O error:' % self.conf_file)
-            die(e)
-        except Exception, e:
-            if not serialized_logs == '':
-                # Malformed local config - nothing to do but to die.
-                report('Cannot load local config object from %s. Error:' % self.conf_file)
-                die(e)
-            else:
-                # If config is just created and empty - construct empty object and pass it to the local config
-                self.parse_local_config_json_object(LocalConfigHolder.create_empty_local_config_json_object())
-
 config = Config()
 
-def get_local_config_dir_path():
-    """
-    Depending on UID of the user that had invoked the Agent returns
-    corresponding path to local config (config.json) file.
-
-    :return str:
-    """
-    if os.geteuid() == 0:
-        # Invoked by root or using sudo
-        local_c_dir = LOCAL_CONFIG_DIR_SYSTEM
-    else:
-        local_c_dir = os.path.expanduser('~') + '/' + LOCAL_CONFIG_DIR_USER
-    return local_c_dir + '/'
-
-def get_local_config_file_path():
-    """
-    Returns full path to local config (config.json) file.
-
-    :return str:
-    """
-    conf_dir = get_local_config_dir_path()
-    return conf_dir + LOCAL_CONFIG_JSON_FILE
-
-def get_or_create_local_config():
-    """
-    Checks whether local config (config.json) file exists and if not -
-    creates it alongside with creating parent directory for it if
-    that directory does not exist too.
-    Returns full path to local config (config.json).
-
-    :return str:
-    """
-    conf_file = get_local_config_file_path()
-    if os.path.exists(conf_file) and os.path.isfile(conf_file):
-        return conf_file
-    else:
-        try:
-            report('%s not found. Trying to create.' % conf_file)
-            dir = get_local_config_dir_path()
-            if not os.path.exists(dir):
-                os.makedirs(dir)
-            open(conf_file, 'a').close()
-            report('%s created.' % conf_file)
-        except IOError:
-            raise IOError('Cannot create %s:' % conf_file)
-    return conf_file
-
-local_config = LocalConfigHolder()
-
-# Pass the exception
 
 def do_request(conn, operation, addr, data=None, headers={}):
     log.debug('Domain request: %s %s %s %s' % (operation, addr, data, headers))
@@ -2380,8 +2143,10 @@ def api_request(request, required=False, check_status=False, silent=False, die_o
     Processes a request on the logentries domain.
     """
     # Obtain response
-    response, conn = get_response("POST", LE_SERVER_API, urllib.urlencode(request),
-                                  silent=silent, die_on_error=die_on_error, domain=Domain.API)
+    response, conn = get_response(
+        "POST", LE_SERVER_API, urllib.urlencode(request),
+        silent=silent, die_on_error=die_on_error, domain=Domain.API,
+        headers={'Content-Type': 'application/x-www-form-urlencoded'})
 
     # Check the response
     if not response:
@@ -2427,7 +2192,8 @@ def pull_request(what, params):
     response = None
 
     # Obtain response
-    addr = '/%s/%s/?%s' % (config.user_key, urllib.quote(what), urllib.urlencode(params))
+    addr = '/%s/%s/?%s' % (
+        config.user_key, urllib.quote(what), urllib.urlencode(params))
     response, conn = get_response("GET", addr, domain=Domain.PULL)
 
     # Check the response
@@ -2440,51 +2206,10 @@ def pull_request(what, params):
 
     while True:
         data = response.read(65536)
-        if len(data) == 0: break
+        if len(data) == 0:
+            break
         sys.stdout.write(data)
     conn.close()
-
-
-def push_request(ilog, data_size, where, params):
-    """
-    Processes a push request to the logentries domain.
-    """
-    # Obtain response
-    addr = '/%s/%s/?%s' % (config.user_key, urllib.quote(where), urllib.urlencode(params))
-    try:
-        conn = data_connect(config, Domain)
-        do_request(conn, "PUT", addr, headers={CONTENT_LENGTH: '%s' % data_size})
-
-        # Push the file
-        to_send = data_size
-        while to_send != 0:
-            to_read = to_send
-            if to_read > 65536:
-                to_read = 65536
-            data = ilog.read(to_read)
-            if len(data) == 0: break
-            to_send -= len(data)
-            conn.send(data)
-        response = conn.getresponse()
-        if response.status != 200:
-            reason = response.read()
-            try:
-                d_response = json_loads(reason)
-                reason = d_response['reason']
-            except ValueError:
-                pass
-            die('Error: ' + reason)
-        conn.close()
-    except socket.sslerror, msg:  # Network error
-        log.info("SSL error: %s" % msg)
-    except socket.error, msg:  # Network error
-        log.info("Network error: %s" % msg)
-
-        # # Check the response
-        # if not response:
-        # die( "Error: Cannot process LE request, no response")
-        # if response.status != 200:
-        # die( "Error: Cannot process LE request: (%s)"%response.status)
 
 
 def request(request, required=False, check_status=False, rtype='GET', retry=False):
@@ -2494,8 +2219,9 @@ def request(request, required=False, check_status=False, rtype='GET', retry=Fals
     noticed = False
     while True:
         # Obtain response
-        response, conn = get_response(rtype, urllib.quote('/' + config.user_key + '/' + request),
-                                      die_on_error=not retry)
+        response, conn = get_response(
+            rtype, urllib.quote('/' + config.user_key + '/' + request),
+            die_on_error=not retry)
 
         # Check the response
         if response:
@@ -2504,7 +2230,8 @@ def request(request, required=False, check_status=False, rtype='GET', retry=Fals
             die('Error: Cannot process LE request, no response')
         if retry:
             if not noticed:
-                log.info('Error: No response from LE, re-trying in %ss intervals' % SRV_RECON_TIMEOUT)
+                log.info('Error: No response from LE, re-trying in %ss intervals' %
+                         SRV_RECON_TIMEOUT)
                 noticed = True
             time.sleep(SRV_RECON_TIMEOUT)
         else:
@@ -2529,8 +2256,10 @@ def _startup_info():
     Prints correct startup information based on OS
     """
     if 'darwin' in sys.platform:
-        log.info('  sudo launchctl unload /Library/LaunchDaemons/com.logentries.agent.plist')
-        log.info('  sudo launchctl load /Library/LaunchDaemons/com.logentries.agent.plist')
+        log.info(
+            '  sudo launchctl unload /Library/LaunchDaemons/com.logentries.agent.plist')
+        log.info(
+            '  sudo launchctl load /Library/LaunchDaemons/com.logentries.agent.plist')
     elif 'linux' in sys.platform:
         log.info('  sudo service logentries restart')
     elif 'sunos' in sys.platform:
@@ -2546,12 +2275,12 @@ def request_follow(filename, name, type_opt):
     """
     config.agent_key_required()
     request = {"request": "new_log",
-           "user_key": config.user_key,
-           "host_key": config.agent_key,
-           "name": name,
-           "filename": filename,
-           "type": type_opt,
-           "follow": "true"}
+               "user_key": config.user_key,
+               "host_key": config.agent_key,
+               "name": name,
+               "filename": filename,
+               "type": type_opt,
+               "follow": "true"}
     followed_log = api_request(request, True, True)
     print "Will follow %s as %s" % (filename, name)
     log.info("Don't forget to restart the daemon")
@@ -2567,10 +2296,10 @@ def request_hosts(logs=False):
     if logs:
         load_logs = 'true'
     response = api_request({
-                               'request': 'get_user',
-                               'load_hosts': 'true',
-                               'load_logs': load_logs,
-                               'user_key': config.user_key}, True, True)
+        'request': 'get_user',
+        'load_hosts': 'true',
+        'load_logs': load_logs,
+        'user_key': config.user_key}, True, True)
     return response['hosts']
 
 
@@ -2608,88 +2337,130 @@ def cmd_register(args):
     """
     no_more_args(args)
     config.load()
+
     if config.agent_key != NOT_SET and not config.force:
         die("Server already registered. Use --force to override current registration.")
     config.user_key_required(True)
     config.hostname_required()
     config.name_required()
 
-    if not config.use_config_log_paths:
-        si = system_detect(True)
+    si = system_detect(True)
 
-        request = {"request": "register",
-                   'user_key': config.user_key,
-                   'name': config.name,
-                   'hostname': config.hostname,
-                   'system': si['system'],
-                   'distname': si['distname'],
-                   'distver': si['distver']
-        }
-        response = api_request(request, True, True)
+    request = {"request": "register",
+               'user_key': config.user_key,
+               'name': config.name,
+               'hostname': config.hostname,
+               'system': si['system'],
+               'distname': si['distname'],
+               'distver': si['distver']
+               }
+    response = api_request(request, True, True)
 
-        config.agent_key = response['host_key']
-        config.save()
+    config.agent_key = response['host_key']
+    config.save()
 
-        log.info("Registered %s (%s)" % (config.name, config.hostname))
+    log.info("Registered %s (%s)" % (config.name, config.hostname))
 
-        # Registering logs
-        logs = []
-        if config.std or config.std_all:
-            logs = collect_log_names(si)
-        for logx in logs:
-            if config.std_all or logx['default'] == '1':
-                request_follow(logx['filename'], logx['name'], logx['type'])
-    else:
-        log.info("Registered %s (%s)" % (config.name, config.hostname))
-        config.save()
+    # Registering logs
+    logs = []
+    if config.std or config.std_all:
+        logs = collect_log_names(si)
+    for logx in logs:
+        if config.std_all or logx['default'] == '1':
+            request_follow(logx['filename'], logx['name'], logx['type'])
 
 # The function checks for 2 things: 1) that the path is not empty;
 # 2) the path starts with '/' character which indicates that the log has
 # a "physical" path which starts from filesystem root.
+
+
 def check_file_name(file_name):
     return file_name.startswith('/')
 
 
-def load_logs():
+def get_filters(available_filters, filter_filenames, log_name, log_key, log_filename, log_token):
+    debug_filters(
+        "Log name=%s id=%s filename=%s token=%s", log_name, log_key,
+        log_filename, log_token)
+
+    # Check filters
+    if not filter_filenames(log_filename):
+        debug_filters(
+            " Log blocked by filter_filenames, not following")
+        log.info(
+            'Not following %s, blocked by filter_filenames', log_name)
+        return None
+    debug_filters(
+        " Looking for filters by log name, log id, and token")
+
+    event_filter = None
+    if not event_filter and log_key:
+        debug_filters(" Looking for filters by log name")
+        event_filter = available_filters.get(log_name)
+        if not event_filter:
+            debug_filters(" No filter found by log name")
+
+    if not event_filter and log_key:
+        debug_filters(" Looking for filters by log ID")
+        event_filter = available_filters.get(log_key)
+        if not event_filter:
+            debug_filters(" No filter found by log ID")
+
+    if not event_filter and log_token:
+        debug_filters(" Looking for filters by token")
+        event_filter = available_filters.get(log_token)
+        if not event_filter:
+            debug_filters(" No filter found by token")
+
+    if event_filter and not hasattr(event_filter, '__call__'):
+        debug_filters(
+            " Filter found, but ignored because it's not a function")
+        event_filter = None
+    if not event_filter:
+        event_filter = filter_events
+        debug_filters(" No filter found")
+    else:
+        debug_filters(" Using filter %s", event_filter)
+    return event_filter
+
+
+def start_followers(default_transport):
     """
-    Loads logs from the server and initializes followers.
+    Loads logs from the server (or configuration) and initializes followers.
     """
     noticed = False
-    logs = None
+    logs = []
+    followers = []
+    transports = []
 
-    if config.use_config_log_paths:
-        report("The Agent will use log list from %s. If you wish to use followed logs list from\n"
-               "Logentries' server please run the Agent with specifying option --use-config-log-paths=false"
-               % get_local_config_file_path())
-
-    if not config.use_config_log_paths:
+    if config.pull_server_side_config:
         # Use LE server as the source for list of followed logs
         while not logs:
-           resp = request('hosts/%s/' % config.agent_key, False, False, retry=True)
-           if resp['response'] != 'ok':
-               if not noticed:
-                   log.error('Error retrieving list of logs: %s, retrying in %ss intervals' % (
-                       resp['reason'], SRV_RECON_TIMEOUT))
-                   noticed = True
-               time.sleep(SRV_RECON_TIMEOUT)
-               continue
-           logs = resp['list']
-           if not logs:
-               time.sleep(SRV_RECON_TIMEOUT)
-    else:
-        #  We're working in 'local' mode, so we will try to use the list of followed files that is stored locally.
-        logs = []
-        local_config.load_local_config()
-        local_logs_list = local_config.logs_list
+            resp = request('hosts/%s/' %
+                           config.agent_key, False, False, retry=True)
+            if resp['response'] != 'ok':
+                if not noticed:
+                    log.error('Error retrieving list of logs: %s, retrying in %ss intervals' % (
+                        resp['reason'], SRV_RECON_TIMEOUT))
+                    noticed = True
+                time.sleep(SRV_RECON_TIMEOUT)
+                continue
+            logs = resp['list']
+            if not logs:
+                time.sleep(SRV_RECON_TIMEOUT)
+        # Select logs for the agent
+        logs = [l for l in logs if l.get('follow') == 'true']
 
-        for log in local_logs_list:
-            # Unpack log dictionary
-            log_path = log['path']
-            log_name = log['name']
-            log_token = log['token']
-            # Construct response-like item which has the same structure as ones returned by LE Server.
-            logs.append({'type': 'token', 'name': log_name, 'filename': log_path, 'key': '', 'token': log_token,
-                         'follow': 'true'})
+    for cl in config.configured_logs:
+        # Unpack log dictionary
+        log_path = cl.path
+        log_name = cl.name
+        log_token = cl.token
+        # Construct response-like item which has the same structure as ones
+        # returned by LE Server.
+        logs.append(
+            {'type': 'token', 'name': log_name, 'filename': log_path, 'key': '', 'token': log_token,
+                     'follow': 'true'})
 
     available_filters = {}
     filter_filenames = default_filter_filenames
@@ -2699,12 +2470,14 @@ def load_logs():
             import filters
 
             available_filters = getattr(filters, 'filters', {})
-            filter_filenames = getattr(filters, 'filter_filenames', default_filter_filenames)
+            filter_filenames = getattr(
+                filters, 'filter_filenames', default_filter_filenames)
 
             debug_filters("Available filters: %s", available_filters)
             debug_filters("Filter filenames: %s", filter_filenames)
         except:
-            log.error('Cannot import event filter module %s: %s', config.filters, sys.exc_info()[1])
+            log.error('Cannot import event filter module %s: %s',
+                      config.filters, sys.exc_info()[1])
             log.error('Details: %s', traceback.print_exc(sys.exc_info()))
 
     # Start followers
@@ -2719,43 +2492,48 @@ def load_logs():
             if l['type'] == 'token':
                 log_token = l['token']
 
-            debug_filters("Log name=%s key=%s filename=%s", log_name, log_key, log_filename)
-
-            # Check filters
-            if not filter_filenames(log_filename):
-                debug_filters(" Log blocked by filter_filenames, not following")
-                log.info('Not following %s, blocked by filter_filenames', log_name)
+            # Do not start a follower for a log with absent filepath.
+            if not check_file_name(log_filename):
                 continue
-            debug_filters(" Looking for filters by name and key")
-            event_filter = available_filters.get(log_name)
-            if not event_filter:
-                debug_filters(" No filter found by name, checking key")
-                event_filter = available_filters.get(log_key)
-            if event_filter and not hasattr(event_filter, '__call__'):
-                debug_filters(" Filter found, but ignored because it's not a function")
-                event_filter = None
-            if not event_filter:
-                event_filter = filter_events
-                debug_filters(" No filter found")
+
+            entry_filter = get_filters(available_filters, filter_filenames, log_name, log_key, log_filename, log_token)
+            if not entry_filter:
+                continue
+
+            log.info("Following %s" % log_filename)
+
+            if log_token:
+                formatter = formatters.FormatSyslog(
+                    config.hostname, log_name, log_token)
+                transport = default_transport.get()
+            elif log_key:
+                endpoint = Domain.API
+                port = 443
+                use_ssl = not config.suppress_ssl
+                if config.force_domain:
+                    endpoint = config.force_domain
+                if config.debug_local:
+                    endpoint = Domain.LOCAL
+                    port = 8000
+                    use_ssl = False
+                preamble = 'PUT /%s/hosts/%s/%s/?realtime=1 HTTP/1.0\r\n\r\n' % (
+                    config.user_key, config.agent_key, log_key)
+                formatter = formatters.FormatPlain('')
+                transport = Transport(
+                    endpoint, port, use_ssl, preamble, config.debug_transport_events)
+                transports.append(transport)
             else:
-                debug_filters(" Using filter %s", event_filter)
+                continue
 
             # Instantiate the follower
-            if check_file_name(log_filename): # Do not start a follower for a log with absent filepath.
-                LogFollower(log_filename, log_key, event_filter, log_token)
-
-            if l['type'] == 'token':  # Add only token logs to the list
-                # Push log to the local list
-                if not config.use_config_log_paths:
-                    local_config.add_log(log_filename, log_name, log_token)
-
-    if not config.use_config_log_paths:
-        local_config.save_local_config()
+            follower = Follower(log_filename, entry_filter, transport,
+                                formatter)
+            followers.append(follower)
+    return (followers, transports)
 
 
 def is_followed(filename):
-    """
-    Checks if the file given is followed.
+    """Checks if the file given is followed.
     """
     host = request('hosts/%s/' % config.agent_key, True, True)
     logs = host['list']
@@ -2766,34 +2544,52 @@ def is_followed(filename):
 
 
 def cmd_monitor(args):
-    """
-    Monitors host activity and sends events collected to logentries infrastructure.
+    """Monitors host activity and sends events collected to logentries
+    infrastructure.
     """
     no_more_args(args)
     config.load()
     stats = None
-    if not config.use_config_log_paths: # XXX
-        if config.agent_key == NOT_SET:
-            die('Please register the host first with command `le register\'')
-        config.agent_key_required()
-            # Register resource monitoring
-        stats = Stats()
 
-    config.user_key_required(not config.daemon)
+    # We need account and host ID to get server side configuration
+    if config.pull_server_side_config:
+        config.user_key_required(not config.daemon)
+        config.agent_key_required()
+
+    # Start default transport channel
+    default_transport = DefaultTransport(config)
+
+    # Register resource monitoring
+    if config.agent_key != NOT_SET:
+        stats = Stats(default_transport)
+        # FIXME: where to start stats?
 
     if config.daemon:
         daemonize()
+    followers = []
+    transports = []
     try:
-        # Load logs to follow
+        # Load logs to follow and start following them
         if not config.debug_stats_only:
-            load_logs()
+            (followers, transports) = start_followers(default_transport)
 
         # Park this thread
         while True:
             time.sleep(600)  # FIXME: is there a better way?
     except KeyboardInterrupt:
-        if stats: stats.cancel()
-        set_shutdown()
+        pass
+
+    print >> sys.stderr, "\nShutting down"
+    # Stop metrics
+    if stats:
+        stats.cancel()
+    # Close followers
+    for follower in followers:
+        follower.close()
+    # Close transports
+    for transport in transports:
+        transport.close()
+    default_transport.close()
 
 
 def cmd_monitor_daemon(args):
@@ -2810,43 +2606,34 @@ def cmd_follow(args):
     """
     if len(args) == 0:
         die("Error: Specify the file name of the log to follow.")
+    if len(args) > 1:
+        die("Error: Too many arguments.\n"
+            "A common mistake is to use wildcards in path that is being "
+            "expanded by shell. Enclose the path in single quotes to avoid "
+            "expansion.")
 
     config.load()
     config.agent_key_required()
-    local_config.load_local_config()
+    # FIXME: follow to add logs into local configuration
 
-    if config.use_config_log_paths:
-        report("The Agent will save new log entry to list to %s. If you wish to use followed logs list from\n"
-               "Logentries' server please run the Agent with specifying option --use-config-log-paths=false"
-               % get_local_config_file_path())
+    arg = args[0]
+    filename = os.path.abspath(arg)
+    name = config.name
+    if name == NOT_SET:
+        name = os.path.basename(filename)
+    type_opt = config.type_opt
+    if type_opt == NOT_SET:
+        type_opt = ""
 
-    for arg in args:
-        filename = os.path.abspath(arg)
-        name = config.name
-        if name == NOT_SET:
-            name = os.path.basename(filename)
-        type_opt = config.type_opt
-        if type_opt == NOT_SET:
-            type_opt = ""
+    # Check that we don't follow that file already
+    if not config.force and is_followed(filename):
+        log.warning('Already following %s' % filename)
+        return
 
-        # Check that we don't follow that file already
-        if not config.force and is_followed(filename):
-            log.warning('Already following %s' % filename)
-            return
+    if len(glob.glob(filename)) == 0:
+        log.warning('\nWARNING: File %s does not exist' % filename)
 
-        if len(glob.glob(filename)) == 0:
-            log.warning('\nWARNING: File %s does not exist' % filename)
-
-        # Do not request LE server to follow a log if the agent is in
-        # 'local' mode.
-        if not config.use_config_log_paths:
-            request_follow(filename, name, type_opt)
-        else:
-            # Add a log to config.json only if the Agent is in 'local' mode, because by
-            # default followed files have 'agent' type, not 'token'
-            local_config.add_log(filename, name, '')
-
-    local_config.save_local_config()
+    request_follow(filename, name, type_opt)
 
 
 def cmd_followed(args):
@@ -2990,7 +2777,8 @@ def cmd_ls(args):
 
     # if addr.count('/') > 2:
     # die( 'Path not found')
-    list_object(request(addr, True, True), hostnames=addr.startswith('hostnames'))
+    list_object(request(addr, True, True),
+                hostnames=addr.startswith('hostnames'))
 
 
 def cmd_rm(args):
@@ -3045,40 +2833,6 @@ def cmd_pull(args):
     pull_request(addr, params)
 
 
-def cmd_push(args):
-    """
-    Log push command
-    """
-    if len(args) < 2:
-        die(PUSH_USAGE)
-    config.load()
-    config.user_key_required(True)
-
-    filename = args[0]
-
-    addr = args[1]
-    if addr.startswith('/'):
-        addr = addr[1:]
-    if addr.endswith('/'):
-        addr = addr[:-1]
-    if not is_log_fs(addr + '/'):
-        die('Error: Not a suitable log path')
-
-    params = {}
-    if len(args) > 2:
-        params['logtype'] = args[2]
-
-    try:
-        data_size = os.path.getsize(filename)
-        logfile = open(filename, "r")
-    except OSError:
-        die("Error: Cannot open '%s'" % filename)
-    except IOError:
-        die("Error: Cannot open '%s'" % filename)
-
-    push_request(logfile, data_size, addr, params)
-
-
 #
 # Main method
 #
@@ -3130,4 +2884,3 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         die("Terminated", EXIT_TERMINATED)
-
