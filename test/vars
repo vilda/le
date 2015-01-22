@@ -1,0 +1,73 @@
+#!/bin/bash
+
+#
+# Common variables and functions shared by tests
+#
+
+set -e
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+CONFIG=sandbox_config
+LE="$DIR/../src/le.py --local --debug --config $CONFIG"
+
+ACCOUNT_KEY=f720fe54-879a-11e4-81ac-277d856f873e
+HOST_KEY=41ae887a-284a-4d78-91fe-56485b076148
+
+LE_PID=''
+API_MOCK_PID=''
+DATA_MOCK_PID=''
+
+function Scenario {
+	X="\n\nScenario '$@'\n\n"
+	echo -e "$X"
+	[ -z "$AUTO_TEST" ] || echo -e "$X" >&2
+
+	rm -f "$CONFIG"
+}
+
+function Testcase {
+	X="\nTestcase '$@'\n"
+	echo -e "$X"
+	[ -z "$AUTO_TEST" ] || echo -e "$X" >&2
+}
+
+# Create temporary directory if it does not exist already
+if [ -z "$AUTO_TEST" ] ; then
+	TMP=$(mktemp -d)
+fi
+
+function finish {
+	set +e
+
+	if [ -n "$LE_PID" ]; then
+		kill $LE_PID
+	fi
+	if [ -n "$API_MOCK_PID" ]; then
+		kill $API_MOCK_PID
+	fi
+	if [ -n "$DATA_MOCK_PID" ]; then
+		kill $DATA_MOCK_PID
+	fi
+	if [ -z "$AUTO_TEST" ] ; then
+		rm -rf -- "$TMP"
+	fi
+
+	# Wait for le/mock processes to finish
+	wait 2>/dev/null
+}
+trap finish EXIT
+
+# Go to the temporar dir
+cd -- "$TMP"
+
+# Start API server mock
+$DIR/env/bin/python $DIR/mocks/api_mock.py >>"$TMP/mock_output" 2>&1 &
+API_MOCK_PID=$!
+until curl -s localhost:8000 >/dev/null; do sleep 0.1; done
+
+# Start data server mock
+$DIR/env/bin/python $DIR/mocks/data_mock.py >>"$TMP/data_mock_output" 2>&1 &
+DATA_MOCK_PID=$!
+until (echo >/dev/tcp/localhost/10000) &>/dev/null ; do sleep 0.1 ; done
+

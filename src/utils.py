@@ -1,27 +1,34 @@
+
+# coding: utf-8
+# vim: set ts=4 sw=4 et:
+
 import errno
 import httplib
 import os
 import re
 import socket
-import sys
 import ssl
+import sys
+import uuid
 from backports import match_hostname, CertificateError
 
 import logging
 
 
-__author__ = 'uli'
+__author__ = 'Logentries'
 
-__all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
-           "default_cert_file", "system_cert_file",
-           "data_connect", "domain_connect", "no_more_args", "find_hosts", "find_logs", "die", "rfile", 'TCP_TIMEOUT',
-           "rm_pidfile", "set_proc_title", "is_uuid"]
+__all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "EXIT_TERMINATED",
+           "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
+           "default_cert_file", "system_cert_file", "domain_connect",
+           "no_more_args", "find_hosts", "find_logs", "die", "rfile", 'TCP_TIMEOUT',
+           "rm_pidfile", "set_proc_title", "uuid_parse"]
 
 # Return codes
 EXIT_OK = 0
 EXIT_NO = 1
 EXIT_ERR = 3
 EXIT_HELP = 4
+EXIT_TERMINATED = 5  # Terminated by user (Ctrl+C)
 
 LE_CERT_NAME = 'ca-certs.pem'
 
@@ -30,8 +37,10 @@ TCP_TIMEOUT = 10  # TCP timeout for the socket in seconds
 wrap_socket = ssl.wrap_socket
 
 authority_certificate_files = [  # Debian 5.x, 6.x, 7.x, Ubuntu 9.10, 10.4, 13.0
-                                 "/etc/ssl/certs/ca-certificates.crt",  # Fedora 12, Fedora 13, CentOS 5
-                                 "/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem",  # Amazon AMI
+                                 "/etc/ssl/certs/ca-certificates.crt",
+                                 # Fedora 12, Fedora 13, CentOS 5
+                                 "/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem",
+                                 # Amazon AMI
                                  "/etc/pki/tls/certs/ca-bundle.crt",
 ]
 
@@ -41,6 +50,7 @@ log = logging.getLogger(LOG_LE_AGENT)
 
 
 class ServerHTTPSConnection(httplib.HTTPSConnection):
+
     """
     A slight modification of HTTPSConnection to verify the certificate
     """
@@ -63,11 +73,13 @@ class ServerHTTPSConnection(httplib.HTTPSConnection):
                 self._tunnel()
         except AttributeError:
             pass
-        self.sock = wrap_socket(sock, ca_certs=self.cert_file, cert_reqs=ssl.CERT_REQUIRED)
+        self.sock = wrap_socket(
+            sock, ca_certs=self.cert_file, cert_reqs=ssl.CERT_REQUIRED)
         try:
             match_hostname(self.sock.getpeercert(), self.host)
         except CertificateError, ce:
-            die("Could not validate SSL certificate for {0}: {1}".format(self.host, ce.message))
+            die("Could not validate SSL certificate for {0}: {1}".format(
+                self.host, ce.message))
 
 
 def default_cert_file_name(config):
@@ -173,33 +185,6 @@ def make_https_connection(config, s):
     return ServerHTTPSConnection(config, s, cert_file)
 
 
-def data_connect(config, Domain):
-    # Choose server address
-    if config.force_domain:
-        s = config.force_domain
-    elif config.force_data_host:
-        s = config.force_data_host
-    else:
-        s = Domain.DATA
-
-    # Special case for local debugging
-    if config.debug_local:
-        s = Domain.API_LOCAL
-
-    # Connect to server with SSL in untrusted network
-    log.debug('Connecting to %s', s)
-
-    # Determine if to use SSL for connection
-    # Never use SSL for debugging, always use SSL with main server
-    use_ssl = not config.suppress_ssl and not config.debug_local
-
-    # Pass the connection
-    if use_ssl:
-        return make_https_connection(config, s)
-    else:
-        return httplib.HTTPConnection(s)
-
-
 def domain_connect(config, domain, Domain):
     """
     Connects to the domain specified.
@@ -221,9 +206,6 @@ def domain_connect(config, domain, Domain):
         else:
             s = Domain.MAIN_LOCAL
 
-    # Connect to server with SSL in untrusted network
-    log.debug('Connecting to %s', s)
-
     # Determine if to use SSL for connection
     # Never use SSL for debugging, always use SSL with main server
     use_ssl = True
@@ -231,6 +213,16 @@ def domain_connect(config, domain, Domain):
         use_ssl = False
     elif Domain == Domain.API:
         use_ssl = not config.suppress_ssl
+
+    # Connect to server with SSL in untrusted network
+    if use_ssl:
+        port = 443
+    else:
+        port = 80
+    if config.debug_local:
+        port = 8000
+    s = '%s:%s' % (s, port)
+    log.debug('Connecting to %s', s)
 
     # Pass the connection
     if use_ssl:
@@ -263,13 +255,6 @@ def expr_match(expr, text):
     return False
 
 
-def uuid_match(uuid, text):
-    """
-    Returns True if the uuid given is uuid and it matches to the text.
-    """
-    return is_uuid(uuid) and uuid == text
-
-
 def find_hosts(expr, hosts):
     """
     Finds host name among hosts.
@@ -288,8 +273,9 @@ def log_match(expr, log_item):
 
     We perform the test on UUID, log name, and file name.
     """
-    return uuid_match(expr, log_item['key']) or expr_match(expr, log_item['name']) or expr_match(expr,
-                                                                                                 log_item['filename'])
+    return uuid_match(
+        expr, log_item['key']) or expr_match(expr, log_item['name']) or expr_match(expr,
+                                                                                   log_item['filename'])
 
 
 def find_logs(expr, hosts):
@@ -325,7 +311,8 @@ def rfile(name):
     Returns content of the file, without trailing newline.
     """
     x = open(name).read()
-    if len(x) != 0 and x[-1] == '\n': x = x[0:len(x) - 1]
+    if len(x) != 0 and x[-1] == '\n':
+        x = x[0:len(x) - 1]
     return x
 
 
@@ -349,11 +336,27 @@ def set_proc_title(title):
         pass
 
 
+def uuid_match(uuid, text):
+    """
+    Returns True if the uuid given is uuid and it matches to the text.
+    """
+    return is_uuid(uuid) and uuid == text
+
+
 def is_uuid(x):
     """
     Returns true if the string given appears to be UUID.
     """
     return re.match(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', x)
+
+
+def uuid_parse(text):
+    """Returns uuid given or None in case of syntax error.
+    """
+    try:
+        return uuid.UUID(text).__str__()
+    except ValueError:
+        return None
 
 
 #

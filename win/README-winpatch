@@ -1,5 +1,0 @@
-patch-exe.patch can be applied to le.py to create the windows exe.
-To generate the windows exe run "python setup_exe.py py2exe" with the patched le.py
-
-winservicepatch.patch can be applied to le.py to create the windows service install exe.
-To generate the windows service install exe run "python setup.py py2exe" with the patched le.py
