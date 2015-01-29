@@ -187,6 +187,9 @@ Where parameters are:
   --datahub               send logs to the specified data hub address
                           the format is address:port with port being optional
   --system-stat-token=    set the token for system stats log (beta)
+  --pull-server-side-config=True use the server side config for following files.
+                                 Any other value besides True means that the server
+                                 configuration is ignored (beta)
 """
 
 
@@ -1655,7 +1658,7 @@ class Config(object):
         self.datahub_ip = NOT_SET
         self.datahub_port = NOT_SET
         self.system_stats_token = NOT_SET
-        self.pull_server_side_config = True
+        self.pull_server_side_config = NOT_SET
         self.configured_logs = []
 
         # Special options
@@ -1774,9 +1777,13 @@ class Config(object):
                 self.hostname = conf.get(MAIN_SECT, HOSTNAME_PARAM)
                 if not self.hostname:
                     self.hostname = NOT_SET
-            new_pull_server_side_config = conf.get(
-                MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM)
-            self.pull_server_side_config = new_pull_server_side_config == 'True'
+            if self.pull_server_side_config == NOT_SET:
+                new_pull_server_side_config = conf.get(MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM)
+                self.pull_server_side_config = new_pull_server_side_config == 'True'
+                if new_pull_server_side_config == None:
+                    self.pull_server_side_config = True
+
+
             new_suppress_ssl = conf.get(MAIN_SECT, SUPPRESS_SSL_PARAM)
             if new_suppress_ssl == 'True':
                 self.suppress_ssl = new_suppress_ssl == 'True'
@@ -1835,7 +1842,7 @@ class Config(object):
                 conf.set(MAIN_SECT, USE_CA_PROVIDED_PARAM, 'True')
             if self.force_domain:
                 conf.set(MAIN_SECT, FORCE_DOMAIN_PARAM, self.force_domain)
-            if not self.pull_server_side_config:
+            if self.pull_server_side_config != NOT_SET:
                 conf.set(MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM, "%s" %
                          self.pull_server_side_config)
             if self.datahub != NOT_SET:
@@ -2076,6 +2083,8 @@ class Config(object):
                 self.use_ca_provided = True
             elif name == "--system-stat-token":
                 self.set_system_stat_token(value)
+            elif name == "--pull-server-side-config":
+              self.pull_server_side_config = value == "True"
             elif name == "--datahub":
                 self.set_datahub_settings(value)
 

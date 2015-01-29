@@ -22,8 +22,8 @@ Testcase 'Register'
 
 $LE register --name Name --hostname Hostname
 #e Connecting to 127.0.0.1:8000
-#e Domain request: POST / distver=8.0&name=Name&distname=Debian&hostname=Hostname&request=register&system=Linux&user_key=f720fe54-879a-11e4-81ac-277d856f873e {'Content-Type': 'application/x-www-form-urlencoded'}
-#e Domain response: "{"host": {"distver": "8.0", "c": 1315863111149, "hostname": "Hostname", "name": "Name", "distname": "Debian", "object": "host", "key": "41ae887a-284a-4d78-91fe-56485b076148"}, "agent_key": "41ae887a-284a-4d78-91fe-56485b076148", "host_key": "41ae887a-284a-4d78-91fe-56485b076148", "worker": "a0", "response": "ok"}"
+#e Domain request: POST / distver=%DEBIAN_VERSION_ENC%&name=Name&distname=Debian&hostname=Hostname&request=register&system=Linux&user_key=f720fe54-879a-11e4-81ac-277d856f873e {'Content-Type': 'application/x-www-form-urlencoded'}
+#e Domain response: "{"host": {"distver": "%DEBIAN_VERSION%", "c": 1315863111149, "hostname": "Hostname", "name": "Name", "distname": "Debian", "object": "host", "key": "41ae887a-284a-4d78-91fe-56485b076148"}, "agent_key": "41ae887a-284a-4d78-91fe-56485b076148", "host_key": "41ae887a-284a-4d78-91fe-56485b076148", "worker": "a0", "response": "ok"}"
 #e Registered Name (Hostname)
 
 Testcase 'Follow'
