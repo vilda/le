@@ -21,7 +21,7 @@ __all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "EXIT_TERMINATED",
            "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
            "default_cert_file", "system_cert_file", "domain_connect",
            "no_more_args", "find_hosts", "find_logs", "die", "rfile", 'TCP_TIMEOUT',
-           "rm_pidfile", "set_proc_title", "uuid_parse"]
+           "rm_pidfile", "set_proc_title", "uuid_parse", "report"]
 
 # Return codes
 EXIT_OK = 0
@@ -48,6 +48,8 @@ LOG_LE_AGENT = 'logentries.com'
 
 log = logging.getLogger(LOG_LE_AGENT)
 
+def report(what):
+    print >> sys.stderr, what
 
 class ServerHTTPSConnection(httplib.HTTPSConnection):
 
