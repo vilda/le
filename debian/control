@@ -3,7 +3,7 @@ Section: admin
 Priority: extra
 Maintainer: Logentries Team <hello@logentries.com>
 Standards-Version: 3.9.1
-Build-Depends: debhelper (>= 9), dh-python, python-setuptools, python-all-dev (>= 2.3.5-11)
+Build-Depends: debhelper (>= 9), dh-python, python-setuptools, python-all-dev (>= 2.3.5-11), virtualenv
 Homepage: https://logentries.com/
 X-Python-Version: >= 2.4
 
