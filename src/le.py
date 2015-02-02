@@ -11,6 +11,7 @@
 #
 
 from utils import *
+from __init__ import __version__
 
 NOT_SET = None
 
@@ -190,7 +191,6 @@ Where parameters are:
                                  configuration is ignored (beta)
 """
 
-from __init__ import __version__
 
 def print_usage(version_only=False):
     if version_only:
