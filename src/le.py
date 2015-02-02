@@ -1802,13 +1802,12 @@ class Config(object):
             self.configured_logs = []
             for name in conf.sections():
                 if name != MAIN_SECT:
+                    token = ""
                     if not self.datahub:
                         token = uuid_parse(conf.get(name, TOKEN_PARAM))
                         if not token:
                             log.warn("Invalid Log Token detected in configuration file.")
                             continue
-                    else:
-                        token = None
                     path = conf.get(name, PATH_PARAM)
                     self.configured_logs.append(
                         ConfiguredLog(name, token, path))
