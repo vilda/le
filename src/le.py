@@ -2513,13 +2513,9 @@ def start_followers(default_transport):
 
             log.info("Following %s" % log_filename)
 
-            if log_token:
+            if log_token or config.datahub:
                 formatter = formatters.FormatSyslog(
                     config.hostname, log_name, log_token)
-                transport = default_transport.get()
-            elif config.datahub:
-                formatter = formatters.FormatSyslog(
-                    config.hostname, log_name, "")
                 transport = default_transport.get()
             elif log_key:
                 endpoint = Domain.API
