@@ -16,6 +16,15 @@ $LE init --account-key=$ACCOUNT_KEY
 cat $CONFIG
 #o [Main]
 #o user-key = f720fe54-879a-11e4-81ac-277d856f873e
+#o metrics-mem = system
+#o metrics-token = 
+#o metrics-disk = sum
+#o metrics-swap = system
+#o metrics-space = /
+#o metrics-vcpu = 
+#o metrics-net = sum
+#o metrics-interval = 5s
+#o metrics-cpu = system
 #o
 
 Testcase 'Register'
