@@ -1,4 +1,3 @@
-
 Logentries agent
 ================
 
@@ -58,7 +57,7 @@ processes. Example configuration may look like this:
 	metrics-swap = system
 	metrics-net = sum eth0
 	metrics-disk = sum sda4 sda5
-	metrics-disku = /
+	metrics-space = /
 
 	[cassandra]
 	metrics-process = org.apache.cassandra.service.CassandraDaemon
@@ -300,4 +299,3 @@ Fields explained:
    main memory
 -  *vms* virtual memory size - the amount of virtual memory the process has
    allocated, including shared libraries
-
