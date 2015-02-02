@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # coding: utf-8
 # vim: set ts=4 sw=4 et:
 
@@ -11,8 +11,6 @@
 #
 
 from utils import *
-
-VERSION = "1.4.4"
 
 NOT_SET = None
 
@@ -155,7 +153,7 @@ LSB_RELEASE = '/etc/lsb-release'
 
 PULL_USAGE = "pull <path> <when> <filter> <limit>"
 PUSH_USAGE = "push <file> <path> <log-type>"
-USAGE = "Logentries agent version " + VERSION + """
+USAGE = "Logentries agent version " + __version__ + """
 usage: le COMMAND [ARGS]
 
 Where command is one of:
@@ -192,14 +190,11 @@ Where parameters are:
                                  configuration is ignored (beta)
 """
 
-
-def report(what):
-    print >> sys.stderr, what
-
+from __init__ import __version__
 
 def print_usage(version_only=False):
     if version_only:
-        report(VERSION)
+        report(__version__)
     else:
         report(USAGE)
 
@@ -238,6 +233,7 @@ from collections import deque
 from backports import CertificateError, match_hostname
 
 import formatters
+import metrics
 
 #
 # Start logging
@@ -865,7 +861,7 @@ class Stats:
     """Collects statistics about the system work load.
     """
 
-    def __init__(self, default_transport):
+    def __init__(self):
         self.timer = None
         self.to_remove = False
         self.first = True
@@ -1660,6 +1656,7 @@ class Config(object):
         self.system_stats_token = NOT_SET
         self.pull_server_side_config = NOT_SET
         self.configured_logs = []
+        self.metrics = metrics.MetricsConfig()
 
         # Special options
         self.daemon = False
@@ -1687,6 +1684,8 @@ class Config(object):
         self.debug_transport_events = False
         # All filtering actions are logged
         self.debug_filters = False
+        # All metrics actions are logged
+        self.debug_metrics = False
         # Adapter connects to locahost
         self.debug_local = False
         # Do not collect statistics
@@ -1799,6 +1798,8 @@ class Config(object):
                 if system_stats_token_str != '':
                     self.system_stats_token = system_stats_token_str
 
+            self.metrics.load(conf)
+
             self.configured_logs = []
             for name in conf.sections():
                 if name != MAIN_SECT:
@@ -1855,6 +1856,8 @@ class Config(object):
                 conf.set(clog.name, TOKEN_PARAM, clog.token)
                 conf.set(clog.name, PATH_PARAM, clog.path)
 
+            self.metrics.save(conf)
+
             conf.write(conf_file)
         except IOError, e:
             die("Error: IO error when writing to config file: %s" % e)
@@ -1905,7 +1908,7 @@ class Config(object):
         Exits with error message if the agent key is not defined.
         """
         if self.agent_key == NOT_SET:
-            die("Agent key is required. Register the host or specify an agent key with the --host-key parameter.")
+            die("Host key is required. Register the host or specify the host key with the --host-key parameter.")
 
     def have_agent_key(self):
         """Tests if the agent key has been assigned to this instance."""
@@ -1996,7 +1999,7 @@ class Config(object):
         Parses command line parameters and updates config parameters accordingly
         """
         PARAM_LIST = """user-key= account-key= agent-key= host-key= no-timestamps debug-events
-                    debug-transport-events
+                    debug-transport-events debug-metrics
                     debug-filters debug-loglist local debug-stats debug-nostats
                     debug-stats-only debug-cmds debug-system help version yes force uuid list
                     std std-all name= hostname= type= pid-file= debug no-defaults
@@ -2054,6 +2057,8 @@ class Config(object):
                 self.debug_transport_events = True
             elif name == "--debug-filters":
                 self.debug_filters = True
+            elif name == "--debug-metrics":
+                self.debug_metrics = True
             elif name == "--local":
                 self.debug_local = True
             elif name == "--debug-stats":
@@ -2559,6 +2564,7 @@ def cmd_monitor(args):
     no_more_args(args)
     config.load()
     stats = None
+    smetrics = None
 
     # We need account and host ID to get server side configuration
     if config.pull_server_side_config:
@@ -2570,8 +2576,10 @@ def cmd_monitor(args):
 
     # Register resource monitoring
     if config.agent_key != NOT_SET:
-        stats = Stats(default_transport)
-        # FIXME: where to start stats?
+        stats = Stats()
+        formatter = formatters.FormatSyslog(config.hostname, 'le', config.metrics.token)
+        smetrics = metrics.Metrics(config.metrics, default_transport, formatter, config.debug_metrics)
+        smetrics.start()
 
     if config.daemon:
         daemonize()
@@ -2592,6 +2600,8 @@ def cmd_monitor(args):
     # Stop metrics
     if stats:
         stats.cancel()
+    if smetrics:
+        smetrics.cancel()
     # Close followers
     for follower in followers:
         follower.close()
