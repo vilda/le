@@ -1,7 +1,7 @@
 Logentries agent
 ================
 
-A command line utility for a convenient access to logentries logging
+A command line utility for a convenient access to Logentries logging
 infrastructure.
 
 
@@ -107,7 +107,7 @@ Filtering file names
 If you want to explicitly restrict which files can the agent follow, create the
 filters module as described in the previous section and define the
 `filter_filenames` function. The `filter_filenames` function accepts full path to a
-file which is about bo be followed. The function returns True if the file name
+file which is about to be followed. The function returns True if the file name
 is acceptable or False otherwise. The agent will ignore files which does not
 pass this test. The following example defines filter which allows the agent to
 follow log files only:
@@ -210,7 +210,7 @@ Fields explained:
    (lower priority)
 -  *system* time spent processing system level tasks
 -  *usage* total time spent processing
--  *idle* time spent idle, with no outstandign tasks and no incomplete I/O
+-  *idle* time spent idle, with no outstanding tasks and no incomplete I/O
    operations
 -  *iowait* time spent waiting for I/O operation to complete (idle)
 -  *irq* time spent servicing/handling hardware interrupts
@@ -227,7 +227,7 @@ VCPU
 ----
 
 Specify the `metrics-vcpu` parameter to collect metrics for each individual CPU.
-The only viable value is `core` which will normaliza usage to single CPU.
+The only viable value is `core` which will normalize usage to single CPU.
 
 Example:
 
@@ -317,8 +317,8 @@ Fields explained:
 -  *packets_recv* number of packets received since last record
 -  *err_in* number of errors while receiving
 -  *err_out* number of errors while sending
--  *drop_in* number of incomming packets which were dropped
--  *drop_out* number of outgoing packets which were sropped
+-  *drop_in* number of incoming packets which were dropped
+-  *drop_out* number of outgoing packets which were dropped
 
 Disk IO
 -------
@@ -393,7 +393,7 @@ Fields explained:
 -  *reads* the number of read operations since last record
 -  *writes* the number of write operations since last record
 -  *bytes_read* the number of bytes read since last record
--  *bytes_write* the number of bytes writen since last record
+-  *bytes_write* the number of bytes written since last record
 -  *fds* the number of open file descriptors
 -  *mem* % of memory used
 -  *total* total amount of memory
