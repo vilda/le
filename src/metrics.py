@@ -541,7 +541,7 @@ class Metrics(object):
     def start(self):
         if self._ready:
             self._schedule(time.time())
-        self._collect_info()
+            self._collect_info()
 
     def cancel(self):
         if self._ready:
