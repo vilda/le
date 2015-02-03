@@ -1,0 +1,5 @@
+python-virtualenv
+python-pip
+python-dev
+libtls-dev
+curl
