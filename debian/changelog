@@ -1,3 +1,37 @@
+logentries (1.4.5) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * LOG-3008 Minor fixes and cleanup
+  * LOG-3008 Removing reference to old clusters, apps, and salogs
+  * LOG-3008 Removing patch for Windows
+  * LOG-3008 Fixing style, assing uuid matching functions
+  * LOG-3008 Adding plain and syslog formatters
+  * LOG-3008 Adding initial implementation for plan and syslog formatters
+  * LOG-3008 Refactoring to main classes Transport and Follower
+  * LOG-3008 Tests for basic use cases
+  * LOG-3136 Adding metrics
+  * LOG-3136 Adjusting tests for metrics
+  * LOG-3136 adding requirements.apt
+  * LOG-3152 Adding information about filtering
+  * LOG-3152 Fixing typos in README
+
+  [ Ulrich Dangel ]
+  * LOG-3008 run tests while building the debian package
+  * LOG-3008 Add templates for testcases as the distribution version may differ
+  * LOG-3008 parse command line option for not pulling from server
+  * LOG-3136 move version import on top of the file to prevent NameError
+  * LOG-3136 fix example for disk usage/space
+  * LOG-3136 fix debian environment and running autoamted tests
+
+  [ Stephen Hynes ]
+  * Don't check for a valid token if in datahub mode
+  * Refactor token check
+  * Refactor check for datahub and log token
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Tue, 03 Feb 2015 15:18:21 +0000
+
 logentries (1.4.4) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
