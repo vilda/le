@@ -9,7 +9,7 @@ Scenario 'Help'
 Testcase 'List help usage'
 
 $LE
-#e Logentries agent version 1.4.4
+#e Logentries agent version 1.4.5
 #e usage: le COMMAND [ARGS]
 #e 
 #e Where command is one of:
@@ -31,7 +31,7 @@ $LE
 #e 
 #e Where parameters are:
 #e   --help                  show usage help and exit
-#e   --version               display version number and exit
+#e   --version 1.4.5
 #e   --account-key=          set account key and exit
 #e   --host-key=             set local host key and exit, generate key if key is empty
 #e   --no-timestamps         no timestamps in agent reportings
