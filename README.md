@@ -1,7 +1,7 @@
 Logentries agent
 ================
 
-A command line utility for a convenient access to logentries logging
+A command line utility for a convenient access to Logentries logging
 infrastructure.
 
 
@@ -38,6 +38,108 @@ How to use
 			the format is address:port with port being optional
 	--suppress-ssl    do not use SSL with API server
 	--yes	            always respond yes
+
+Configuration
+-------------
+
+The agent stores configuration in `~/.le/config` for ordinary users and in
+`/root/le/config` for root (daemon). It is created with `init` or `reinit`
+commands and can be created or modified manually.
+
+
+Manipulate your data in transit
+-------------------------------
+
+If you want to modify log entries before they are sent to Logentries, the agent
+enabled you to do so via filters. Filers are useful for filtering sensitive
+information, obfuscating, or explicit parsing (adding key-value pairs).
+
+Specify a Python module directory in your configuration by adding a line in the form of:
+
+	filters=/opt/le/le_filters
+
+Create empty `__init__.py` to set up a module. Then add filters.py file which
+contains filters dictionary. The dictionary informs the agent that for the
+given log name, log ID, or token, the specified filtering function should be
+used. For example the following dictionary:
+
+	filters={
+		"example.log": filter_logname,
+		"7e518e54-40e4-4c5a-88df-4559d03126e6": filter_logid,
+	}
+
+Where `filter_logname` and `filter_loguuid` are functions which filters events
+for the respective log. Filtering functions receive a single string containing
+log entries terminated with a new line. Function can modify lines in any way
+and return them back for sending to Logentries servers. Do not forget to keep
+new line termination. The following skeleton displays typical structure of the
+filtering function:
+
+	def filter_example( events):
+		# Split the block into individual log entries
+		parts = events.split( '\n')[:-1]
+		# Collect modified parts
+		new_parts = []
+		for entry in parts:
+			# Do something with entry
+			new_entry = entry # XXX
+			# Append new entry
+			new_parts.append( new_entry)
+		# Return modified output
+		return ''.join( x+'\n' for x in new_parts)
+
+Typical filtering function is much simpler though. For example the following
+filtering function removes all occurrences of credit card numbers:
+
+	import re
+
+	# Credit card number matcher
+	CREDIT_CARD = re.compile( r'\d{4}-\d{4}-\d{4}-\d{4}')
+	# Credit card number replacement
+	CC_REPLACEMENT = 'xxxx-xxxx-xxxx-xxxx'  # '-'.join( ['x'*4]*4) if you prefer
+
+	def filter_credit_card( events):
+		return CREDIT_CARD.sub( CC_REPLACEMENT, events)
+
+Filtering file names
+--------------------
+
+If you want to explicitly restrict which files can the agent follow, create the
+filters module as described in the previous section and define the
+`filter_filenames` function. The `filter_filenames` function accepts full path to a
+file which is about to be followed. The function returns True if the file name
+is acceptable or False otherwise. The agent will ignore files which does not
+pass this test. The following example defines filter which allows the agent to
+follow log files only:
+
+	def filter_filenames( filename):
+		return filename.endswith( '.log')
+
+Alternatively, the following example defines filter which denies to follow any
+file outside /var/log/ directory:
+
+	def filter_filenames( filename):
+		return filename.startswith( '/var/log/')
+
+Note the examples above do not take into account symbolic links.
+
+
+Following logs that change their names
+--------------------------------------
+
+Due to rollover policies logs are often renamed using a sequential number or
+the current timestamp. Luckily the Logentries agent can handle this for you.
+The Logentries agent can be pointed at particular folders to gather any active
+logs from that directory or its subdirectories using wildcards in file names.
+For example, the following patterns can be used with the follow command to
+gather logs from the given directories:
+
+	/var/log/mysystem/mylog-*.log
+
+Using wildcards when specifying the log to follow allows for situations where
+you need to follow the most recent log in a particular folder. The Logentries
+agent looks for any active log in the folder and will monitor the events in
+that log.
 
 
 System metrics
@@ -108,7 +210,7 @@ Fields explained:
    (lower priority)
 -  *system* time spent processing system level tasks
 -  *usage* total time spent processing
--  *idle* time spent idle, with no outstandign tasks and no incomplete I/O
+-  *idle* time spent idle, with no outstanding tasks and no incomplete I/O
    operations
 -  *iowait* time spent waiting for I/O operation to complete (idle)
 -  *irq* time spent servicing/handling hardware interrupts
@@ -125,7 +227,7 @@ VCPU
 ----
 
 Specify the `metrics-vcpu` parameter to collect metrics for each individual CPU.
-The only viable value is `core` which will normaliza usage to single CPU.
+The only viable value is `core` which will normalize usage to single CPU.
 
 Example:
 
@@ -215,8 +317,8 @@ Fields explained:
 -  *packets_recv* number of packets received since last record
 -  *err_in* number of errors while receiving
 -  *err_out* number of errors while sending
--  *drop_in* number of incomming packets which were dropped
--  *drop_out* number of outgoing packets which were sropped
+-  *drop_in* number of incoming packets which were dropped
+-  *drop_out* number of outgoing packets which were dropped
 
 Disk IO
 -------
@@ -291,7 +393,7 @@ Fields explained:
 -  *reads* the number of read operations since last record
 -  *writes* the number of write operations since last record
 -  *bytes_read* the number of bytes read since last record
--  *bytes_write* the number of bytes writen since last record
+-  *bytes_write* the number of bytes written since last record
 -  *fds* the number of open file descriptors
 -  *mem* % of memory used
 -  *total* total amount of memory
