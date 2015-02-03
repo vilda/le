@@ -2573,6 +2573,9 @@ def cmd_monitor(args):
         config.user_key_required(not config.daemon)
         config.agent_key_required()
 
+    if config.daemon:
+        daemonize()
+
     # Start default transport channel
     default_transport = DefaultTransport(config)
 
@@ -2583,8 +2586,6 @@ def cmd_monitor(args):
         smetrics = metrics.Metrics(config.metrics, default_transport, formatter, config.debug_metrics)
         smetrics.start()
 
-    if config.daemon:
-        daemonize()
     followers = []
     transports = []
     try:
