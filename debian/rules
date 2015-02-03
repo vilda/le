@@ -8,4 +8,4 @@ override_dh_auto_install:
 	dh $@ --with python2
 
 override_dh_auto_test:
-	cd test ; [ ! -d env ] && virtualenv env && pip install -r requirements.pip ; ./tests.sh
+	cd test ; [ ! -d env ] && virtualenv env && env/bin/pip install -r requirements.pip ; ./tests.sh

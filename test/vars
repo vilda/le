@@ -8,6 +8,7 @@ set -e
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
+unshare -n
 CONFIG=sandbox_config
 LE="$DIR/../src/le.py --local --debug --config $CONFIG"
 
@@ -41,13 +42,13 @@ function finish {
 	set +e
 
 	if [ -n "$LE_PID" ]; then
-		kill $LE_PID
+		kill $LE_PID 2>/dev/null || true
 	fi
 	if [ -n "$API_MOCK_PID" ]; then
-		kill $API_MOCK_PID
+		kill $API_MOCK_PID 2>/dev/null || true
 	fi
 	if [ -n "$DATA_MOCK_PID" ]; then
-		kill $DATA_MOCK_PID
+		kill $DATA_MOCK_PID 2>/dev/null || true
 	fi
 	if [ -z "$AUTO_TEST" ] ; then
 		rm -rf -- "$TMP"
