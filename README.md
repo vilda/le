@@ -444,3 +444,19 @@ Fields explained:
    main memory
 -  *vms* virtual memory size - the amount of virtual memory the process has
    allocated, including shared libraries
+
+Linux Agent (LE Agent) Installation
+-----------------------------------
+
+There are two ways to install the LE Agent.
+
+1.  NORMAL INTERACTIVE- Simply run `sudo bash logentries_install.sh`
+
+This will download and install the LE Agent on your machine and prompt you for your Logentries account email and Logentries account password.
+
+
+2. AUTOMATED, USING YOUR LOGENTRIES' ACCOUNT KEY - Run the Linux installer using your Logentries Account Key as the first command line arguemnt as in `sudo bash logentries_install.sh <account_key>` for example `sudo bash logentries_install.sh xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+
+This will bypass the prompts for your Email or password and simply download and install the LE Agent adding this Host and its Logs to your Account.  
+
+To attain your Logentries Account Key from the Logentries web UI see: https://logentries.com/doc/accountkey/
