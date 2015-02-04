@@ -35,12 +35,12 @@ How to use
 	--no-timestamps   no timestamps in agent reportings
 	--force           force given operation
 	--datahub         send logs to the specified data hub address
-			          the format is address:port with port being optional
+					  the format is address:port with port being optional
 	--suppress-ssl    do not use SSL with API server
 	--yes	          always respond yes
-	--pull-server-side-config=
-	                  Set whether to pull configuration data from
-					  from the API server.
+	--pull-server-side-config=True use the server side config for following files.
+								 Any other value besides True means that the server
+								 configuration is ignored (beta)
 
 
 Configuration
@@ -64,7 +64,7 @@ To read from the configuration file run:
 
 The Agent will stop communicating with the API Servers and now read from the configuration file to determine what logs to follow.
 
-To specify what log file to follow you must edit /etc/le/config and append the following to the end of the file.
+To specify what log file to follow you must edit your configuration file and append the following to the end of the file.
 
 	[YourLog_OR_AppName]
 	path = /path/to/log/file
@@ -87,7 +87,7 @@ You can run the Agent without registering the host by doing the following.
 
 * Install the Agent via a package manager
 * Once installed run the following command, "sudo le reinit --pull-server-side-config=False"
-* Edit your /etc/le/config file and add in the configuration for following log files
+* Edit your config file and add in the configuration for following log files
 
 
 Manipulate your data in transit
