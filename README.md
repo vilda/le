@@ -24,6 +24,7 @@ How to use
 	followed <filename>  Check if the file is followed
 	clean     Removes configuration file
 	ls        List internal filesystem and settings: <path>
+	ls ips    List IP addresses used by the agent
 	rm        Remove entity: <path>
 	pull      Pull log file: <path> <when> <filter> <limit>
 
@@ -35,59 +36,64 @@ How to use
 	--no-timestamps   no timestamps in agent reportings
 	--force           force given operation
 	--datahub         send logs to the specified data hub address
-					  the format is address:port with port being optional
+	                  the format is address:port with port being optional
 	--suppress-ssl    do not use SSL with API server
 	--yes	          always respond yes
-	--pull-server-side-config=True use the server side config for following files.
-								 Any other value besides True means that the server
-								 configuration is ignored (beta)
+	--pull-server-side-config=False do not use server-side config for following files
 
 
-Configuration
--------------
+Local configuration
+-------------------
 
 The agent stores configuration in `~/.le/config` for ordinary users and in
 `/root/le/config` for root (daemon). It is created with `init` or `reinit`
 commands and can be created or modified manually.
 
 
-Following log files through your Configuration file
+List IP addresses the agent uses
+--------------------------------
+
+Run the `ls ips` command to get a list of IP addresses the agent uses. These IP
+addresses needs to be whitelisted in firewall rules.
+
+
+Follow log files through your configuration file
 ---------------------------------------------------
 
-You can configure the Agent to follow log files which are defined in your configuration file.
-This allows you to specify what logs to follow and what Tokens to use. This can be useful in an
-autoscaling enviroment if you wish to reuse the same configuration file multiple times without creating new hosts.
+Apart from server-side configuration you can configure log files to be followed
+locally. Locally configured logs use token-based inputs and enables to collect
+log entries from multiple sources into one destination log. This can be useful
+in an autoscaling environment. You can reuse the same configuration file
+multiple times without creating new hosts.
 
-To read from the configuration file run:
+Each log to follow has a separate section in the configuration of the form:
 
-	--pull-server-side-config=False
-
-The Agent will stop communicating with the API Servers and now read from the configuration file to determine what logs to follow.
-
-To specify what log file to follow you must edit your configuration file and append the following to the end of the file.
-
-	[YourLog_OR_AppName]
+	[name]
 	path = /path/to/log/file
 	token = MY_TOKEN
 
 Where:
 
-	* [YourLog_OR_AppName] = is an identifier that is added to your log events
-	* path = is the relative path of the file you wish to follow
-	* token = is the log token that we received from Logentries.
+-  *name* is an identifier of the application that is added to your log entries
+-  *path* is an absolute path to the file you wish to follow
+-  *token* is the token for destination log created in Logentries
 
 
 Forward log data without registering a Host
--------------------------------------------
+----------------------------------------------
 
-In an auto scaling enviroment you may not want to create a Host each time you install the Agent.
-Using the "--pull-server-side-config" argument we can configure the Agent not to communicate with the Logentries API servers and instead read from it's configuration file.
+In an auto scaling environment you may not want to create a Host each time you
+install the agent.
 
-You can run the Agent without registering the host by doing the following.
+To disable pulling server-side configuration (and thus avoiding communication
+with Logentries API) add this line in the configuration:
 
-* Install the Agent via a package manager
-* Once installed run the following command, "sudo le reinit --pull-server-side-config=False"
-* Edit your config file and add in the configuration for following log files
+	pull-server-side-config=False
+
+Or specify `--pull-server-side-config=False` on the command like for the `init`
+or `reinit` commands:
+
+	sudo le reinit --pull-server-side-config=False
 
 
 Manipulate your data in transit
@@ -228,6 +234,8 @@ Example output may look like this:
 	<14>1 2015-01-28T23:42:03.669212Z myhost le - net - net=eth0 sent_bytes=36230 recv_bytes=1260226 sent_packets=481 recv_packets=848 err_in=0 err_out=0 drop_in=0 drop_out=0
 	<14>1 2015-01-28T23:52:48.741521Z myhost le - cassandra - cpu_user=0.6 cpu_system=0.0 reads=250 writes=0 bytes_read=0 bytes_write=8192 fds=141 mem=4.4 total=16770625536 rss=734867456 vms=3441418240
 
+The agent requires [psutil](https://github.com/giampaolo/psutil) library installed.
+This library is commonly available from OS repositories named `python-psutil`.
 
 CPU
 ---
