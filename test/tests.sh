@@ -1,7 +1,6 @@
 #!/bin/bash
 
 
-unshare -n /bin/bash <<EOF
 set -e
 # Get the list of tests to run from command line or take all tests from the
 # default path
@@ -23,7 +22,6 @@ declare -A TEMPLATES
 [ -f /etc/debian_version ] && TEMPLATES[DEBIAN_VERSION]="$(cat /etc/debian_version)"
 [ -f /etc/debian_version ] && TEMPLATES[DEBIAN_VERSION_ENC]="${TEMPLATES[DEBIAN_VERSION]/\//%2F}"
 
-ifconfig lo 127.0.0.1
 # Run tests one by one
 for A in ${TESTS[*]} ; do
 	echo $A
@@ -54,7 +52,6 @@ for A in ${TESTS[*]} ; do
 
 	rm -rf -- "$TMP"
 done
-EOF
 
 echo 'SUCCESS'
 
