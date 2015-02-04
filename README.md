@@ -24,6 +24,7 @@ infrastructure.
     * [Disk space](#disk-space)
     * [Processes](#processes)
   * [Deployment best practices](#deployment-best-practices)
+  * [Linux Agent Installation](#linux-agent-le-agent-installation)
 
 
 How to use
@@ -539,7 +540,6 @@ Fields explained:
 -  *vms* virtual memory size - the amount of virtual memory the process has
    allocated, including shared libraries
 
-
 Deployment best practices
 -------------------------
 
@@ -561,3 +561,12 @@ pull-server-side-config set to False. Logs are separated per application.
 Applications of the same type (i.e. web, mail, DB) will send data to their own log.
 Hosts are distinguished by their hostname which is appended to each log entry.
 
+Linux Agent (LE Agent) Installation
+-----------------------------------
+
+There are two ways to install the LE Agent.
+
+1. Interactive - Simply run `sudo bash logentries_install.sh`. This will download and install the LE Agent on your machine and prompt you for your Logentries account email and Logentries account password.
+2. Automated, using your Logentries' account key - Run the Linux installer using your Logentries Account Key as the first command line arguemnt as in `sudo bash logentries_install.sh <account_key>` for example `sudo bash logentries_install.sh xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.  This will bypass the prompts for your Email or password and simply download and install the LE Agent adding this Host and its Logs to your Account.
+
+To attain your Logentries Account Key from the Logentries web UI see: https://logentries.com/doc/accountkey/

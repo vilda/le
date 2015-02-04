@@ -82,6 +82,17 @@ declare -a LOGS_TO_FOLLOW=(
 /var/log/wtmp
 /var/log/faillog);
 
+# Test regex pattern against LE_ACCOUNT_KEY arg 1.
+regex_acct_key="[0-9A-Za-z]{8}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{12}$"
+if [ -n "$1" ] ; then
+	if [[ $1 =~ $regex_acct_key ]] ; then
+		printf "proceeding..."
+	else
+		printf "\nWrong format entered for account key.\nCorrect format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx ... Exiting installer\n\n"
+		exit 1
+	fi
+fi
+
 if [ -f /etc/le/config ]; then
 	printf "\n***** WARNING *****\n"
 	printf "It looks like you already have the Logentries agent registered on this machine\n"
