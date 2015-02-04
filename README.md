@@ -35,9 +35,13 @@ How to use
 	--no-timestamps   no timestamps in agent reportings
 	--force           force given operation
 	--datahub         send logs to the specified data hub address
-			the format is address:port with port being optional
+					  the format is address:port with port being optional
 	--suppress-ssl    do not use SSL with API server
-	--yes	            always respond yes
+	--yes	          always respond yes
+	--pull-server-side-config=True use the server side config for following files.
+								 Any other value besides True means that the server
+								 configuration is ignored (beta)
+
 
 Configuration
 -------------
@@ -45,6 +49,45 @@ Configuration
 The agent stores configuration in `~/.le/config` for ordinary users and in
 `/root/le/config` for root (daemon). It is created with `init` or `reinit`
 commands and can be created or modified manually.
+
+
+Following log files through your Configuration file
+---------------------------------------------------
+
+You can configure the Agent to follow log files which are defined in your configuration file.
+This allows you to specify what logs to follow and what Tokens to use. This can be useful in an
+autoscaling enviroment if you wish to reuse the same configuration file multiple times without creating new hosts.
+
+To read from the configuration file run:
+
+	--pull-server-side-config=False
+
+The Agent will stop communicating with the API Servers and now read from the configuration file to determine what logs to follow.
+
+To specify what log file to follow you must edit your configuration file and append the following to the end of the file.
+
+	[YourLog_OR_AppName]
+	path = /path/to/log/file
+	token = MY_TOKEN
+
+Where:
+
+	* [YourLog_OR_AppName] = is an identifier that is added to your log events
+	* path = is the relative path of the file you wish to follow
+	* token = is the log token that we received from Logentries.
+
+
+Forward log data without registering a Host
+-------------------------------------------
+
+In an auto scaling enviroment you may not want to create a Host each time you install the Agent.
+Using the "--pull-server-side-config" argument we can configure the Agent not to communicate with the Logentries API servers and instead read from it's configuration file.
+
+You can run the Agent without registering the host by doing the following.
+
+* Install the Agent via a package manager
+* Once installed run the following command, "sudo le reinit --pull-server-side-config=False"
+* Edit your config file and add in the configuration for following log files
 
 
 Manipulate your data in transit
