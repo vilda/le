@@ -18,7 +18,7 @@ fi
 TMP_DIR=$(mktemp -d -t logentries.XXXXX)
 trap "rm -rf "$TMP_DIR"" EXIT
 
-FILES="le.py backports.py utils.py"
+FILES="le.py backports.py utils.py __init__.py metrics.py formatters.py"
 LE_PARENT="https://raw.githubusercontent.com/logentries/le/master/src/"
 CURL="/usr/bin/env curl -O"
 
