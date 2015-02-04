@@ -54,7 +54,23 @@ List IP addresses the agent uses
 --------------------------------
 
 Run the `ls ips` command to get a list of IP addresses the agent uses. These IP
-addresses needs to be whitelisted in firewall rules.
+addresses needs to be whitelisted in firewall.
+
+
+Follow log files through server-side configuration
+--------------------------------------------------
+
+After registering the host you can add a file to follow via `follow` command:
+
+	sudo le follow /srv/log/cassandra/system.out [--name Cassandra]
+
+You can repeat the command for additional logs. Note `--name` is optional to
+specify log name as it will appear in UI and log listing. If not specified
+file name is used.
+
+You need to restart the agent to pick up the new configuration:
+
+	sudo service logentries restart
 
 
 Follow log files through your configuration file
@@ -94,6 +110,24 @@ Or specify `--pull-server-side-config=False` on the command like for the `init`
 or `reinit` commands:
 
 	sudo le reinit --pull-server-side-config=False
+
+
+Follow logs that change their names
+--------------------------------------
+
+Due to rollover policies logs are often renamed using a sequential number or
+the current timestamp. Luckily the Logentries agent can handle this for you.
+The Logentries agent can be pointed at particular folders to gather any active
+logs from that directory or its subdirectories using wildcards in file names.
+For example, the following patterns can be used with the follow command to
+gather logs from the given directories:
+
+	/var/log/mysystem/mylog-*.log
+
+Using wildcards when specifying the log to follow allows for situations where
+you need to follow the most recent log in a particular folder. The Logentries
+agent looks for any active log in the folder and will monitor the events in
+that log.
 
 
 Manipulate your data in transit
@@ -171,24 +205,6 @@ file outside /var/log/ directory:
 		return filename.startswith( '/var/log/')
 
 Note the examples above do not take into account symbolic links.
-
-
-Following logs that change their names
---------------------------------------
-
-Due to rollover policies logs are often renamed using a sequential number or
-the current timestamp. Luckily the Logentries agent can handle this for you.
-The Logentries agent can be pointed at particular folders to gather any active
-logs from that directory or its subdirectories using wildcards in file names.
-For example, the following patterns can be used with the follow command to
-gather logs from the given directories:
-
-	/var/log/mysystem/mylog-*.log
-
-Using wildcards when specifying the log to follow allows for situations where
-you need to follow the most recent log in a particular folder. The Logentries
-agent looks for any active log in the folder and will monitor the events in
-that log.
 
 
 System metrics
