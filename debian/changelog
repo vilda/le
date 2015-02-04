@@ -1,3 +1,13 @@
+logentries (1.4.6) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
+
+  [ Viliam Holub ]
+  * Team upload.
+  * LOG-3154 Moving daemonize code
+  * LOG-3154 Bumping up version
+
+
+ -- Logentries Team <hello@logentries.com>  Wed, 04 Feb 2015 09:53:07 +0000
+
 logentries (1.4.5) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
