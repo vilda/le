@@ -55,9 +55,6 @@ LE_SERVER_API = '/'
 LE_DEFAULT_SSL_PORT = 20000
 LE_DEFAULT_NON_SSL_PORT = 10000
 
-SYSTEM_STATS_TAG = 'SystemStats'
-SYSTEM_STATS_LOG_FILE = SYSTEM_STATS_TAG + '.log'
-
 
 class Domain(object):
 
@@ -67,7 +64,6 @@ class Domain(object):
     API = 'api.logentries.com'
     DATA = 'data.logentries.com'
     PULL = 'pull.logentries.com'
-    STREAM = 'data.logentries.com'
     # Local debugging
     MAIN_LOCAL = '127.0.0.1'
     API_LOCAL = '127.0.0.1'
@@ -186,9 +182,7 @@ Where parameters are:
   --datahub               send logs to the specified data hub address
                           the format is address:port with port being optional
   --system-stat-token=    set the token for system stats log (beta)
-  --pull-server-side-config=True use the server side config for following files.
-                                 Any other value besides True means that the server
-                                 configuration is ignored (beta)
+  --pull-server-side-config=False do not use server-side config for following files
 """
 
 
@@ -1379,9 +1373,6 @@ class Follower(object):
                 self._set_file_position(self._get_file_position())
             iaa_cnt += 1
 
-        # Send IAA packet if required
-        #if iaa_cnt == IAA_INTERVAL:
-        #    return None
         return line
 
     def _send_line(self, line):
@@ -1779,9 +1770,8 @@ class Config(object):
             if self.pull_server_side_config == NOT_SET:
                 new_pull_server_side_config = conf.get(MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM)
                 self.pull_server_side_config = new_pull_server_side_config == 'True'
-                if new_pull_server_side_config == None:
+                if new_pull_server_side_config is None:
                     self.pull_server_side_config = True
-
 
             new_suppress_ssl = conf.get(MAIN_SECT, SUPPRESS_SSL_PARAM)
             if new_suppress_ssl == 'True':
@@ -2091,7 +2081,7 @@ class Config(object):
             elif name == "--system-stat-token":
                 self.set_system_stat_token(value)
             elif name == "--pull-server-side-config":
-              self.pull_server_side_config = value == "True"
+                self.pull_server_side_config = value == "True"
             elif name == "--datahub":
                 self.set_datahub_settings(value)
 
@@ -2108,13 +2098,6 @@ class Config(object):
         if self.debug_local and self.force_domain:
             die("Do not specify --local and --force-domain at the same time.")
         return args
-
-    def get_port(self):
-        PORT = {False: LE_DEFAULT_SSL_PORT, True: LE_DEFAULT_NON_SSL_PORT}
-        port = PORT[config.suppress_ssl]
-        if self.datahub:
-            return config.datahub_port
-        return port
 
 config = Config()
 
@@ -2512,7 +2495,9 @@ def start_followers(default_transport):
             if not check_file_name(log_filename):
                 continue
 
-            entry_filter = get_filters(available_filters, filter_filenames, log_name, log_key, log_filename, log_token)
+            entry_filter = get_filters(available_filters, filter_filenames,
+                                       log_name, log_key, log_filename,
+                                       log_token)
             if not entry_filter:
                 continue
 
@@ -2535,8 +2520,8 @@ def start_followers(default_transport):
                 preamble = 'PUT /%s/hosts/%s/%s/?realtime=1 HTTP/1.0\r\n\r\n' % (
                     config.user_key, config.agent_key, log_key)
                 formatter = formatters.FormatPlain('')
-                transport = Transport(
-                    endpoint, port, use_ssl, preamble, config.debug_transport_events)
+                transport = Transport(endpoint, port, use_ssl, preamble,
+                                      config.debug_transport_events)
                 transports.append(transport)
             else:
                 continue
@@ -2582,8 +2567,10 @@ def cmd_monitor(args):
     # Register resource monitoring
     if config.agent_key != NOT_SET:
         stats = Stats()
-        formatter = formatters.FormatSyslog(config.hostname, 'le', config.metrics.token)
-        smetrics = metrics.Metrics(config.metrics, default_transport, formatter, config.debug_metrics)
+        formatter = formatters.FormatSyslog(config.hostname, 'le',
+                                            config.metrics.token)
+        smetrics = metrics.Metrics(config.metrics, default_transport,
+                                   formatter, config.debug_metrics)
         smetrics.start()
 
     followers = []
@@ -2615,8 +2602,8 @@ def cmd_monitor(args):
 
 
 def cmd_monitor_daemon(args):
-    """
-    Monitors as a daemon host activity and sends events collected to logentries infrastructure.
+    """Monitors as a daemon host activity and sends events collected to
+    logentries infrastructure.
     """
     config.daemon = True
     cmd_monitor(args)
@@ -2781,10 +2768,27 @@ def is_log_fs(addr):
     return False
 
 
+def cmd_ls_ips(ags):
+    """
+    List IPs used by the agent.
+    """
+    l = []
+    for name in [Domain.MAIN, Domain.API, Domain.DATA, Domain.PULL]:
+        for info in socket.getaddrinfo(name, None, 0, 0, socket.IPPROTO_TCP):
+            ip = info[4][0]
+            print >>sys.stderr, '%-16s %s' % (ip, name)
+            l.append(ip)
+    print l
+    print ' '.join(l)
+
+
 def cmd_ls(args):
     """
     General list command
     """
+    if len(args) == 1 and args[0] == 'ips':
+        cmd_ls_ips(args)
+        return
     if len(args) == 0:
         args = ['/']
     config.load()
