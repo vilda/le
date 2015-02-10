@@ -201,7 +201,7 @@ def print_usage(version_only=False):
 try:
     import hashlib
 except ImportError:
-    return
+    pass
 import string
 import re
 import Queue
