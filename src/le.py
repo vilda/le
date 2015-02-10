@@ -198,7 +198,10 @@ def print_usage(version_only=False):
 #
 # Libraries
 #
-import hashlib
+try:
+    import hashlib
+except ImportError:
+    return
 import string
 import re
 import Queue
