@@ -198,7 +198,7 @@ def print_usage(version_only=False):
 #
 # Libraries
 #
-
+import hashlib
 import string
 import re
 import Queue
