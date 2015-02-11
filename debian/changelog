@@ -1,3 +1,25 @@
+logentries (1.4.7) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Stephen Hynes ]
+  * Add documentation for following log files in config file
+  *  Use standard definition of pull service side configuration
+  * Fix ssl verification error on older versions of python
+  * Add try catch for import hashlib
+  * Pass if hashlib can not be loaded
+
+  [ Viliam Holub ]
+  * LOG-3152 Removing unshare from tests
+  * LOG-3152 Adding ls ips commands, fixing PEP8 warnings
+  * LOG-3152 Improving README wording
+  * LOG-3152 Adding file follow instructions
+
+  [ michael-seibert-le ]
+  * Update install.sh
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Wed, 11 Feb 2015 11:43:30 +0000
+
 logentries (1.4.6) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
 
   [ Viliam Holub ]
