@@ -2514,6 +2514,8 @@ def start_followers(default_transport):
                 endpoint = Domain.API
                 port = 443
                 use_ssl = not config.suppress_ssl
+                if not use_ssl:
+                    port = 80
                 if config.force_domain:
                     endpoint = config.force_domain
                 if config.debug_local:
