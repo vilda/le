@@ -46,9 +46,19 @@ Local configuration
 -------------------
 
 The agent stores configuration in `~/.le/config` for ordinary users and in
-`/root/le/config` for root (daemon). It is created with `init` or `reinit`
+`/etc/le/config` for root (daemon). It is created with `init` or `reinit`
 commands and can be created or modified manually.
 
+The structure of the configuration file follows standard similar to what you
+find in `.git/config` or Windows INI files. Main section `[Main]` contains
+`user-key` (account key) which identifies account, and `agent-key` which
+identifies host (host key). For example:
+
+	[Main]
+	user-key = e720a1e8-a7d5-4f8b-8879-854e51c9290d
+	agent-key = 428b888a-29ab-4079-99ec-9cb7aa2ffea7
+
+The `monitor` command requires both `user-key` and `agent-key` defined.
 
 List IP addresses the agent uses
 --------------------------------
