@@ -2341,7 +2341,8 @@ def cmd_register(args):
     config.load()
 
     if config.agent_key != NOT_SET and not config.force:
-        die("Server already registered. Use --force to override current registration.")
+        report("Warning: Server already registered. Use --force to override current registration.")
+        return
     config.user_key_required(True)
     config.hostname_required()
     config.name_required()
