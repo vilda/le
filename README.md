@@ -4,10 +4,6 @@ Logentries agent
 A command line utility for a convenient access to Logentries logging
 infrastructure.
 
-
-Table of Contents
-=================
-
   * [How to use](#how-to-use)
   * [Repositories](#repositories)
   * [Configuration file](#configuration-file)
