@@ -42,41 +42,48 @@ How to use
 	--pull-server-side-config=False do not use server-side config for following files
 
 
-Local configuration
--------------------
+Configuration file
+------------------
 
 The agent stores configuration in `~/.le/config` for ordinary users and in
 `/etc/le/config` for root (daemon). It is created with `init` or `reinit`
 commands and can be created or modified manually.
 
 The structure of the configuration file follows standard similar to what you
-find in `.git/config` or Windows INI files. Main section `[Main]` contains
-`user-key` (account key) which identifies account, and `agent-key` which
-identifies host (host key). For example:
+find in `.git/config` or Windows INI files. For example:
 
 	[Main]
 	user-key = e720a1e8-a7d5-4f8b-8879-854e51c9290d
 	agent-key = 428b888a-29ab-4079-99ec-9cb7aa2ffea7
 
-The `monitor` command requires both `user-key` and `agent-key` defined.
+	[cassandra]
+	metrics-process = org.apache.cassandra.service.CassandraDaemon
+	path = /var/log/cassandra/system.log
+	token = a846bd59-a674-4088-b9fd-e72da1df5946
 
-List IP addresses the agent uses
---------------------------------
+Main section `[Main]` contains agent-wide general configuration. Any other
+section defines per-application settings such as log filenames and metrics.
 
-Run the `ls ips` command to get a list of IP addresses the agent uses. These IP
-addresses needs to be whitelisted in firewall.
+In the main section, `user-key` (account key) which identifies account, and
+`agent-key` which identifies host (host key).
+
+Note the `monitor` command requires both `user-key` and `agent-key` defined.
 
 
 Follow log files through server-side configuration
 --------------------------------------------------
 
-After registering the host you can add a file to follow via `follow` command:
+After registering the host (via `register` command or specifying `agent-key` in
+configuration) you can add a file to follow via `follow` command:
 
 	sudo le follow /srv/log/cassandra/system.out [--name Cassandra]
 
-You can repeat the command for additional logs. Note `--name` is optional to
-specify log name as it will appear in UI and log listing. If not specified
-file name is used.
+You can repeat the command for additional logs. The agent creates a new log
+entry in Logentries under the host specified. It will also enable the file to
+be followed by the agent.
+
+Note `--name` is optional to specify log name as it will appear in UI and log
+listing. If not specified, plain file name is used.
 
 You need to restart the agent to pick up the new configuration:
 
@@ -84,7 +91,7 @@ You need to restart the agent to pick up the new configuration:
 
 
 Follow log files through your configuration file
----------------------------------------------------
+------------------------------------------------
 
 Apart from server-side configuration you can configure log files to be followed
 locally. Locally configured logs use token-based inputs and enables to collect
@@ -105,14 +112,14 @@ Where:
 -  *token* is the token for destination log created in Logentries
 
 
-Forward log data without registering a Host
-----------------------------------------------
+Using local configuration only
+------------------------------
 
 In an auto scaling environment you may not want to create a Host each time you
 install the agent.
 
 To disable pulling server-side configuration (and thus avoiding communication
-with Logentries API) add this line in the configuration:
+with Logentries API) add this line in the `[Main]` section of the configuration:
 
 	pull-server-side-config=False
 
@@ -120,6 +127,13 @@ Or specify `--pull-server-side-config=False` on the command like for the `init`
 or `reinit` commands:
 
 	sudo le reinit --pull-server-side-config=False
+
+
+List IP addresses the agent uses
+--------------------------------
+
+Run the `ls ips` command to get a list of IP addresses the agent uses. These IP
+addresses needs to be whitelisted in firewall.
 
 
 Follow logs that change their names
@@ -144,7 +158,7 @@ Manipulate your data in transit
 -------------------------------
 
 If you want to modify log entries before they are sent to Logentries, the agent
-enabled you to do so via filters. Filers are useful for filtering sensitive
+enabled you to do so via filters. Filters are useful for filtering sensitive
 information, obfuscating, or explicit parsing (adding key-value pairs).
 
 Specify a Python module directory in your configuration by adding a line in the form of:
@@ -220,6 +234,10 @@ Note the examples above do not take into account symbolic links.
 System metrics
 --------------
 
+**Note:** The agent requires [psutil](https://github.com/giampaolo/psutil) library
+installed. This library is commonly available from OS repositories named
+`python-psutil`.
+
 The agent collects system metrics regarding CPU, memory, network, disk, and
 processes. Example configuration may look like this:
 
@@ -260,8 +278,6 @@ Example output may look like this:
 	<14>1 2015-01-28T23:42:03.669212Z myhost le - net - net=eth0 sent_bytes=36230 recv_bytes=1260226 sent_packets=481 recv_packets=848 err_in=0 err_out=0 drop_in=0 drop_out=0
 	<14>1 2015-01-28T23:52:48.741521Z myhost le - cassandra - cpu_user=0.6 cpu_system=0.0 reads=250 writes=0 bytes_read=0 bytes_write=8192 fds=141 mem=4.4 total=16770625536 rss=734867456 vms=3441418240
 
-The agent requires [psutil](https://github.com/giampaolo/psutil) library installed.
-This library is commonly available from OS repositories named `python-psutil`.
 
 CPU
 ---
@@ -478,3 +494,26 @@ Fields explained:
    main memory
 -  *vms* virtual memory size - the amount of virtual memory the process has
    allocated, including shared libraries
+
+
+Deployment best practices
+-------------------------
+
+Logentries agent provides several methods of configuration. The method you
+choose depends on the size and structure of your environment. You are free to
+combine both methods.
+
+**For small systems** such as single web server, mail server, workstation, the
+easiest way is to register the host and logs followed via the agent. The agent
+will create a Host entry in UI and all logs inside this Host. Configuration will
+be stored on Logentries systems and the agent will pull the latest configuration
+during startup.
+
+**For large systems** such as computational clusters, autoscaling setups, the
+meaning of particular host is loosing its meaning as they are becoming
+ephemeral. The best option for these systems is to share the same configuration
+across servers in the cluster, using locally defined logs only with
+pull-server-side-config set to False. Logs are separated per application. All
+applications of the same type (web, mail, DB) logs into the same destination.
+Hosts are distinguished by their hostname which is appended to each log entry.
+
