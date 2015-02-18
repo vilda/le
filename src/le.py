@@ -1796,12 +1796,19 @@ class Config(object):
             self.configured_logs = []
             for name in conf.sections():
                 if name != MAIN_SECT:
-                    token = ""
-                    if not self.datahub:
-                        token = uuid_parse(conf.get(name, TOKEN_PARAM))
-                        if not token:
-                            log.warn("Invalid Log Token detected in configuration file.")
-                            continue
+                    token = ''
+                    try:
+                        xtoken = conf.get(name, TOKEN_PARAM)
+                        if xtoken:
+                            token = uuid_parse(xtoken)
+                            if not token:
+                                log.warn("Invalid log token `%s' in section `%s', section ignored."%(xtoken, name))
+                                continue
+                    except ConfigParser.NoOptionError:
+                        pass
+                    if not token and not self.datahub:
+                        log.warn("No log token found in section `%s', section ignored."%name)
+                        continue
                     path = conf.get(name, PATH_PARAM)
                     self.configured_logs.append(
                         ConfiguredLog(name, token, path))
@@ -1848,6 +1855,7 @@ class Config(object):
                     MAIN_SECT, SYSSTAT_TOKEN_PARAM, self.system_stats_token)
 
             for clog in self.configured_logs:
+                conf.add_section(clog.name)
                 conf.set(clog.name, TOKEN_PARAM, clog.token)
                 conf.set(clog.name, PATH_PARAM, clog.path)
 
