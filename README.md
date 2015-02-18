@@ -5,6 +5,30 @@ A command line utility for a convenient access to Logentries logging
 infrastructure.
 
 
+Table of Contents
+=================
+
+  * [How to use](#how-to-use)
+  * [Repositories](#repositories)
+  * [Configuration file](#configuration-file)
+  * [Follow log files through server-side configuration](#follow-log-files-through-server-side-configuration)
+  * [Follow log files through your configuration file](#follow-log-files-through-your-configuration-file)
+  * [Using local configuration only](#using-local-configuration-only)
+  * [List IP addresses the agent uses](#list-ip-addresses-the-agent-uses)
+  * [Follow logs that change their names](#follow-logs-that-change-their-names)
+  * [Manipulate your data in transit](#manipulate-your-data-in-transit)
+  * [Filtering file names](#filtering-file-names)
+  * [System metrics (beta)](#system-metrics-beta)
+    * [CPU](#cpu)
+    * [VCPU](#vcpu)
+    * [Memory](#memory)
+    * [Swap](#swap)
+    * [Network](#network)
+    * [Disk IO](#disk-io)
+    * [Disk space](#disk-space)
+    * [Processes](#processes)
+  * [Deployment best practices](#deployment-best-practices)
+
 
 How to use
 ----------
