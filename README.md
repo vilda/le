@@ -42,6 +42,37 @@ How to use
 	--pull-server-side-config=False do not use server-side config for following files
 
 
+Repositories
+------------
+
+For Debian/Ubuntu systems include this line in `/etc/apt/sources.list.d/logentries.list`:
+
+	deb http://rep.logentries.com/ XXX main
+
+Replace `XXX` with the name of your system, i.e. one of wheezy, jessie,
+lucid, precise, quantal, saucy, trusty, utopic. You also need to add Logentries
+release key:
+
+	gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+
+Then run `apt-get update` and `apt-get install logentries`. If you want to run
+the agent as daemon, install it via `apt-get install logentries-daemon`.
+
+For rpm-based systems RH, CentOS, Fedora, add this in `/etc/yum.repos.d/logentries.repo`
+
+	[logentries]
+	name=Logentries repo
+	enabled=1
+	metadata_expire=1d
+	baseurl=http://rep.logentries.com/XXX/\$basearch
+	gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
+
+Replace `XXX` with the name of your system, i.e. one of fedora18, fedora19,
+fedora20, fedora21, rh5, rh6, amazonlatest, centos5, centos6. Then run `yum
+update` and `yum install logentries`. If you want to run the agent as daemon,
+install it via `yum install logentries-daemon`.
+
+
 Configuration file
 ------------------
 
