@@ -5,6 +5,7 @@ A command line utility for a convenient access to Logentries logging
 infrastructure.
 
 
+
 How to use
 ----------
 
@@ -262,8 +263,8 @@ file outside /var/log/ directory:
 Note the examples above do not take into account symbolic links.
 
 
-System metrics
---------------
+System metrics (beta)
+---------------------
 
 **Note:** The agent requires [psutil](https://github.com/giampaolo/psutil) library
 installed. This library is commonly available from OS repositories named
@@ -310,8 +311,7 @@ Example output may look like this:
 	<14>1 2015-01-28T23:52:48.741521Z myhost le - cassandra - cpu_user=0.6 cpu_system=0.0 reads=250 writes=0 bytes_read=0 bytes_write=8192 fds=141 mem=4.4 total=16770625536 rss=734867456 vms=3441418240
 
 
-CPU
----
+### CPU
 
 Specify the `metrics-cpu` parameter to collect CPU metrics. Allowed values are
 `system` which will normalize usage of all CPUs to 100%, or `core` which will
@@ -347,8 +347,7 @@ Fields explained:
    value
 -  *vcpus* total number of CPUs
 
-VCPU
-----
+### VCPU
 
 Specify the `metrics-vcpu` parameter to collect metrics for each individual CPU.
 The only viable value is `core` which will normalize usage to single CPU.
@@ -363,8 +362,7 @@ Example log entry:
 
 Fields are similar to CPU section.
 
-Memory
-------
+### Memory
 
 Specify the `metrics-mem` parameter to collect memory metrics. The only viable
 value is `system`.
@@ -390,8 +388,7 @@ Fields explained:
 -  *cached* part of the memory used as disk cache, tmpfs, vms, and
    memory-mapped files
 
-Swap
-----
+### Swap
 
 Specify the `metrics-swap` parameter to collect swap area metrics. The only
 viable value is `system`.
@@ -412,8 +409,7 @@ Fields explained:
 -  *in* input traffic in bytes
 -  *out* output traffic in bytes
 
-Network
--------
+### Network
 
 In the `metrics-net` configuration parameter specify network interfaces for
 which the agent will collect metrics.
@@ -444,8 +440,7 @@ Fields explained:
 -  *drop_in* number of incoming packets which were dropped
 -  *drop_out* number of outgoing packets which were dropped
 
-Disk IO
--------
+### Disk IO
 
 In the `metrics-disk` configuration parameter specify devices for which will the agent
 collect metrics.
@@ -472,8 +467,7 @@ Fields explained:
 -  *time_read* time spent reading from device in milliseconds since last record
 -  *time_write* time spent writing to device in milliseconds since last record
 
-Disk space
-----------
+### Disk space
 
 In the `metrics-space` configuration parameter specify mount points for which
 will the agent collect usage metrics.
@@ -495,8 +489,7 @@ Fields explained:
 
 Note that used + free might not reach 100% in certain cases.
 
-Processes
----------
+### Processes
 
 To follow a particular process, specify a pattern matching process' command
 argument in `metrics-process`. Specify this parameter in a separate section.
