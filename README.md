@@ -549,15 +549,15 @@ combine both methods.
 
 **For small systems** such as single web server, mail server, workstation, the
 easiest way is to register the host and logs followed via the agent. The agent
-will create a Host entry in UI and all logs inside this Host. Configuration will
-be stored on Logentries systems and the agent will pull the latest configuration
-during startup.
+will create a Host entry in the UI and send log entries to this Host for each
+followed file. Configuration will be stored on Logentries systems and the agent
+will pull the latest configuration during startup.
 
 **For large systems** such as computational clusters, autoscaling setups, the
-meaning of particular host is loosing its meaning as they are becoming
+meaning of particular host is losing its meaning as they are becoming
 ephemeral. The best option for these systems is to share the same configuration
 across servers in the cluster, using locally defined logs only with
-pull-server-side-config set to False. Logs are separated per application. All
-applications of the same type (web, mail, DB) logs into the same destination.
+pull-server-side-config set to False. Logs are separated per application.
+Applications of the same type (i.e. web, mail, DB) will send data to their own log.
 Hosts are distinguished by their hostname which is appended to each log entry.
 
