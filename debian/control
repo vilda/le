@@ -9,7 +9,7 @@ X-Python-Version: >= 2.4
 
 Package: logentries
 Architecture: all
-Recommends: python-simplejson, python-setproctitle
+Recommends: python-simplejson, python-setproctitle, python-psutil
 Depends: ${misc:Depends}, python, ca-certificates, python-pkg-resources
 Description: Agent for logentries.com
  Logentries is a log management and analysis service (https://logentries.com/).
