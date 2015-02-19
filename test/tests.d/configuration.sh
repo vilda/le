@@ -46,3 +46,38 @@ cat $CONFIG
 #o metrics-cpu = system
 #o
 
+Scenario 'Re-init with lcoally configured log'
+
+$LE reinit --pull-server-side-config=False --suppress-ssl --datahub="127.0.0.1:10000" --hostname "abarakedabra"
+#e Reinitialized
+
+tee >>$CONFIG <<EOF
+[syslog]
+path=/var/log/syslog
+token=629cc7e9-3344-4cef-b364-7fb6baeb74f2
+EOF
+
+$LE reinit --pull-server-side-config=False --suppress-ssl --datahub="127.0.0.1:10000"
+#e Reinitialized
+
+cat $CONFIG
+#o [Main]
+#o hostname = abarakedabra
+#o suppress_ssl = True
+#o pull-server-side-config = False
+#o datahub = 127.0.0.1:10000
+#o metrics-mem = system
+#o metrics-token = 
+#o metrics-disk = sum
+#o metrics-swap = system
+#o metrics-space = /
+#o metrics-vcpu = 
+#o metrics-net = sum
+#o metrics-interval = 5s
+#o metrics-cpu = system
+#o
+#o [syslog]
+#o token = 629cc7e9-3344-4cef-b364-7fb6baeb74f2
+#o path = /var/log/syslog
+#o
+
