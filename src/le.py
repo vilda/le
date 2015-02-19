@@ -1802,13 +1802,9 @@ class Config(object):
                         if xtoken:
                             token = uuid_parse(xtoken)
                             if not token:
-                                log.warn("Invalid log token `%s' in section `%s', section ignored."%(xtoken, name))
-                                continue
+                                log.warn("Invalid log token `%s' in section `%s'."%(xtoken, name))
                     except ConfigParser.NoOptionError:
                         pass
-                    if not token and not self.datahub:
-                        log.warn("No log token found in section `%s', section ignored."%name)
-                        continue
                     path = conf.get(name, PATH_PARAM)
                     self.configured_logs.append(
                         ConfiguredLog(name, token, path))
@@ -2581,11 +2577,11 @@ def cmd_monitor(args):
     # Register resource monitoring
     if config.agent_key != NOT_SET:
         stats = Stats()
-        formatter = formatters.FormatSyslog(config.hostname, 'le',
-                                            config.metrics.token)
-        smetrics = metrics.Metrics(config.metrics, default_transport,
-                                   formatter, config.debug_metrics)
-        smetrics.start()
+    formatter = formatters.FormatSyslog(config.hostname, 'le',
+                                        config.metrics.token)
+    smetrics = metrics.Metrics(config.metrics, default_transport,
+                                formatter, config.debug_metrics)
+    smetrics.start()
 
     followers = []
     transports = []
