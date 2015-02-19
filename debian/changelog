@@ -1,3 +1,16 @@
+logentries (1.4.8) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Stephen Hynes ]
+  * If ssl is disabled use port 80 to send to api
+
+  [ Viliam Holub ]
+  * Adding example config
+  * Making register command fail with warning only
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Thu, 19 Feb 2015 11:48:29 +0000
+
 logentries (1.4.7) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Stephen Hynes ]
