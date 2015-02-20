@@ -1587,6 +1587,8 @@ class Transport(object):
                 self._send_entry(entry)
             except Queue.Empty:
                 pass
+            except Exception:
+                log.error("Exception in run: {0}".format(traceback.format_exc()))
         self._close_connection()
 
 
