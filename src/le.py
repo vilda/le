@@ -1196,6 +1196,15 @@ class Stats:
         except socket.error, (err_no, err_str):
             pass
 
+    def schedule(self, next_step):
+        if not self.to_remove:
+            self.timer = threading.Timer(next_step, self.send_stats, ())
+            self.timer.daemon = True
+            self.timer.start()
+
+    def start(self):
+        self.schedule(1)
+
     def send_stats(self):
         """
         Collects all statistics and sends them to Logentries.
@@ -1216,10 +1225,7 @@ class Stats:
 
         ethalon += EPOCH
         next_step = (ethalon - time.time()) % EPOCH
-        if not self.to_remove:
-            self.timer = threading.Timer(next_step, self.send_stats, ())
-            self.timer.daemon = True
-            self.timer.start()
+        self.schedule(next_step)
 
     def cancel(self):
         self.to_remove = True
@@ -2525,7 +2531,7 @@ def start_followers(default_transport):
                     endpoint = config.force_domain
                 if config.debug_local:
                     endpoint = Domain.LOCAL
-                    port = 8000
+                    port = 8081
                     use_ssl = False
                 preamble = 'PUT /%s/hosts/%s/%s/?realtime=1 HTTP/1.0\r\n\r\n' % (
                     config.user_key, config.agent_key, log_key)
@@ -2577,6 +2583,7 @@ def cmd_monitor(args):
     # Register resource monitoring
     if config.agent_key != NOT_SET:
         stats = Stats()
+        stats.start()
     formatter = formatters.FormatSyslog(config.hostname, 'le',
                                         config.metrics.token)
     smetrics = metrics.Metrics(config.metrics, default_transport,
