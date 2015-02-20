@@ -1193,7 +1193,7 @@ class Stats:
                 rq, silent=not config.debug, die_on_error=False)
             if config.debug_stats:
                 log.info(response)
-        except socket.error, (err_no, err_str):
+        except socket.error:
             pass
 
     def send_stats(self):
@@ -1553,7 +1553,7 @@ class Transport(object):
                 if self._debug_transport_events:
                     print >> sys.stderr, entry,
                 break
-            except socket.error, (err_no, err_str):
+            except socket.error:
                 self._open_connection()
 
     def send(self, entry):
