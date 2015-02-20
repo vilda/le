@@ -222,7 +222,10 @@ def domain_connect(config, domain, Domain):
     else:
         port = 80
     if config.debug_local:
-        port = 8000
+        if Domain == Domain.API:
+            port = 8000
+        else:
+            port = 8081
     s = '%s:%s' % (s, port)
     log.debug('Connecting to %s', s)
 

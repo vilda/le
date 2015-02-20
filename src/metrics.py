@@ -585,6 +585,7 @@ class MetricsConfig(object):
 
     def __init__(self):
         # Set instance fields initialized to default values
+        self.token = '' # Avoid pylint error
         for item in self.DEFAULTS:
             self.__dict__[item] = self.DEFAULTS[item]
         self.processes = []

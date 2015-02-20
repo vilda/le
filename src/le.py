@@ -479,7 +479,7 @@ def collect_log_names(system_info):
             if name[-3:] != '.gz' and re.match(r'.*\.\d+$', name) is None:
                 logs.append(os.path.join(root, name))
 
-    log.debug("Collected logs: %s" % logs)
+    log.debug("Collected logs: %s", logs)
     try:
         c = httplib.HTTPSConnection(LE_SERVER_API)
         request = {
@@ -487,7 +487,7 @@ def collect_log_names(system_info):
             'distname': system_info['distname'],
             'distver': system_info['distver']
         }
-        log.debug("Requesting %s" % request)
+        log.debug("Requesting %s", request)
         c.request('post', ID_LOGS_API, urllib.urlencode(request), {})
         response = c.getresponse()
         if not response or response.status != 200:
@@ -496,7 +496,7 @@ def collect_log_names(system_info):
         data = json_loads(response.read())
         log_data = data['logs']
 
-        log.debug("Identified logs: %s" % log_data)
+        log.debug("Identified logs: %s", log_data)
     except socket.error, msg:
         die('Error: Cannot contact server, %s' % msg)
     except ValueError, msg:
@@ -889,7 +889,7 @@ class Stats:
             self.procfilesystem = False
             self.uname = platform.uname()
             self.sys = self.uname[0]
-            log.debug('sys: %s' % (self.sys))
+            log.debug('sys: %s', self.sys)
 
         # for scaling in osx_top_stats -- key is a scale factor (gig,
         # meg, etc), value is what to multiply by to get to kilobytes
@@ -1042,8 +1042,8 @@ class Stats:
                     size *= self.scale2kb[scale]
                 else:
                     log.warning("Error: value in %s expressed in "
-                                "dimension I can't translate to kb: %s %s" %
-                                (line, size, scale))
+                                "dimension I can't translate to kb: %s %s",
+                                line, size, scale)
             return size
 
         # the first set of 'top' headers display average values over
@@ -1084,7 +1084,7 @@ class Stats:
                     self.save_data(data, 'csq', 0)
                 else:
                     log.warning("Error: could not parse CPU stats "
-                                "in top output line %s" % (line))
+                                "in top output line %s", line)
 
             elif line.startswith('PhysMem: ') and toppass == 2:
                 """
@@ -1109,7 +1109,7 @@ class Stats:
                     self.save_data(data, 'mc', 0)
                 else:
                     log.warning("Error: could not parse memory stats "
-                                "in top output line %s" % (line))
+                                "in top output line %s", line)
 
             elif line.startswith('Disks: ') and toppass == 2:
                 diskresult = diskre.match(line)
@@ -1129,7 +1129,7 @@ class Stats:
                     self.prev_disk_stats = [reads, writes]
                 else:
                     log.warning("Error: could not parse disk stats "
-                                "in top output line %s" % (line))
+                                "in top output line %s", line)
 
     def netstats_stats(self, data):
         """
@@ -1196,6 +1196,15 @@ class Stats:
         except socket.error:
             pass
 
+    def schedule(self, next_step):
+        if not self.to_remove:
+            self.timer = threading.Timer(next_step, self.send_stats, ())
+            self.timer.daemon = True
+            self.timer.start()
+
+    def start(self):
+        self.schedule(1)
+
     def send_stats(self):
         """
         Collects all statistics and sends them to Logentries.
@@ -1216,10 +1225,7 @@ class Stats:
 
         ethalon += EPOCH
         next_step = (ethalon - time.time()) % EPOCH
-        if not self.to_remove:
-            self.timer = threading.Timer(next_step, self.send_stats, ())
-            self.timer.daemon = True
-            self.timer.start()
+        self.schedule(next_step)
 
     def cancel(self):
         self.to_remove = True
@@ -1285,8 +1291,8 @@ class Follower(object):
                     pass
 
             if error_info:
-                log.info("Cannot open file '%s', re-trying in %ss intervals" %
-                         (self.name, REOPEN_INT))
+                log.info("Cannot open file '%s', re-trying in %ss intervals",
+                         self.name, REOPEN_INT)
                 error_info = False
             time.sleep(REOPEN_TRY_INTERVAL)
 
@@ -1725,8 +1731,8 @@ class Config(object):
             os.remove(self.config_filename)
         except OSError, e:
             if e.errno != 2:
-                log.warning("Error: %s: %s" %
-                            (self.config_filename, e.strerror))
+                log.warning("Error: %s: %s",
+                            self.config_filename, e.strerror)
                 return False
         return True
 
@@ -1804,7 +1810,7 @@ class Config(object):
                         if xtoken:
                             token = uuid_parse(xtoken)
                             if not token:
-                                log.warn("Invalid log token `%s' in section `%s'."%(xtoken, name))
+                                log.warning("Invalid log token `%s' in section `%s'.", xtoken, name)
                     except ConfigParser.NoOptionError:
                         pass
                     path = conf.get(name, PATH_PARAM)
@@ -2112,7 +2118,7 @@ config = Config()
 
 
 def do_request(conn, operation, addr, data=None, headers={}):
-    log.debug('Domain request: %s %s %s %s' % (operation, addr, data, headers))
+    log.debug('Domain request: %s %s %s %s', operation, addr, data, headers)
     if data:
         conn.request(operation, addr, data, headers=headers)
     else:
@@ -2132,10 +2138,10 @@ def get_response(operation, addr, data=None, headers={}, silent=False, die_on_er
         return response, conn
     except socket.sslerror, msg:  # Network error
         if not silent:
-            log.info("SSL error: %s" % msg)
+            log.info("SSL error: %s", msg)
     except socket.error, msg:  # Network error
         if not silent:
-            log.debug("Network error: %s" % msg)
+            log.debug("Network error: %s", msg)
     except httplib.BadStatusLine:
         error = "Internal error, bad status line"
         if die_on_error:
@@ -2171,7 +2177,7 @@ def api_request(request, required=False, check_status=False, silent=False, die_o
 
     xresponse = response.read()
     conn.close()
-    log.debug('Domain response: "%s"' % xresponse)
+    log.debug('Domain response: "%s"', xresponse)
     try:
         d_response = json_loads(xresponse)
     except ValueError:
@@ -2238,7 +2244,7 @@ def request(request, required=False, check_status=False, rtype='GET', retry=Fals
             die('Error: Cannot process LE request, no response')
         if retry:
             if not noticed:
-                log.info('Error: No response from LE, re-trying in %ss intervals' %
+                log.info('Error: No response from LE, re-trying in %ss intervals',
                          SRV_RECON_TIMEOUT)
                 noticed = True
             time.sleep(SRV_RECON_TIMEOUT)
@@ -2247,7 +2253,7 @@ def request(request, required=False, check_status=False, rtype='GET', retry=Fals
 
     response = response.read()
     conn.close()
-    log.debug('List response: %s' % response)
+    log.debug('List response: %s', response)
     try:
         d_response = json_loads(response)
     except ValueError:
@@ -2368,7 +2374,7 @@ def cmd_register(args):
     config.agent_key = response['host_key']
     config.save()
 
-    log.info("Registered %s (%s)" % (config.name, config.hostname))
+    log.info("Registered %s (%s)", config.name, config.hostname)
 
     # Registering logs
     logs = []
@@ -2449,8 +2455,8 @@ def start_followers(default_transport):
                            config.agent_key, False, False, retry=True)
             if resp['response'] != 'ok':
                 if not noticed:
-                    log.error('Error retrieving list of logs: %s, retrying in %ss intervals' % (
-                        resp['reason'], SRV_RECON_TIMEOUT))
+                    log.error('Error retrieving list of logs: %s, retrying in %ss intervals',
+                        resp['reason'], SRV_RECON_TIMEOUT)
                     noticed = True
                 time.sleep(SRV_RECON_TIMEOUT)
                 continue
@@ -2511,7 +2517,7 @@ def start_followers(default_transport):
             if not entry_filter:
                 continue
 
-            log.info("Following %s" % log_filename)
+            log.info("Following %s", log_filename)
 
             if log_token or config.datahub:
                 formatter = formatters.FormatSyslog(
@@ -2527,7 +2533,7 @@ def start_followers(default_transport):
                     endpoint = config.force_domain
                 if config.debug_local:
                     endpoint = Domain.LOCAL
-                    port = 8000
+                    port = 8081
                     use_ssl = False
                 preamble = 'PUT /%s/hosts/%s/%s/?realtime=1 HTTP/1.0\r\n\r\n' % (
                     config.user_key, config.agent_key, log_key)
@@ -2579,6 +2585,7 @@ def cmd_monitor(args):
     # Register resource monitoring
     if config.agent_key != NOT_SET:
         stats = Stats()
+        stats.start()
     formatter = formatters.FormatSyslog(config.hostname, 'le',
                                         config.metrics.token)
     smetrics = metrics.Metrics(config.metrics, default_transport,
@@ -2648,11 +2655,11 @@ def cmd_follow(args):
 
     # Check that we don't follow that file already
     if not config.force and is_followed(filename):
-        log.warning('Already following %s' % filename)
+        log.warning('Already following %s', filename)
         return
 
     if len(glob.glob(filename)) == 0:
-        log.warning('\nWARNING: File %s does not exist' % filename)
+        log.warning('\nWARNING: File %s does not exist', filename)
 
     request_follow(filename, name, type_opt)
 
