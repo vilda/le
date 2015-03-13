@@ -561,6 +561,7 @@ pull-server-side-config set to False. Logs are separated per application.
 Applications of the same type (i.e. web, mail, DB) will send data to their own log.
 Hosts are distinguished by their hostname which is appended to each log entry.
 
+
 Linux Agent (LE Agent) Installation
 -----------------------------------
 
