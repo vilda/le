@@ -114,6 +114,10 @@ find in `.git/config` or Windows INI files. For example:
 	path = /var/log/cassandra/system.log
 	token = a846bd59-a674-4088-b9fd-e72da1df5946
 
+        [nginx access.log]
+        path = /var/log/nginx/access.log
+        logset = webserver
+
 Main section `[Main]` contains agent-wide general configuration. Any other
 section defines per-application settings such as log filenames and metrics.
 
@@ -157,12 +161,17 @@ Each log to follow has a separate section in the configuration of the form:
 	[name]
 	path = /path/to/log/file
 	token = MY_TOKEN
+        logset = LOG_SET_NAME
 
 Where:
 
 -  *name* is an identifier of the application that is added to your log entries
 -  *path* is an absolute path to the file you wish to follow
 -  *token* is the token for destination log created in Logentries
+-  *logset* is the name of the logset in which the log `name` should  be added
+
+A valid configuration for a log to follow has to have either `token` or `logset`. If both
+are provided the `logset` parameter takes precedence.
 
 
 Using local configuration only
