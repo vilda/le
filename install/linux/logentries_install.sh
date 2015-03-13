@@ -88,9 +88,9 @@ regex_acct_key="[0-9A-Za-z]{8}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9
 if [ -n "$1" ] ; then
 	if [[ $1 =~ $regex_acct_key ]] ; then
 		printf "proceeding..."
-	else 
-    	printf "\nWrong format entered for account key.\nCorrect format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx ... Exiting installer\n\n"
-    	exit	
+	else
+		printf "\nWrong format entered for account key.\nCorrect format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx ... Exiting installer\n\n"
+		exit 1
 	fi
 fi
 

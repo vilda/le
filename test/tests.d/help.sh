@@ -9,7 +9,7 @@ Scenario 'Help'
 Testcase 'List help usage'
 
 $LE
-#e Logentries agent version 1.4.6
+#e Logentries agent version 1.4.9
 #e usage: le COMMAND [ARGS]
 #e 
 #e Where command is one of:
@@ -41,8 +41,6 @@ $LE
 #e   --datahub               send logs to the specified data hub address
 #e                           the format is address:port with port being optional
 #e   --system-stat-token=    set the token for system stats log (beta)
-#e   --pull-server-side-config=True use the server side config for following files.
-#e                                  Any other value besides True means that the server
-#e                                  configuration is ignored (beta)
+#e   --pull-server-side-config=False do not use server-side config for following files
 #e
 

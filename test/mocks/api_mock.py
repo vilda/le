@@ -183,6 +183,6 @@ if __name__ == "__main__":
 		(r"/([a-z0-9-]+)/hosts/([a-zA-Z0-9%-]+)/([a-zA-Z0-9%-]+)/.*", IngestionHandler),
 	])
 	log.startLogging( sys.stdout)
-	reactor.listenTCP( 8000, application)
+	reactor.listenTCP( 8081, application)
 	reactor.run()
 

@@ -1,3 +1,66 @@
+logentries (1.4.9) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Explaining configuration, adding examples
+  * Add instructions how to install agent via repositories
+  * Moving metrics into subsections
+  * Adding TOC in README
+  * Improving README TOC
+  * Fix handling sections in reinit
+  * Enabling metrics even without agent key specified
+  * Fixing wording in README
+  * Fixing local port
+  * Adding start method to old stats
+  * Improving logging messages, avoiding pylint warnings
+  * Changing api port number from 8000 to 8081
+
+  [ Jenkins ]
+  * Release new version 1.4.8
+
+  [ Ulrich Dangel ]
+  * Recommend python-psutil for system stats
+  * Do not require err_str for socket.error
+  * Add exception handler to run method to capture unknown errors and continue sending
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Fri, 20 Feb 2015 21:41:48 +0000
+
+logentries (1.4.8) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Stephen Hynes ]
+  * If ssl is disabled use port 80 to send to api
+
+  [ Viliam Holub ]
+  * Adding example config
+  * Making register command fail with warning only
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Thu, 19 Feb 2015 11:48:29 +0000
+
+logentries (1.4.7) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Stephen Hynes ]
+  * Add documentation for following log files in config file
+  *  Use standard definition of pull service side configuration
+  * Fix ssl verification error on older versions of python
+  * Add try catch for import hashlib
+  * Pass if hashlib can not be loaded
+
+  [ Viliam Holub ]
+  * LOG-3152 Removing unshare from tests
+  * LOG-3152 Adding ls ips commands, fixing PEP8 warnings
+  * LOG-3152 Improving README wording
+  * LOG-3152 Adding file follow instructions
+
+  [ michael-seibert-le ]
+  * Update install.sh
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Wed, 11 Feb 2015 11:43:31 +0000
+
 logentries (1.4.6) wheezy jessie lucid precise quantal saucy trusty; urgency=medium
 
   [ Viliam Holub ]

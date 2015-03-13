@@ -4,6 +4,28 @@ Logentries agent
 A command line utility for a convenient access to Logentries logging
 infrastructure.
 
+  * [How to use](#how-to-use)
+  * [Repositories](#repositories)
+  * [Configuration file](#configuration-file)
+  * [Follow log files through server-side configuration](#follow-log-files-through-server-side-configuration)
+  * [Follow log files through your configuration file](#follow-log-files-through-your-configuration-file)
+  * [Using local configuration only](#using-local-configuration-only)
+  * [List IP addresses the agent uses](#list-ip-addresses-the-agent-uses)
+  * [Follow logs that change their names](#follow-logs-that-change-their-names)
+  * [Manipulate your data in transit](#manipulate-your-data-in-transit)
+  * [Filtering file names](#filtering-file-names)
+  * [System metrics (beta)](#system-metrics-beta)
+    * [CPU](#cpu)
+    * [VCPU](#vcpu)
+    * [Memory](#memory)
+    * [Swap](#swap)
+    * [Network](#network)
+    * [Disk IO](#disk-io)
+    * [Disk space](#disk-space)
+    * [Processes](#processes)
+  * [Deployment best practices](#deployment-best-practices)
+  * [Linux Agent Installation](#linux-agent-le-agent-installation)
+
 
 How to use
 ----------
@@ -24,6 +46,7 @@ How to use
 	followed <filename>  Check if the file is followed
 	clean     Removes configuration file
 	ls        List internal filesystem and settings: <path>
+	ls ips    List IP addresses used by the agent
 	rm        Remove entity: <path>
 	pull      Pull log file: <path> <when> <filter> <limit>
 
@@ -35,66 +58,160 @@ How to use
 	--no-timestamps   no timestamps in agent reportings
 	--force           force given operation
 	--datahub         send logs to the specified data hub address
-					  the format is address:port with port being optional
+	                  the format is address:port with port being optional
 	--suppress-ssl    do not use SSL with API server
 	--yes	          always respond yes
-	--pull-server-side-config=True use the server side config for following files.
-								 Any other value besides True means that the server
-								 configuration is ignored (beta)
+	--pull-server-side-config=False do not use server-side config for following files
 
 
-Configuration
--------------
+Repositories
+------------
+
+For Debian/Ubuntu systems include this line in `/etc/apt/sources.list.d/logentries.list`:
+
+	deb http://rep.logentries.com/ XXX main
+
+Replace `XXX` with the name of your system, i.e. one of wheezy, jessie,
+lucid, precise, quantal, saucy, trusty, utopic. You also need to add Logentries
+release key:
+
+	gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+
+Then run `apt-get update` and `apt-get install logentries`. If you want to run
+the agent as daemon, install it via `apt-get install logentries-daemon`.
+
+For rpm-based systems RH, CentOS, Fedora, add this in `/etc/yum.repos.d/logentries.repo`
+
+	[logentries]
+	name=Logentries repo
+	enabled=1
+	metadata_expire=1d
+	baseurl=http://rep.logentries.com/XXX/\$basearch
+	gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
+
+Replace `XXX` with the name of your system, i.e. one of fedora18, fedora19,
+fedora20, fedora21, rh5, rh6, amazonlatest, centos5, centos6. Then run `yum
+update` and `yum install logentries`. If you want to run the agent as daemon,
+install it via `yum install logentries-daemon`.
+
+
+Configuration file
+------------------
 
 The agent stores configuration in `~/.le/config` for ordinary users and in
-`/root/le/config` for root (daemon). It is created with `init` or `reinit`
+`/etc/le/config` for root (daemon). It is created with `init` or `reinit`
 commands and can be created or modified manually.
 
+The structure of the configuration file follows standard similar to what you
+find in `.git/config` or Windows INI files. For example:
 
-Following log files through your Configuration file
----------------------------------------------------
+	[Main]
+	user-key = e720a1e8-a7d5-4f8b-8879-854e51c9290d
+	agent-key = 428b888a-29ab-4079-99ec-9cb7aa2ffea7
 
-You can configure the Agent to follow log files which are defined in your configuration file.
-This allows you to specify what logs to follow and what Tokens to use. This can be useful in an
-autoscaling enviroment if you wish to reuse the same configuration file multiple times without creating new hosts.
+	[cassandra]
+	metrics-process = org.apache.cassandra.service.CassandraDaemon
+	path = /var/log/cassandra/system.log
+	token = a846bd59-a674-4088-b9fd-e72da1df5946
 
-To read from the configuration file run:
+Main section `[Main]` contains agent-wide general configuration. Any other
+section defines per-application settings such as log filenames and metrics.
 
-	--pull-server-side-config=False
+In the main section, `user-key` (account key) which identifies account, and
+`agent-key` which identifies host (host key).
 
-The Agent will stop communicating with the API Servers and now read from the configuration file to determine what logs to follow.
+Note the `monitor` command requires both `user-key` and `agent-key` defined.
 
-To specify what log file to follow you must edit your configuration file and append the following to the end of the file.
 
-	[YourLog_OR_AppName]
+Follow log files through server-side configuration
+--------------------------------------------------
+
+After registering the host (via `register` command or specifying `agent-key` in
+configuration) you can add a file to follow via `follow` command:
+
+	sudo le follow /srv/log/cassandra/system.out [--name Cassandra]
+
+You can repeat the command for additional logs. The agent creates a new log
+entry in Logentries under the host specified. It will also enable the file to
+be followed by the agent.
+
+Note `--name` is optional to specify log name as it will appear in UI and log
+listing. If not specified, plain file name is used.
+
+You need to restart the agent to pick up the new configuration:
+
+	sudo service logentries restart
+
+
+Follow log files through your configuration file
+------------------------------------------------
+
+Apart from server-side configuration you can configure log files to be followed
+locally. Locally configured logs use token-based inputs and enables to collect
+log entries from multiple sources into one destination log. This can be useful
+in an autoscaling environment. You can reuse the same configuration file
+multiple times without creating new hosts.
+
+Each log to follow has a separate section in the configuration of the form:
+
+	[name]
 	path = /path/to/log/file
 	token = MY_TOKEN
 
 Where:
 
-	* [YourLog_OR_AppName] = is an identifier that is added to your log events
-	* path = is the relative path of the file you wish to follow
-	* token = is the log token that we received from Logentries.
+-  *name* is an identifier of the application that is added to your log entries
+-  *path* is an absolute path to the file you wish to follow
+-  *token* is the token for destination log created in Logentries
 
 
-Forward log data without registering a Host
--------------------------------------------
+Using local configuration only
+------------------------------
 
-In an auto scaling enviroment you may not want to create a Host each time you install the Agent.
-Using the "--pull-server-side-config" argument we can configure the Agent not to communicate with the Logentries API servers and instead read from it's configuration file.
+In an auto scaling environment you may not want to create a Host each time you
+install the agent.
 
-You can run the Agent without registering the host by doing the following.
+To disable pulling server-side configuration (and thus avoiding communication
+with Logentries API) add this line in the `[Main]` section of the configuration:
 
-* Install the Agent via a package manager
-* Once installed run the following command, "sudo le reinit --pull-server-side-config=False"
-* Edit your config file and add in the configuration for following log files
+	pull-server-side-config=False
+
+Or specify `--pull-server-side-config=False` on the command like for the `init`
+or `reinit` commands:
+
+	sudo le reinit --pull-server-side-config=False
+
+
+List IP addresses the agent uses
+--------------------------------
+
+Run the `ls ips` command to get a list of IP addresses the agent uses. These IP
+addresses needs to be whitelisted in firewall.
+
+
+Follow logs that change their names
+--------------------------------------
+
+Due to rollover policies logs are often renamed using a sequential number or
+the current timestamp. Luckily the Logentries agent can handle this for you.
+The Logentries agent can be pointed at particular folders to gather any active
+logs from that directory or its subdirectories using wildcards in file names.
+For example, the following patterns can be used with the follow command to
+gather logs from the given directories:
+
+	/var/log/mysystem/mylog-*.log
+
+Using wildcards when specifying the log to follow allows for situations where
+you need to follow the most recent log in a particular folder. The Logentries
+agent looks for any active log in the folder and will monitor the events in
+that log.
 
 
 Manipulate your data in transit
 -------------------------------
 
 If you want to modify log entries before they are sent to Logentries, the agent
-enabled you to do so via filters. Filers are useful for filtering sensitive
+enabled you to do so via filters. Filters are useful for filtering sensitive
 information, obfuscating, or explicit parsing (adding key-value pairs).
 
 Specify a Python module directory in your configuration by adding a line in the form of:
@@ -167,26 +284,12 @@ file outside /var/log/ directory:
 Note the examples above do not take into account symbolic links.
 
 
-Following logs that change their names
---------------------------------------
+System metrics (beta)
+---------------------
 
-Due to rollover policies logs are often renamed using a sequential number or
-the current timestamp. Luckily the Logentries agent can handle this for you.
-The Logentries agent can be pointed at particular folders to gather any active
-logs from that directory or its subdirectories using wildcards in file names.
-For example, the following patterns can be used with the follow command to
-gather logs from the given directories:
-
-	/var/log/mysystem/mylog-*.log
-
-Using wildcards when specifying the log to follow allows for situations where
-you need to follow the most recent log in a particular folder. The Logentries
-agent looks for any active log in the folder and will monitor the events in
-that log.
-
-
-System metrics
---------------
+**Note:** The agent requires [psutil](https://github.com/giampaolo/psutil) library
+installed. This library is commonly available from OS repositories named
+`python-psutil`.
 
 The agent collects system metrics regarding CPU, memory, network, disk, and
 processes. Example configuration may look like this:
@@ -229,8 +332,7 @@ Example output may look like this:
 	<14>1 2015-01-28T23:52:48.741521Z myhost le - cassandra - cpu_user=0.6 cpu_system=0.0 reads=250 writes=0 bytes_read=0 bytes_write=8192 fds=141 mem=4.4 total=16770625536 rss=734867456 vms=3441418240
 
 
-CPU
----
+### CPU
 
 Specify the `metrics-cpu` parameter to collect CPU metrics. Allowed values are
 `system` which will normalize usage of all CPUs to 100%, or `core` which will
@@ -266,8 +368,7 @@ Fields explained:
    value
 -  *vcpus* total number of CPUs
 
-VCPU
-----
+### VCPU
 
 Specify the `metrics-vcpu` parameter to collect metrics for each individual CPU.
 The only viable value is `core` which will normalize usage to single CPU.
@@ -282,8 +383,7 @@ Example log entry:
 
 Fields are similar to CPU section.
 
-Memory
-------
+### Memory
 
 Specify the `metrics-mem` parameter to collect memory metrics. The only viable
 value is `system`.
@@ -309,8 +409,7 @@ Fields explained:
 -  *cached* part of the memory used as disk cache, tmpfs, vms, and
    memory-mapped files
 
-Swap
-----
+### Swap
 
 Specify the `metrics-swap` parameter to collect swap area metrics. The only
 viable value is `system`.
@@ -331,8 +430,7 @@ Fields explained:
 -  *in* input traffic in bytes
 -  *out* output traffic in bytes
 
-Network
--------
+### Network
 
 In the `metrics-net` configuration parameter specify network interfaces for
 which the agent will collect metrics.
@@ -363,8 +461,7 @@ Fields explained:
 -  *drop_in* number of incoming packets which were dropped
 -  *drop_out* number of outgoing packets which were dropped
 
-Disk IO
--------
+### Disk IO
 
 In the `metrics-disk` configuration parameter specify devices for which will the agent
 collect metrics.
@@ -391,8 +488,7 @@ Fields explained:
 -  *time_read* time spent reading from device in milliseconds since last record
 -  *time_write* time spent writing to device in milliseconds since last record
 
-Disk space
-----------
+### Disk space
 
 In the `metrics-space` configuration parameter specify mount points for which
 will the agent collect usage metrics.
@@ -414,8 +510,7 @@ Fields explained:
 
 Note that used + free might not reach 100% in certain cases.
 
-Processes
----------
+### Processes
 
 To follow a particular process, specify a pattern matching process' command
 argument in `metrics-process`. Specify this parameter in a separate section.
@@ -445,18 +540,34 @@ Fields explained:
 -  *vms* virtual memory size - the amount of virtual memory the process has
    allocated, including shared libraries
 
+Deployment best practices
+-------------------------
+
+Logentries agent provides several methods of configuration. The method you
+choose depends on the size and structure of your environment. You are free to
+combine both methods.
+
+**For small systems** such as single web server, mail server, workstation, the
+easiest way is to register the host and logs followed via the agent. The agent
+will create a Host entry in the UI and send log entries to this Host for each
+followed file. Configuration will be stored on Logentries systems and the agent
+will pull the latest configuration during startup.
+
+**For large systems** such as computational clusters, autoscaling setups, the
+meaning of particular host is losing its meaning as they are becoming
+ephemeral. The best option for these systems is to share the same configuration
+across servers in the cluster, using locally defined logs only with
+pull-server-side-config set to False. Logs are separated per application.
+Applications of the same type (i.e. web, mail, DB) will send data to their own log.
+Hosts are distinguished by their hostname which is appended to each log entry.
+
+
 Linux Agent (LE Agent) Installation
 -----------------------------------
 
 There are two ways to install the LE Agent.
 
-1.  NORMAL INTERACTIVE- Simply run `sudo bash logentries_install.sh`
-
-This will download and install the LE Agent on your machine and prompt you for your Logentries account email and Logentries account password.
-
-
-2. AUTOMATED, USING YOUR LOGENTRIES' ACCOUNT KEY - Run the Linux installer using your Logentries Account Key as the first command line arguemnt as in `sudo bash logentries_install.sh <account_key>` for example `sudo bash logentries_install.sh xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-
-This will bypass the prompts for your Email or password and simply download and install the LE Agent adding this Host and its Logs to your Account.  
+1. Interactive - Simply run `sudo bash logentries_install.sh`. This will download and install the LE Agent on your machine and prompt you for your Logentries account email and Logentries account password.
+2. Automated, using your Logentries' account key - Run the Linux installer using your Logentries Account Key as the first command line arguemnt as in `sudo bash logentries_install.sh <account_key>` for example `sudo bash logentries_install.sh xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.  This will bypass the prompts for your Email or password and simply download and install the LE Agent adding this Host and its Logs to your Account.
 
 To attain your Logentries Account Key from the Logentries web UI see: https://logentries.com/doc/accountkey/

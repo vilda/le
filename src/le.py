@@ -55,9 +55,6 @@ LE_SERVER_API = '/'
 LE_DEFAULT_SSL_PORT = 20000
 LE_DEFAULT_NON_SSL_PORT = 10000
 
-SYSTEM_STATS_TAG = 'SystemStats'
-SYSTEM_STATS_LOG_FILE = SYSTEM_STATS_TAG + '.log'
-
 
 class Domain(object):
 
@@ -67,7 +64,6 @@ class Domain(object):
     API = 'api.logentries.com'
     DATA = 'data.logentries.com'
     PULL = 'pull.logentries.com'
-    STREAM = 'data.logentries.com'
     # Local debugging
     MAIN_LOCAL = '127.0.0.1'
     API_LOCAL = '127.0.0.1'
@@ -186,9 +182,7 @@ Where parameters are:
   --datahub               send logs to the specified data hub address
                           the format is address:port with port being optional
   --system-stat-token=    set the token for system stats log (beta)
-  --pull-server-side-config=True use the server side config for following files.
-                                 Any other value besides True means that the server
-                                 configuration is ignored (beta)
+  --pull-server-side-config=False do not use server-side config for following files
 """
 
 
@@ -204,7 +198,10 @@ def print_usage(version_only=False):
 #
 # Libraries
 #
-
+try:
+    import hashlib
+except ImportError:
+    pass
 import string
 import re
 import Queue
@@ -482,7 +479,7 @@ def collect_log_names(system_info):
             if name[-3:] != '.gz' and re.match(r'.*\.\d+$', name) is None:
                 logs.append(os.path.join(root, name))
 
-    log.debug("Collected logs: %s" % logs)
+    log.debug("Collected logs: %s", logs)
     try:
         c = httplib.HTTPSConnection(LE_SERVER_API)
         request = {
@@ -490,7 +487,7 @@ def collect_log_names(system_info):
             'distname': system_info['distname'],
             'distver': system_info['distver']
         }
-        log.debug("Requesting %s" % request)
+        log.debug("Requesting %s", request)
         c.request('post', ID_LOGS_API, urllib.urlencode(request), {})
         response = c.getresponse()
         if not response or response.status != 200:
@@ -499,7 +496,7 @@ def collect_log_names(system_info):
         data = json_loads(response.read())
         log_data = data['logs']
 
-        log.debug("Identified logs: %s" % log_data)
+        log.debug("Identified logs: %s", log_data)
     except socket.error, msg:
         die('Error: Cannot contact server, %s' % msg)
     except ValueError, msg:
@@ -892,7 +889,7 @@ class Stats:
             self.procfilesystem = False
             self.uname = platform.uname()
             self.sys = self.uname[0]
-            log.debug('sys: %s' % (self.sys))
+            log.debug('sys: %s', self.sys)
 
         # for scaling in osx_top_stats -- key is a scale factor (gig,
         # meg, etc), value is what to multiply by to get to kilobytes
@@ -1045,8 +1042,8 @@ class Stats:
                     size *= self.scale2kb[scale]
                 else:
                     log.warning("Error: value in %s expressed in "
-                                "dimension I can't translate to kb: %s %s" %
-                                (line, size, scale))
+                                "dimension I can't translate to kb: %s %s",
+                                line, size, scale)
             return size
 
         # the first set of 'top' headers display average values over
@@ -1087,7 +1084,7 @@ class Stats:
                     self.save_data(data, 'csq', 0)
                 else:
                     log.warning("Error: could not parse CPU stats "
-                                "in top output line %s" % (line))
+                                "in top output line %s", line)
 
             elif line.startswith('PhysMem: ') and toppass == 2:
                 """
@@ -1112,7 +1109,7 @@ class Stats:
                     self.save_data(data, 'mc', 0)
                 else:
                     log.warning("Error: could not parse memory stats "
-                                "in top output line %s" % (line))
+                                "in top output line %s", line)
 
             elif line.startswith('Disks: ') and toppass == 2:
                 diskresult = diskre.match(line)
@@ -1132,7 +1129,7 @@ class Stats:
                     self.prev_disk_stats = [reads, writes]
                 else:
                     log.warning("Error: could not parse disk stats "
-                                "in top output line %s" % (line))
+                                "in top output line %s", line)
 
     def netstats_stats(self, data):
         """
@@ -1196,8 +1193,17 @@ class Stats:
                 rq, silent=not config.debug, die_on_error=False)
             if config.debug_stats:
                 log.info(response)
-        except socket.error, (err_no, err_str):
+        except socket.error:
             pass
+
+    def schedule(self, next_step):
+        if not self.to_remove:
+            self.timer = threading.Timer(next_step, self.send_stats, ())
+            self.timer.daemon = True
+            self.timer.start()
+
+    def start(self):
+        self.schedule(1)
 
     def send_stats(self):
         """
@@ -1219,10 +1225,7 @@ class Stats:
 
         ethalon += EPOCH
         next_step = (ethalon - time.time()) % EPOCH
-        if not self.to_remove:
-            self.timer = threading.Timer(next_step, self.send_stats, ())
-            self.timer.daemon = True
-            self.timer.start()
+        self.schedule(next_step)
 
     def cancel(self):
         self.to_remove = True
@@ -1288,8 +1291,8 @@ class Follower(object):
                     pass
 
             if error_info:
-                log.info("Cannot open file '%s', re-trying in %ss intervals" %
-                         (self.name, REOPEN_INT))
+                log.info("Cannot open file '%s', re-trying in %ss intervals",
+                         self.name, REOPEN_INT)
                 error_info = False
             time.sleep(REOPEN_TRY_INTERVAL)
 
@@ -1379,9 +1382,6 @@ class Follower(object):
                 self._set_file_position(self._get_file_position())
             iaa_cnt += 1
 
-        # Send IAA packet if required
-        #if iaa_cnt == IAA_INTERVAL:
-        #    return None
         return line
 
     def _send_line(self, line):
@@ -1559,7 +1559,7 @@ class Transport(object):
                 if self._debug_transport_events:
                     print >> sys.stderr, entry,
                 break
-            except socket.error, (err_no, err_str):
+            except socket.error:
                 self._open_connection()
 
     def send(self, entry):
@@ -1593,6 +1593,8 @@ class Transport(object):
                 self._send_entry(entry)
             except Queue.Empty:
                 pass
+            except Exception:
+                log.error("Exception in run: {0}".format(traceback.format_exc()))
         self._close_connection()
 
 
@@ -1729,8 +1731,8 @@ class Config(object):
             os.remove(self.config_filename)
         except OSError, e:
             if e.errno != 2:
-                log.warning("Error: %s: %s" %
-                            (self.config_filename, e.strerror))
+                log.warning("Error: %s: %s",
+                            self.config_filename, e.strerror)
                 return False
         return True
 
@@ -1779,9 +1781,8 @@ class Config(object):
             if self.pull_server_side_config == NOT_SET:
                 new_pull_server_side_config = conf.get(MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM)
                 self.pull_server_side_config = new_pull_server_side_config == 'True'
-                if new_pull_server_side_config == None:
+                if new_pull_server_side_config is None:
                     self.pull_server_side_config = True
-
 
             new_suppress_ssl = conf.get(MAIN_SECT, SUPPRESS_SSL_PARAM)
             if new_suppress_ssl == 'True':
@@ -1803,12 +1804,15 @@ class Config(object):
             self.configured_logs = []
             for name in conf.sections():
                 if name != MAIN_SECT:
-                    token = ""
-                    if not self.datahub:
-                        token = uuid_parse(conf.get(name, TOKEN_PARAM))
-                        if not token:
-                            log.warn("Invalid Log Token detected in configuration file.")
-                            continue
+                    token = ''
+                    try:
+                        xtoken = conf.get(name, TOKEN_PARAM)
+                        if xtoken:
+                            token = uuid_parse(xtoken)
+                            if not token:
+                                log.warning("Invalid log token `%s' in section `%s'.", xtoken, name)
+                    except ConfigParser.NoOptionError:
+                        pass
                     path = conf.get(name, PATH_PARAM)
                     self.configured_logs.append(
                         ConfiguredLog(name, token, path))
@@ -1855,6 +1859,7 @@ class Config(object):
                     MAIN_SECT, SYSSTAT_TOKEN_PARAM, self.system_stats_token)
 
             for clog in self.configured_logs:
+                conf.add_section(clog.name)
                 conf.set(clog.name, TOKEN_PARAM, clog.token)
                 conf.set(clog.name, PATH_PARAM, clog.path)
 
@@ -2091,7 +2096,7 @@ class Config(object):
             elif name == "--system-stat-token":
                 self.set_system_stat_token(value)
             elif name == "--pull-server-side-config":
-              self.pull_server_side_config = value == "True"
+                self.pull_server_side_config = value == "True"
             elif name == "--datahub":
                 self.set_datahub_settings(value)
 
@@ -2109,18 +2114,11 @@ class Config(object):
             die("Do not specify --local and --force-domain at the same time.")
         return args
 
-    def get_port(self):
-        PORT = {False: LE_DEFAULT_SSL_PORT, True: LE_DEFAULT_NON_SSL_PORT}
-        port = PORT[config.suppress_ssl]
-        if self.datahub:
-            return config.datahub_port
-        return port
-
 config = Config()
 
 
 def do_request(conn, operation, addr, data=None, headers={}):
-    log.debug('Domain request: %s %s %s %s' % (operation, addr, data, headers))
+    log.debug('Domain request: %s %s %s %s', operation, addr, data, headers)
     if data:
         conn.request(operation, addr, data, headers=headers)
     else:
@@ -2140,10 +2138,10 @@ def get_response(operation, addr, data=None, headers={}, silent=False, die_on_er
         return response, conn
     except socket.sslerror, msg:  # Network error
         if not silent:
-            log.info("SSL error: %s" % msg)
+            log.info("SSL error: %s", msg)
     except socket.error, msg:  # Network error
         if not silent:
-            log.debug("Network error: %s" % msg)
+            log.debug("Network error: %s", msg)
     except httplib.BadStatusLine:
         error = "Internal error, bad status line"
         if die_on_error:
@@ -2179,7 +2177,7 @@ def api_request(request, required=False, check_status=False, silent=False, die_o
 
     xresponse = response.read()
     conn.close()
-    log.debug('Domain response: "%s"' % xresponse)
+    log.debug('Domain response: "%s"', xresponse)
     try:
         d_response = json_loads(xresponse)
     except ValueError:
@@ -2246,7 +2244,7 @@ def request(request, required=False, check_status=False, rtype='GET', retry=Fals
             die('Error: Cannot process LE request, no response')
         if retry:
             if not noticed:
-                log.info('Error: No response from LE, re-trying in %ss intervals' %
+                log.info('Error: No response from LE, re-trying in %ss intervals',
                          SRV_RECON_TIMEOUT)
                 noticed = True
             time.sleep(SRV_RECON_TIMEOUT)
@@ -2255,7 +2253,7 @@ def request(request, required=False, check_status=False, rtype='GET', retry=Fals
 
     response = response.read()
     conn.close()
-    log.debug('List response: %s' % response)
+    log.debug('List response: %s', response)
     try:
         d_response = json_loads(response)
     except ValueError:
@@ -2355,7 +2353,8 @@ def cmd_register(args):
     config.load()
 
     if config.agent_key != NOT_SET and not config.force:
-        die("Server already registered. Use --force to override current registration.")
+        report("Warning: Server already registered. Use --force to override current registration.")
+        return
     config.user_key_required(True)
     config.hostname_required()
     config.name_required()
@@ -2375,7 +2374,7 @@ def cmd_register(args):
     config.agent_key = response['host_key']
     config.save()
 
-    log.info("Registered %s (%s)" % (config.name, config.hostname))
+    log.info("Registered %s (%s)", config.name, config.hostname)
 
     # Registering logs
     logs = []
@@ -2456,8 +2455,8 @@ def start_followers(default_transport):
                            config.agent_key, False, False, retry=True)
             if resp['response'] != 'ok':
                 if not noticed:
-                    log.error('Error retrieving list of logs: %s, retrying in %ss intervals' % (
-                        resp['reason'], SRV_RECON_TIMEOUT))
+                    log.error('Error retrieving list of logs: %s, retrying in %ss intervals',
+                        resp['reason'], SRV_RECON_TIMEOUT)
                     noticed = True
                 time.sleep(SRV_RECON_TIMEOUT)
                 continue
@@ -2512,11 +2511,13 @@ def start_followers(default_transport):
             if not check_file_name(log_filename):
                 continue
 
-            entry_filter = get_filters(available_filters, filter_filenames, log_name, log_key, log_filename, log_token)
+            entry_filter = get_filters(available_filters, filter_filenames,
+                                       log_name, log_key, log_filename,
+                                       log_token)
             if not entry_filter:
                 continue
 
-            log.info("Following %s" % log_filename)
+            log.info("Following %s", log_filename)
 
             if log_token or config.datahub:
                 formatter = formatters.FormatSyslog(
@@ -2526,17 +2527,19 @@ def start_followers(default_transport):
                 endpoint = Domain.API
                 port = 443
                 use_ssl = not config.suppress_ssl
+                if not use_ssl:
+                    port = 80
                 if config.force_domain:
                     endpoint = config.force_domain
                 if config.debug_local:
                     endpoint = Domain.LOCAL
-                    port = 8000
+                    port = 8081
                     use_ssl = False
                 preamble = 'PUT /%s/hosts/%s/%s/?realtime=1 HTTP/1.0\r\n\r\n' % (
                     config.user_key, config.agent_key, log_key)
                 formatter = formatters.FormatPlain('')
-                transport = Transport(
-                    endpoint, port, use_ssl, preamble, config.debug_transport_events)
+                transport = Transport(endpoint, port, use_ssl, preamble,
+                                      config.debug_transport_events)
                 transports.append(transport)
             else:
                 continue
@@ -2582,9 +2585,12 @@ def cmd_monitor(args):
     # Register resource monitoring
     if config.agent_key != NOT_SET:
         stats = Stats()
-        formatter = formatters.FormatSyslog(config.hostname, 'le', config.metrics.token)
-        smetrics = metrics.Metrics(config.metrics, default_transport, formatter, config.debug_metrics)
-        smetrics.start()
+        stats.start()
+    formatter = formatters.FormatSyslog(config.hostname, 'le',
+                                        config.metrics.token)
+    smetrics = metrics.Metrics(config.metrics, default_transport,
+                                formatter, config.debug_metrics)
+    smetrics.start()
 
     followers = []
     transports = []
@@ -2615,8 +2621,8 @@ def cmd_monitor(args):
 
 
 def cmd_monitor_daemon(args):
-    """
-    Monitors as a daemon host activity and sends events collected to logentries infrastructure.
+    """Monitors as a daemon host activity and sends events collected to
+    logentries infrastructure.
     """
     config.daemon = True
     cmd_monitor(args)
@@ -2649,11 +2655,11 @@ def cmd_follow(args):
 
     # Check that we don't follow that file already
     if not config.force and is_followed(filename):
-        log.warning('Already following %s' % filename)
+        log.warning('Already following %s', filename)
         return
 
     if len(glob.glob(filename)) == 0:
-        log.warning('\nWARNING: File %s does not exist' % filename)
+        log.warning('\nWARNING: File %s does not exist', filename)
 
     request_follow(filename, name, type_opt)
 
@@ -2781,10 +2787,27 @@ def is_log_fs(addr):
     return False
 
 
+def cmd_ls_ips(ags):
+    """
+    List IPs used by the agent.
+    """
+    l = []
+    for name in [Domain.MAIN, Domain.API, Domain.DATA, Domain.PULL]:
+        for info in socket.getaddrinfo(name, None, 0, 0, socket.IPPROTO_TCP):
+            ip = info[4][0]
+            print >>sys.stderr, '%-16s %s' % (ip, name)
+            l.append(ip)
+    print l
+    print ' '.join(l)
+
+
 def cmd_ls(args):
     """
     General list command
     """
+    if len(args) == 1 and args[0] == 'ips':
+        cmd_ls_ips(args)
+        return
     if len(args) == 0:
         args = ['/']
     config.load()
