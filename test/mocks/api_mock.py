@@ -100,6 +100,23 @@ class ApiHandler( cyclone.web.RequestHandler):
 					'log': LOG0,
 					'worker': 'a0',
 				}))
+			elif host_key == HOST1_KEY:
+				self.write( json.dumps( {
+					'response': 'ok',
+					'log_key': LOG1_KEY,
+					'log': LOG1,
+					'worker': 'a0',
+				}))
+		elif request == 'get_user':
+			load_logs = self.get_argument('load_logs')
+			resp = {
+				'response': 'ok',
+				'hosts': [ HOST0, HOST1 ]
+			}
+			if load_logs == 'true':
+				resp['hosts'][0]['logs'] = [ LOG0 ]
+				resp['hosts'][1]['logs'] = [ LOG1 ]
+			self.write( json.dumps( resp))
 		else:
 			raise cyclone.web.HTTPError( 400)
 

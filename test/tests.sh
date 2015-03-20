@@ -33,6 +33,7 @@ for A in ${TESTS[*]} ; do
 	EXPECTED_STDERR=$TMP/expected_stderr
 	REAL_STDOUT=$TMP/real_stdout
 	REAL_STDERR=$TMP/real_stderr
+	TEMPLATES[CWD]=$TMP
 
 	# Extract expected output and real output (by running the test scenario)
 	sed -n -e 's/^#o \?\(.*\)$/\1/p' -e 's/^\(Scenario .*\)$/\n\n\1\n\n/p' -e 's/^\(Testcase .*\)$/\n\1\n/p' -- "$A" | sed "s|\$TMP|$TMP|g" >"$EXPECTED_STDOUT"

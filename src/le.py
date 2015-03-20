@@ -41,6 +41,7 @@ SYSSTAT_TOKEN_PARAM = 'system-stat-token'
 HOSTNAME_PARAM = 'hostname'
 TOKEN_PARAM = 'token'
 PATH_PARAM = 'path'
+SET_PARAM = 'logset'
 PULL_SERVER_SIDE_CONFIG_PARAM = 'pull-server-side-config'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
@@ -1639,6 +1640,15 @@ class ConfiguredLog(object):
         self.name = name
         self.token = token
         self.path = path
+        self.logset = None
+        self.set_key = None
+        self.log_key = None
+
+    def has_shared_log_details(self):
+        """
+        Flag on whether its a valid sharedlog/logset.
+        """
+        return self.logset is not None and self.set_key is not None and self.log_key is not None
 
 
 class Config(object):
@@ -1801,21 +1811,7 @@ class Config(object):
 
             self.metrics.load(conf)
 
-            self.configured_logs = []
-            for name in conf.sections():
-                if name != MAIN_SECT:
-                    token = ''
-                    try:
-                        xtoken = conf.get(name, TOKEN_PARAM)
-                        if xtoken:
-                            token = uuid_parse(xtoken)
-                            if not token:
-                                log.warning("Invalid log token `%s' in section `%s'.", xtoken, name)
-                    except ConfigParser.NoOptionError:
-                        pass
-                    path = conf.get(name, PATH_PARAM)
-                    self.configured_logs.append(
-                        ConfiguredLog(name, token, path))
+            self.load_configured_logs(conf)
 
         except ConfigParser.NoSectionError:
             # TODO: Warning
@@ -1824,6 +1820,56 @@ class Config(object):
             # TODO: Warning
             return False
         return True
+
+    def load_configured_logs(self, conf):
+        global log
+        """
+        Tries to load configured logs from the config file.
+        These are logs that use tokens and logsets.
+        """
+        self.configured_logs = []
+        account_hosts = None
+        for name in conf.sections():
+            if name != MAIN_SECT:
+                token = ''
+                try:
+                    xtoken = conf.get(name, TOKEN_PARAM)
+                    if xtoken:
+                        token = uuid_parse(xtoken)
+                        if not token:
+                            log.warning("Invalid log token `%s' in section `%s'.", xtoken, name)
+                except ConfigParser.NoOptionError:
+                    pass
+                path = conf.get(name, PATH_PARAM)
+                configured_log = ConfiguredLog(name, token, path)
+
+                set_key = None
+                log_key = None
+                # If these arent set we need to talk to API server and save config
+                logset_name = ''
+                try:
+                    logset_name = conf.get(name, SET_PARAM)
+                except ConfigParser.NoOptionError:
+                    pass
+                if not logset_name and not token:
+                    log.error(u"Ignoring log {} as neither find token nor {} is specified".format(name, SET_PARAM))
+                    continue
+
+                if logset_name:
+                    log_obj = None
+                    logset = get_or_create_logset(logset_name)
+                    log_obj = get_or_create_log(logset, name)
+                    log_key = log_obj['key']
+
+                    configured_log.token = log_obj['token']
+                    set_key = logset['key']
+                    log_key = log_obj['key']
+
+                    configured_log.set_key = set_key
+                    configured_log.log_key = log_key
+
+                    configured_log.logset = logset_name
+                self.configured_logs.append(configured_log)
 
     def save(self):
         """
@@ -1862,6 +1908,8 @@ class Config(object):
                 conf.add_section(clog.name)
                 conf.set(clog.name, TOKEN_PARAM, clog.token)
                 conf.set(clog.name, PATH_PARAM, clog.path)
+                if clog.has_shared_log_details():
+                    conf.set(clog.name, SET_PARAM, clog.logset)
 
             self.metrics.save(conf)
 
@@ -2283,37 +2331,132 @@ def _startup_info():
         log.info('')
 
 
+def create_log(host_key, name, filename, type_opt, do_follow=True, source=None):
+    """
+    Creates a log on server with given parameters.
+    """
+    request = {
+        'request': 'new_log',
+        'user_key': config.user_key,
+        'host_key': host_key,
+        'name': name,
+        'filename': filename,
+        'type': type_opt,
+    }
+    request['follow'] = 'true' if do_follow else 'false'
+    if source is not None:
+        request['source'] = source
+    resp = api_request(request, True, True)
+    return resp['log'] if resp['response'] == 'ok' else None
+
+
+def create_host(name, hostname, system, distname, distver):
+    """
+    Creates a new host on server with given parameters.
+    """
+    request = {
+        'request': 'register',
+        'user_key': config.user_key,
+        'name': name,
+        'hostname': hostname,
+        'system': system,
+        'distname': distname,
+        'distver': distver
+    }
+    resp = api_request(request, True, True)
+    return resp['host'] if resp['response'] == 'ok' else None
+
+
 def request_follow(filename, name, type_opt):
     """
     Creates a new log to follow the file given.
     """
     config.agent_key_required()
-    request = {"request": "new_log",
-               "user_key": config.user_key,
-               "host_key": config.agent_key,
-               "name": name,
-               "filename": filename,
-               "type": type_opt,
-               "follow": "true"}
-    followed_log = api_request(request, True, True)
+    followed_log = create_log(config.agent_key, name, filename, type_opt)
     print "Will follow %s as %s" % (filename, name)
     log.info("Don't forget to restart the daemon")
     _startup_info()
     return followed_log
 
 
-def request_hosts(logs=False):
+def get_cache_dir():
+    """
+    Returns a usable directory which can be used to cache data
+
+    """
+    home = os.path.expanduser('~')
+    cache_home = os.environ.get('XDG_CACHE_HOME') or os.path.join(home, '.cache')
+    path = os.path.join(cache_home, "logentries")
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    return path
+
+
+def get_or_create_logset(logset_name, create=False):
+    """
+    Gets or create a new logset and refreshes the cache if necessary
+    """
+
+    account_hosts = request_hosts(logs=True, force_refresh=create)
+    logset = find_api_obj_by_name(account_hosts, logset_name)
+
+    if logset:
+        return logset
+
+    if not create:
+        return get_or_create_logset(logset_name, not create)
+
+    default = 'Set_default'
+    logset = create_host(logset_name, 'Set_%s' % logset_name, default, default, default)
+    request_hosts(logs=True, force_refresh=True)
+    return logset
+
+
+def get_or_create_log(logset, name):
+    """
+    Gets or creates a new log for the given logset
+    """
+    log_obj = find_api_obj_by_name(logset['logs'], name)
+    if not log_obj:
+        log_obj = create_log(logset['key'], name, 'SharedLog_%s' % name, '', do_follow=False, source='token')
+        request_hosts(logs=True, force_refresh=True)
+
+    return log_obj
+
+
+def request_hosts(logs=False, force_refresh=False):
     """
     Returns list of registered hosts.
     """
     load_logs = 'false'
+    cache_name = "hosts.cache"
+
     if logs:
         load_logs = 'true'
+        cache_name = "hosts-logs.cache"
+
+    cache_dir = get_cache_dir()
+    get_user_cache = os.path.join(cache_dir, cache_name)
+
+    if not force_refresh and os.path.exists(get_user_cache):
+        with open(get_user_cache, "r") as cache:
+            try:
+                return json_loads(cache.read())['hosts']
+            except ValueError:
+                log.warn("Could not read cache, ignoring")
+
     response = api_request({
         'request': 'get_user',
         'load_hosts': 'true',
         'load_logs': load_logs,
         'user_key': config.user_key}, True, True)
+
+    with open(get_user_cache, 'w') as cache:
+        try:
+            cache.write(json_dumps(response))
+        except IOError:
+            log.warning("Could not write to {}, consider adjusting XDG_CACHE_HOME".format(get_user_cache))
+
     return response['hosts']
 
 
@@ -2361,17 +2504,9 @@ def cmd_register(args):
 
     si = system_detect(True)
 
-    request = {"request": "register",
-               'user_key': config.user_key,
-               'name': config.name,
-               'hostname': config.hostname,
-               'system': si['system'],
-               'distname': si['distname'],
-               'distver': si['distver']
-               }
-    response = api_request(request, True, True)
+    host = create_host(config.name, config.hostname, si['system'], si['distname'], si['distver'])
 
-    config.agent_key = response['host_key']
+    config.agent_key = host['key']
     config.save()
 
     log.info("Registered %s (%s)", config.name, config.hostname)
