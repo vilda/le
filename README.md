@@ -114,9 +114,9 @@ find in `.git/config` or Windows INI files. For example:
 	path = /var/log/cassandra/system.log
 	token = a846bd59-a674-4088-b9fd-e72da1df5946
 
-        [nginx access.log]
-        path = /var/log/nginx/access.log
-        logset = webserver
+	[nginx access.log]
+	path = /var/log/nginx/access.log
+	logset = webserver
 
 Main section `[Main]` contains agent-wide general configuration. Any other
 section defines per-application settings such as log filenames and metrics.
