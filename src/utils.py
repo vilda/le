@@ -7,7 +7,6 @@ import httplib
 import os
 import re
 import socket
-import ssl
 import sys
 import uuid
 from backports import match_hostname, CertificateError
@@ -34,7 +33,6 @@ LE_CERT_NAME = 'ca-certs.pem'
 
 TCP_TIMEOUT = 10  # TCP timeout for the socket in seconds
 
-wrap_socket = ssl.wrap_socket
 
 authority_certificate_files = [  # Debian 5.x, 6.x, 7.x, Ubuntu 9.10, 10.4, 13.0
                                  "/etc/ssl/certs/ca-certificates.crt",
@@ -48,6 +46,19 @@ LOG_LE_AGENT = 'logentries.com'
 
 log = logging.getLogger(LOG_LE_AGENT)
 
+try:
+    import ssl
+
+    wrap_socket = ssl.wrap_socket
+    FEAT_SSL = True
+    FEAT_SSL_CONTEXT = 'create_default_context' in ssl.__dict__
+except ImportError:
+    FEAT_SSL = False
+    FEAT_SSL_CONTEXT = False
+
+    def wrap_socket(sock, ca_certs=None, cert_reqs=None):
+        return socket.ssl(sock)
+
 def report(what):
     print >> sys.stderr, what
 
@@ -58,30 +69,37 @@ class ServerHTTPSConnection(httplib.HTTPSConnection):
     """
 
     def __init__(self, config, server, cert_file):
-        self.no_ssl = config.suppress_ssl
+        self.no_ssl = config.suppress_ssl or not FEAT_SSL
         if self.no_ssl:
             httplib.HTTPSConnection.__init__(self, server)
         else:
             self.cert_file = cert_file
-            httplib.HTTPSConnection.__init__(self, server, cert_file=cert_file)
+            if FEAT_SSL_CONTEXT:
+                context = ssl.create_default_context(cafile=cert_file)
+                httplib.HTTPSConnection.__init__(self, server, context=context)
+            else:
+                httplib.HTTPSConnection.__init__(self, server, cert_file=cert_file)
 
     def connect(self):
-        if self.no_ssl:
-            return httplib.HTTPSConnection.connect(self)
-        sock = create_connection(self.host, self.port)
-        try:
-            if self._tunnel_host:
-                self.sock = sock
-                self._tunnel()
-        except AttributeError:
-            pass
-        self.sock = wrap_socket(
-            sock, ca_certs=self.cert_file, cert_reqs=ssl.CERT_REQUIRED)
-        try:
-            match_hostname(self.sock.getpeercert(), self.host)
-        except CertificateError, ce:
-            die("Could not validate SSL certificate for {0}: {1}".format(
-                self.host, ce.message))
+        if FEAT_SSL_CONTEXT:
+            httplib.HTTPSConnection.connect(self)
+        else:
+            if self.no_ssl:
+                return httplib.HTTPSConnection.connect(self)
+            sock = create_connection(self.host, self.port)
+            try:
+                if self._tunnel_host:
+                    self.sock = sock
+                    self._tunnel()
+            except AttributeError:
+                pass
+            self.sock = wrap_socket(
+                sock, ca_certs=self.cert_file, cert_reqs=ssl.CERT_REQUIRED)
+            try:
+                match_hostname(self.sock.getpeercert(), self.host)
+            except CertificateError, ce:
+                die("Could not validate SSL certificate for {0}: {1}".format(
+                    self.host, ce.message))
 
 
 def default_cert_file_name(config):
