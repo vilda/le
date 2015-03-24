@@ -1464,6 +1464,7 @@ class Transport(object):
         or None in case of IO or other errors."""
         self._socket = None
         try:
+            address = '-'
             address = self._get_address()
             s = plain_socket
             s.connect((address, self.port))
