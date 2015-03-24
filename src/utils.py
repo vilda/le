@@ -19,8 +19,8 @@ __author__ = 'Logentries'
 __all__ = ["EXIT_OK", "EXIT_NO", "EXIT_HELP", "EXIT_ERR", "EXIT_TERMINATED",
            "ServerHTTPSConnection", "LOG_LE_AGENT", "create_conf_dir",
            "default_cert_file", "system_cert_file", "domain_connect",
-           "no_more_args", "find_hosts", "find_logs", "die", "rfile", 'TCP_TIMEOUT',
-           "rm_pidfile", "set_proc_title", "uuid_parse", "report"]
+           "no_more_args", "find_hosts", "find_logs", "find_api_obj_by_name", "die",
+           "rfile", 'TCP_TIMEOUT', "rm_pidfile", "set_proc_title", "uuid_parse", "report"]
 
 # Return codes
 EXIT_OK = 0
@@ -322,6 +322,19 @@ def find_logs(expr, hosts):
             if log_match(log_expr, xlog):
                 logs.append(xlog)
     return logs
+
+
+def find_api_obj_by_name(obj_list, name):
+    """
+    Finds object in a list by its name parameter. List of objects must conform
+    to that of a log or host entity from api.
+    """
+    result = None
+    for obj in obj_list:
+        if obj['name'] == name:
+            result = obj
+            break
+    return result
 
 
 def die(cause, exit_code=EXIT_ERR):

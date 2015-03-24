@@ -24,6 +24,7 @@ infrastructure.
     * [Disk space](#disk-space)
     * [Processes](#processes)
   * [Deployment best practices](#deployment-best-practices)
+  * [Linux Agent Installation](#linux-agent-le-agent-installation)
 
 
 How to use
@@ -113,6 +114,10 @@ find in `.git/config` or Windows INI files. For example:
 	path = /var/log/cassandra/system.log
 	token = a846bd59-a674-4088-b9fd-e72da1df5946
 
+	[nginx access.log]
+	path = /var/log/nginx/access.log
+	logset = webserver
+
 Main section `[Main]` contains agent-wide general configuration. Any other
 section defines per-application settings such as log filenames and metrics.
 
@@ -156,12 +161,17 @@ Each log to follow has a separate section in the configuration of the form:
 	[name]
 	path = /path/to/log/file
 	token = MY_TOKEN
+        logset = LOG_SET_NAME
 
 Where:
 
 -  *name* is an identifier of the application that is added to your log entries
 -  *path* is an absolute path to the file you wish to follow
 -  *token* is the token for destination log created in Logentries
+-  *logset* is the name of the logset in which the log `name` should  be added
+
+A valid configuration for a log to follow has to have either `token` or `logset`. If both
+are provided the `logset` parameter takes precedence.
 
 
 Using local configuration only
@@ -539,7 +549,6 @@ Fields explained:
 -  *vms* virtual memory size - the amount of virtual memory the process has
    allocated, including shared libraries
 
-
 Deployment best practices
 -------------------------
 
@@ -561,3 +570,13 @@ pull-server-side-config set to False. Logs are separated per application.
 Applications of the same type (i.e. web, mail, DB) will send data to their own log.
 Hosts are distinguished by their hostname which is appended to each log entry.
 
+
+Linux Agent (LE Agent) Installation
+-----------------------------------
+
+There are two ways to install the LE Agent.
+
+1. Interactive - Simply run `sudo bash logentries_install.sh`. This will download and install the LE Agent on your machine and prompt you for your Logentries account email and Logentries account password.
+2. Automated, using your Logentries' account key - Run the Linux installer using your Logentries Account Key as the first command line arguemnt as in `sudo bash logentries_install.sh <account_key>` for example `sudo bash logentries_install.sh xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.  This will bypass the prompts for your Email or password and simply download and install the LE Agent adding this Host and its Logs to your Account.
+
+To attain your Logentries Account Key from the Logentries web UI see: https://logentries.com/doc/accountkey/

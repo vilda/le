@@ -13,7 +13,7 @@
 #
 #############################################
 
-VERSION="1.0.6"
+VERSION="1.0.7"
 
 # Need root to run this script
 if [ "$(id -u)" != "0" ]
@@ -50,6 +50,7 @@ DAEMON_RESTART_CMD="service logentries restart"
 FOUND=0
 AGENT_NOT_FOUND="The agent was not found after installation.\n Please contact support@logentries.com\n"
 SET_ACCOUNT_KEY="--account-key="
+LE_ACCOUNT_KEY=$1
 
 TAG_NAMES=("Kernel - Process Terminated" "Kernel - Process Killed" "Kernel - Process Started" "Kernel - Process Stopped" "User Logged In" "Invalid User Login attempt" "POSSIBLE BREAK-IN ATTEMPT" "Error")
 TAG_PATTERNS=("/terminated with status 100/" "/Killed process/" "/\/proc\/kmsg started/" "/Kernel logging (proc) stopped/" "/Accepted publickey for/" "/Invalid user/" "/POSSIBLE BREAK-IN ATTEMPT/" "/Invalid user admin/")
@@ -82,6 +83,17 @@ declare -a LOGS_TO_FOLLOW=(
 /var/log/wtmp
 /var/log/faillog);
 
+# Test regex pattern against LE_ACCOUNT_KEY arg 1.
+regex_acct_key="[0-9A-Za-z]{8}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{4}-[0-9A-Za-z]{12}$"
+if [ -n "$1" ] ; then
+	if [[ $1 =~ $regex_acct_key ]] ; then
+		printf "proceeding..."
+	else
+		printf "\nWrong format entered for account key.\nCorrect format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx ... Exiting installer\n\n"
+		exit 1
+	fi
+fi
+
 if [ -f /etc/le/config ]; then
 	printf "\n***** WARNING *****\n"
 	printf "It looks like you already have the Logentries agent registered on this machine\n"
@@ -95,7 +107,7 @@ if [ -f /etc/le/config ]; then
 		exit 0
 	fi
 fi
-
+		
 printf "\n"
 
 # Check if curl is installed, if not, mark it for installation
@@ -287,7 +299,7 @@ if [ $FOUND == "1" ]; then
 
 	printf "\n\n"
 
-	printf "***** Step 3 of 3 - Additional Logs *****\n"
+	printf "***** Step 3 of 3 - Adding Logs to follow *****\n"
 
 	FILES_FOUND=0
 
@@ -298,32 +310,22 @@ if [ $FOUND == "1" ]; then
 		fi
 	done
 
-	printf "$FILES_FOUND additional logs found.\n"
-	read -p "Would you like to monitor all of these too? (n) allows you to choose individual logs...(y) or (n): "
+	printf "$FILES_FOUND logs will be followed.\n"
+
 	printf "\n\n"
-	if [[ $REPLY =~ ^[Yy]$ ]];then
-		printf "Monitoring all logs\n"
-		for j in "${LOGS_TO_FOLLOW[@]}"
-		do
-			$FOLLOW_CMD $j >/tmp/LogentriesDebug 2>&1
-			printf "."
-		done
-		printf "\n"
-	else
-		for j in "${LOGS_TO_FOLLOW[@]}"
-		do
-			if [ -f $j ]; then
-				read -p "Would you like to monitor $j ?..(y) or (n): "
-				if [[ $REPLY =~ ^[Yy]$ ]]; then
-					$FOLLOW_CMD $j >/tmp/LogentriesDebug 2>&1
-				fi
-			fi
-		done
-	fi
+
+	printf "Monitoring all logs\n"
+	for j in "${LOGS_TO_FOLLOW[@]}"
+	do
+		$FOLLOW_CMD $j >/tmp/LogentriesDebug 2>&1
+		printf "following: $j\n"
+	done
+	printf "\n"
+
 	$DAEMON_RESTART_CMD >/tmp/logentriesDebug 2>&1
 	printf "\n\n"
 	printf "***** Install Complete! *****\n"
-	printf "Please note that it may take a few moments for the log data to show in your account.\n\n"
+	printf "To view your logs in real time, go to your Logentries account and select Live-Tail.\n\n"
 
 
 else
