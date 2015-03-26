@@ -1645,7 +1645,7 @@ class ConfiguredLog(object):
         self.set_key = None
         self.log_key = None
 
-    def has_shared_log_details(self):
+    def is_logset(self):
         """
         Flag on whether its a valid sharedlog/logset.
         """
@@ -1907,9 +1907,10 @@ class Config(object):
 
             for clog in self.configured_logs:
                 conf.add_section(clog.name)
-                conf.set(clog.name, TOKEN_PARAM, clog.token)
                 conf.set(clog.name, PATH_PARAM, clog.path)
-                if clog.has_shared_log_details():
+                if not clog.is_logset:
+                    conf.set(clog.name, TOKEN_PARAM, clog.token)
+                else:
                     conf.set(clog.name, SET_PARAM, clog.logset)
 
             self.metrics.save(conf)
@@ -2344,11 +2345,18 @@ def create_log(host_key, name, filename, type_opt, do_follow=True, source=None):
         'filename': filename,
         'type': type_opt,
     }
-    request['follow'] = 'true' if do_follow else 'false'
-    if source is not None:
+    request['follow'] = 'true'
+
+    if not do_follow:
+        request['follow'] = 'false'
+
+    if source:
         request['source'] = source
     resp = api_request(request, True, True)
-    return resp['log'] if resp['response'] == 'ok' else None
+
+    if resp['response'] == 'ok':
+        return resp['log']
+    return None
 
 
 def create_host(name, hostname, system, distname, distver):
