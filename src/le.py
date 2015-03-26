@@ -1649,7 +1649,7 @@ class ConfiguredLog(object):
         """
         Flag on whether its a valid sharedlog/logset.
         """
-        return self.logset is not None and self.set_key is not None and self.log_key is not None
+        return self.logset
 
 
 class Config(object):
@@ -1907,10 +1907,9 @@ class Config(object):
 
             for clog in self.configured_logs:
                 conf.add_section(clog.name)
+                conf.set(clog.name, TOKEN_PARAM, clog.token)
                 conf.set(clog.name, PATH_PARAM, clog.path)
-                if not clog.is_logset:
-                    conf.set(clog.name, TOKEN_PARAM, clog.token)
-                else:
+                if clog.logset:
                     conf.set(clog.name, SET_PARAM, clog.logset)
 
             self.metrics.save(conf)
