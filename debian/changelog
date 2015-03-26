@@ -1,3 +1,33 @@
+logentries (1.4.10) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Jenkins ]
+  * Release new version 1.4.9
+
+  [ michael-seibert-le ]
+  * Update install.sh
+
+  [ Michael Seibert ]
+  * Update install.sh
+
+  [ seibertm ]
+  * LE_ACCOUNT_KEY Argv1 assignment fix
+
+  [ Mark Lacomber ]
+  * LOG-3157 support logsets for the agent
+
+  [ Ulrich Dangel ]
+  * Fix indentation
+  * Change code style and adjust documentation
+  * Fix configuration management and tests
+
+  [ Viliam Holub ]
+  * Using Context from recent Python SSL update
+  * Explicitly initializing address
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Thu, 26 Mar 2015 17:59:49 +0000
+
 logentries (1.4.9) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
