@@ -164,6 +164,17 @@ Where:
 -  *path* is an absolute path to the file you wish to follow
 -  *token* is the token for destination log created in Logentries
 
+Alternatively, instead of `token` specify `destination` parameter in the format
+of `host name/log name'. The agent will search for the host and log identified
+by their name and retrieve the token automatically. If the host or log does not
+exist, it is created.
+
+Example:
+
+	[name]
+	path = /path/to/log/file
+	destination = MyHost/MyLog
+
 
 Using local configuration only
 ------------------------------
