@@ -51,7 +51,7 @@ try:
 
     wrap_socket = ssl.wrap_socket
     FEAT_SSL = True
-    FEAT_SSL_CONTEXT = 'create_default_context' in ssl.__dict__
+    FEAT_SSL_CONTEXT = sys.version_info >= (2, 7, 9)
 except ImportError:
     FEAT_SSL = False
     FEAT_SSL_CONTEXT = False
