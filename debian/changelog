@@ -1,3 +1,12 @@
+logentries (1.4.12) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Ulrich Dangel ]
+  * remove inline if-else
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Mon, 13 Apr 2015 19:42:34 +0000
+
 logentries (1.4.11) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
