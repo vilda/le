@@ -13,6 +13,8 @@
 from utils import *
 from __init__ import __version__
 
+CORP = "logentries"
+
 NOT_SET = None
 
 # Default user and agent keys of none are defined in configuration
@@ -23,6 +25,7 @@ DEFAULT_AGENT_KEY = NOT_SET
 CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
 LE_CONFIG = 'config'
+CACHE_NAME = 'cache'
 
 LOCAL_CONFIG_DIR_USER = '.le'
 LOCAL_CONFIG_DIR_SYSTEM = '/etc/le'
@@ -41,7 +44,7 @@ SYSSTAT_TOKEN_PARAM = 'system-stat-token'
 HOSTNAME_PARAM = 'hostname'
 TOKEN_PARAM = 'token'
 PATH_PARAM = 'path'
-SET_PARAM = 'logset'
+DESTINATION_PARAM = 'destination'
 PULL_SERVER_SIDE_CONFIG_PARAM = 'pull-server-side-config'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
@@ -199,10 +202,13 @@ def print_usage(version_only=False):
 #
 # Libraries
 #
+
+# Do not remove - fix for Python #8484
 try:
     import hashlib
 except ImportError:
     pass
+
 import string
 import re
 import Queue
@@ -227,7 +233,6 @@ import httplib
 import getpass
 import atexit
 import logging.handlers
-from collections import deque
 from backports import CertificateError, match_hostname
 
 import formatters
@@ -326,13 +331,13 @@ def call(command):
     """
     Calls the given command in OS environment.
     """
-    x = subprocess.Popen(
+    output = subprocess.Popen(
         command, stdout=subprocess.PIPE, shell=True).stdout.read()
-    if len(x) == 0:
+    if len(output) == 0:
         return ''
-    if x[-1] == '\n':
-        x = x[0:len(x) - 1]
-    return x
+    if output[-1] == '\n':
+        output = output[:-1]
+    return output
 
 
 def uniq(arr):
@@ -512,8 +517,7 @@ def lsb_release(system_info):
     # General LSB system
     if os.path.isfile(LSB_RELEASE):
         try:
-            fields = dict((a.split('=')
-                          for a in rfile(LSB_RELEASE).split('\n') if len(a.split('=')) == 2))
+            fields = dict((a.split('=') for a in rfile(LSB_RELEASE).split('\n') if len(a.split('=')) == 2))
             system_info['distname'] = fields['DISTRIB_ID']
             system_info['distver'] = fields['DISTRIB_RELEASE']
             return True
@@ -606,8 +610,7 @@ def system_detect(details):
         # Check for general LSB system
         if os.path.isfile(LSB_RELEASE):
             try:
-                fields = dict((a.split('=')
-                              for a in rfile(LSB_RELEASE).split('\n') if len(a.split('=')) == 2))
+                fields = dict((a.split('=') for a in rfile(LSB_RELEASE).split('\n') if len(a.split('=')) == 2))
                 system_info['distname'] = fields['DISTRIB_ID']
                 system_info['distver'] = fields['DISTRIB_RELEASE']
             except ValueError:
@@ -628,7 +631,8 @@ YEAR = 365 * DAY
 
 
 def date_patterns():
-    """ Generates date patterns of the form [day<->month year?]. """
+    """ Generates date patterns of the form [day<->month year?].
+    """
     for year in [' %Y', ' %y']:
         for mon in ['%b', '%B', '%m']:
             yield ['%%d %s%s' % (mon, year), DAY, []]
@@ -642,7 +646,9 @@ def date_patterns():
 
 
 def time_patterns(c_cols):
-    """ Generates time patterns of the form [hour:min:sec?] including empty time. """
+    """Generates time patterns of the form [hour:min:sec?] including empty
+    time.
+    """
     if c_cols >= 2:
         yield ['%H:%M:%S', SEC, []]
     if c_cols >= 1:
@@ -652,12 +658,11 @@ def time_patterns(c_cols):
 
 
 def datetime_patterns(c_cols):
-    """
-    Generates combinations of date and time patterns.
+    """Generates combinations of date and time patterns.
     """
     # Generate dates only
-    for d in date_patterns():
-        yield d
+    for date_pattern in date_patterns():
+        yield date_pattern
 
     # Generate combinations
     for t in time_patterns(c_cols):
@@ -668,9 +673,9 @@ def datetime_patterns(c_cols):
 
 
 def timestamp_patterns(sample):
-    """
-    Generates all timestamp patterns we can handle. It is constructed by generating all possible combinations
-    of date, time, day name and zone. The pattern is [day_name? date<->time zone?] plus simple date and time.
+    """Generates all timestamp patterns we can handle. It is constructed by
+    generating all possible combinations of date, time, day name and zone. The
+    pattern is [day_name? date<->time zone?] plus simple date and time.
     """
     # All timestamps variations
     day_name = ''
@@ -685,7 +690,8 @@ def timestamp_patterns(sample):
 
 def timestamp_group(text):
     """Returns a tuple [timestamp, range] which corresponds to the date and
-    time given. Exists on parse error.  """
+    time given. Exists on parse error.
+    """
     timep = re.sub(r' +', ' ', re.sub(r'[-,./]', ' ', text)).strip()
     start_tuple = None
     for p in timestamp_patterns(timep):
@@ -745,7 +751,7 @@ def parse_timestamp_range(text):
     Recognized structures are:
     t|today
     y|yesterday
-    last? \d* (m|min|minute|h|hour|d|day|mon|month|y|year) s?
+    last? \\d* (m|min|minute|h|hour|d|day|mon|month|y|year) s?
     range
     datetime
     datetime -> range
@@ -854,7 +860,7 @@ def retrieve_account_key():
         print >> sys.stderr, 'Try to log in again, or press Ctrl+C to break'
 
 
-class Stats:
+class Stats(object):
 
     """Collects statistics about the system work load.
     """
@@ -1023,13 +1029,13 @@ class Stats:
 
         We'll get physical memory details from here too
         """
-        cpure = re.compile('CPU usage:\s+([\d.]+)\% user, ([\d.]+)\% sys, '
-                           '([\d.]+)\% idle')
-        memre = re.compile('PhysMem:\s+(\d+\w+) wired, '
-                           '(\d+\w+) active, (\d+\w+) inactive, '
-                           '(\d+\w+) used, (\d+\w+) free.')
-        diskre = re.compile('Disks: (\d+)/(\d+\w+) read, '
-                            '(\d+)/(\d+\w+) written.')
+        cpure = re.compile(r'CPU usage:\s+([\d.]+)\% user, ([\d.]+)\% sys, '
+                           r'([\d.]+)\% idle')
+        memre = re.compile(r'PhysMem:\s+(\d+\w+) wired, '
+                           r'(\d+\w+) active, (\d+\w+) inactive, '
+                           r'(\d+\w+) used, (\d+\w+) free.')
+        diskre = re.compile(r'Disks: (\d+)/(\d+\w+) read, '
+                            r'(\d+)/(\d+\w+) written.')
 
         # scaling routine for use in map() later
         def scaletokb(value):
@@ -1637,9 +1643,10 @@ class DefaultTransport(object):
 
 class ConfiguredLog(object):
 
-    def __init__(self, name, token, path):
+    def __init__(self, name, token, destination, path):
         self.name = name
         self.token = token
+        self.destination = destination
         self.path = path
         self.logset = None
         self.set_key = None
@@ -1825,8 +1832,8 @@ class Config(object):
     def load_configured_logs(self, conf):
         global log
         """
-        Tries to load configured logs from the config file.
-        These are logs that use tokens and logsets.
+        Loads configured logs from the configuration file.
+        These are logs that use tokens.
         """
         self.configured_logs = []
         account_hosts = None
@@ -1842,34 +1849,15 @@ class Config(object):
                 except ConfigParser.NoOptionError:
                     pass
                 path = conf.get(name, PATH_PARAM)
-                configured_log = ConfiguredLog(name, token, path)
 
-                set_key = None
-                log_key = None
-                # If these arent set we need to talk to API server and save config
-                logset_name = ''
+                destination = ''
                 try:
-                    logset_name = conf.get(name, SET_PARAM)
+                    destination = conf.get(name, DESTINATION_PARAM)
                 except ConfigParser.NoOptionError:
                     pass
-                if not logset_name and not token:
-                    log.error(u"Ignoring log {} as neither find token nor {} is specified".format(name, SET_PARAM))
-                    continue
 
-                if logset_name:
-                    log_obj = None
-                    logset = get_or_create_logset(logset_name)
-                    log_obj = get_or_create_log(logset, name)
-                    log_key = log_obj['key']
+                configured_log = ConfiguredLog(name, token, destination, path)
 
-                    configured_log.token = log_obj['token']
-                    set_key = logset['key']
-                    log_key = log_obj['key']
-
-                    configured_log.set_key = set_key
-                    configured_log.log_key = log_key
-
-                    configured_log.logset = logset_name
                 self.configured_logs.append(configured_log)
 
     def save(self):
@@ -1907,10 +1895,11 @@ class Config(object):
 
             for clog in self.configured_logs:
                 conf.add_section(clog.name)
-                conf.set(clog.name, TOKEN_PARAM, clog.token)
+                if clog.token:
+                    conf.set(clog.name, TOKEN_PARAM, clog.token)
                 conf.set(clog.name, PATH_PARAM, clog.path)
-                if clog.logset:
-                    conf.set(clog.name, SET_PARAM, clog.logset)
+                if clog.destination:
+                    conf.set(clog.name, DESTINATION_PARAM, clog.destination)
 
             self.metrics.save(conf)
 
@@ -2054,7 +2043,7 @@ class Config(object):
         """
         Parses command line parameters and updates config parameters accordingly
         """
-        PARAM_LIST = """user-key= account-key= agent-key= host-key= no-timestamps debug-events
+        param_list = """user-key= account-key= agent-key= host-key= no-timestamps debug-events
                     debug-transport-events debug-metrics
                     debug-filters debug-loglist local debug-stats debug-nostats
                     debug-stats-only debug-cmds debug-system help version yes force uuid list
@@ -2062,7 +2051,7 @@ class Config(object):
                     suppress-ssl use-ca-provided force-api-host= force-domain=
                     system-stat-token= datahub= pull-server-side-config= config="""
         try:
-            optlist, args = getopt.gnu_getopt(params, '', PARAM_LIST.split())
+            optlist, args = getopt.gnu_getopt(params, '', param_list.split())
         except getopt.GetoptError, err:
             die("Parameter error: " + str(err))
         for name, value in optlist:
@@ -2388,84 +2377,114 @@ def request_follow(filename, name, type_opt):
 
 
 def get_cache_dir():
+    """Returns a directory suitable for cached data.
     """
-    Returns a usable directory which can be used to cache data
-
-    """
+    # XXX For daemon use system cache directory
     home = os.path.expanduser('~')
     cache_home = os.environ.get('XDG_CACHE_HOME') or os.path.join(home, '.cache')
-    path = os.path.join(cache_home, "logentries")
+    path = os.path.join(cache_home, CORP)
     if not os.path.isdir(path):
         os.makedirs(path)
     return path
 
 
-def get_or_create_logset(logset_name, create=False):
+def get_cache_filename():
+    """Gets full cache filename.
     """
-    Gets or create a new logset and refreshes the cache if necessary
-    """
-
-    account_hosts = request_hosts(logs=True, force_refresh=create)
-    logset = find_api_obj_by_name(account_hosts, logset_name)
-
-    if logset:
-        return logset
-
-    if not create:
-        return get_or_create_logset(logset_name, not create)
-
-    default = 'Set_default'
-    logset = create_host(logset_name, 'Set_%s' % logset_name, default, default, default)
-    request_hosts(logs=True, force_refresh=True)
-    return logset
-
-
-def get_or_create_log(logset, name):
-    """
-    Gets or creates a new log for the given logset
-    """
-    log_obj = find_api_obj_by_name(logset['logs'], name)
-    if not log_obj:
-        log_obj = create_log(logset['key'], name, 'SharedLog_%s' % name, '', do_follow=False, source='token')
-        request_hosts(logs=True, force_refresh=True)
-
-    return log_obj
-
-
-def request_hosts(logs=False, force_refresh=False):
-    """
-    Returns list of registered hosts.
-    """
-    load_logs = 'false'
-    cache_name = "hosts.cache"
-
-    if logs:
-        load_logs = 'true'
-        cache_name = "hosts-logs.cache"
-
     cache_dir = get_cache_dir()
-    get_user_cache = os.path.join(cache_dir, cache_name)
+    return os.path.join(cache_dir, CACHE_NAME)
 
-    if not force_refresh and os.path.exists(get_user_cache):
-        with open(get_user_cache, "r") as cache:
-            try:
-                return json_loads(cache.read())['hosts']
-            except ValueError:
-                log.warn("Could not read cache, ignoring")
 
+def load_cache():
+    """Loads or creates cache.
+    """
+    cache_filename = get_cache_filename()
+    try:
+        if os.path.exists(cache_filename):
+            with open(cache_filename, "r") as cache_file:
+                    return json_loads(cache_file.read())
+    except ValueError:
+        log.warn("Could not read cache, ignoring")
+    except IOError:
+        log.warn("Error while reading cache, ignoring")
+
+    return {'host_keys':{}, 'log_tokens':{}}
+
+
+def save_cache(cache):
+    """Saves cache given.
+    """
+    cache_filename = get_cache_filename()
+    try:
+        with open(cache_filename, 'w') as cache_file:
+                cache_file.write(json_dumps(cache, indent=4, separators=(',', ': ')))
+    except IOError:
+        log.warning("Cannot write to %s, consider adjusting XDG_CACHE_HOME" % cache_filename)
+
+
+def request_hosts(load_logs=False):
+    """Returns list of registered hosts.
+    """
+    if load_logs:
+        xload_logs = 'true'
+    else:
+        xload_logs = 'false'
     response = api_request({
         'request': 'get_user',
         'load_hosts': 'true',
-        'load_logs': load_logs,
+        'load_logs': xload_logs,
         'user_key': config.user_key}, True, True)
 
-    with open(get_user_cache, 'w') as cache:
-        try:
-            cache.write(json_dumps(response))
-        except IOError:
-            log.warning("Could not write to {}, consider adjusting XDG_CACHE_HOME".format(get_user_cache))
-
     return response['hosts']
+
+
+def get_or_create_host(cache, host_name):
+    """Gets or creates a new host and refreshes the cache if necessary
+    """
+    # Find the host in cache
+    if host_name in cache['host_keys']:
+        return cache['host_keys'][host_name]
+
+    # Retrieve the host via API
+    account_hosts = request_hosts(load_logs=True)
+    host = find_api_obj_by_name(account_hosts, host_name)
+
+    if not host:
+        # If it does not exist, create a new one
+        host = create_host(host_name, '', '', '', '')
+
+    host_key = host['key']
+    cache['host_keys'][host_name] = host_key
+    return host_key
+
+
+def get_or_create_log(cache, host_key, log_name):
+    """ Gets or creates a log for the host given. It returns logs's token or
+    None.
+    """
+    if not host_key:
+        return None
+
+    # Find log in cache
+    if log_name in cache['log_tokens']:
+        return cache['log_tokens'][log_name]
+
+    # Retrieve the log via API
+    account_hosts = request_hosts(load_logs=True)
+    host = find_api_obj_by_key(account_hosts, host_key)
+    if not host:
+        return None
+    xlog = find_api_obj_by_name(host['logs'], log_name)
+    if not xlog:
+        # Try to create the log
+        xlog = create_log(host['key'], log_name, '', '', do_follow=False, source='token')
+        if not xlog:
+            return None
+
+    token = xlog.get('token', None)
+    if token:
+        cache['log_tokens'][log_name] = token
+    return token
 
 
 #
@@ -2599,7 +2618,7 @@ def start_followers(default_transport):
             if resp['response'] != 'ok':
                 if not noticed:
                     log.error('Error retrieving list of logs: %s, retrying in %ss intervals',
-                        resp['reason'], SRV_RECON_TIMEOUT)
+                              resp['reason'], SRV_RECON_TIMEOUT)
                     noticed = True
                 time.sleep(SRV_RECON_TIMEOUT)
                 continue
@@ -2705,6 +2724,30 @@ def is_followed(filename):
     return False
 
 
+def create_configured_logs(configured_logs):
+    """ Get tokens for all configured logs. Logs with no token specified are
+    retrieved via API and created if needed.
+    """
+    cache = load_cache()
+    for clog in configured_logs:
+        if not clog.destination and not clog.token:
+            log.error('Ignoring section {} as neither {} nor {} is specified'.format(clog.name, TOKEN_PARAM, DESTINATION_PARAM))
+            continue
+
+        if clog.destination and not clog.token:
+            try:
+                (hostname, logname) = clog.destination.split('/', 1)
+            except ValueError:
+                log.error('Ignoring section %s since `%s\' does not contain host' % (clog.name, DESTINATION_PARAM))
+            host_key = get_or_create_host(cache, hostname)
+            token = get_or_create_log(cache, host_key, logname)
+            if not token:
+                log.error('Ignoring section %s, cannot create log' % clog.name)
+
+            clog.token = token
+    save_cache(cache)
+
+
 def cmd_monitor(args):
     """Monitors host activity and sends events collected to logentries
     infrastructure.
@@ -2718,6 +2761,10 @@ def cmd_monitor(args):
     if config.pull_server_side_config:
         config.user_key_required(not config.daemon)
         config.agent_key_required()
+
+    # Ensure all configured logs are created
+    if config.configured_logs:
+        create_configured_logs( config.configured_logs)
 
     if config.daemon:
         daemonize()
@@ -2869,7 +2916,6 @@ def list_object(request, hostnames=False):
     item_name = ''
     if t == 'rootlist':
         item_name = 'item'
-        pass
     elif t == 'host':
         print 'name =', request['name']
         print 'hostname =', request['hostname']
@@ -2895,7 +2941,6 @@ def list_object(request, hostnames=False):
         item_name = 'host'
         if hostnames:
             index_name = 'hostname'
-        pass
     elif t == 'logtype':
         print 'title =', request['title']
         print 'description =', request['desc']
@@ -2903,11 +2948,9 @@ def list_object(request, hostnames=False):
         return
     elif t == 'loglist':
         item_name = 'log'
-        pass
     elif t == 'logtypelist':
         item_name = 'logtype'
         index_name = 'shortcut'
-        pass
     else:
         die('Unknown object type "%s". Agent too old?' % t)
 
@@ -2922,6 +2965,8 @@ def list_object(request, hostnames=False):
 
 
 def is_log_fs(addr):
+    """Tests if the address points for a log.
+    """
     log_addrs = [r'(logs|apps)/.*/',
                  r'host(name)?s/.*/.*/']
     for la in log_addrs:
@@ -3026,6 +3071,8 @@ def cmd_pull(args):
 #
 
 def main():
+    """Serious business starts here.
+    """
     # Read command line parameters
     args = config.process_params(sys.argv[1:])
 
