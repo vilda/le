@@ -2361,7 +2361,10 @@ def create_host(name, hostname, system, distname, distver):
         'distver': distver
     }
     resp = api_request(request, True, True)
-    return resp['host'] if resp['response'] == 'ok' else None
+    if resp['response'] == 'ok':
+        return resp['host']
+    else:
+        return None
 
 
 def request_follow(filename, name, type_opt):
