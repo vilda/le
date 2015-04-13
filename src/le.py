@@ -202,6 +202,13 @@ def print_usage(version_only=False):
 #
 # Libraries
 #
+
+# Do not remove - fix for Python #8484
+try:
+    import hashlib
+except ImportError:
+    pass
+
 import string
 import re
 import Queue
