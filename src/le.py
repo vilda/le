@@ -2766,7 +2766,7 @@ def cmd_monitor(args):
         config.agent_key_required()
 
     # Ensure all configured logs are created
-    if config.configured_logs:
+    if config.configured_logs and not config.datahub:
         create_configured_logs( config.configured_logs)
 
     if config.daemon:
