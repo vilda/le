@@ -1334,7 +1334,7 @@ class Follower(object):
 
     def _read_log_line(self):
         """ Reads a line from the log. Checks maximal line size. """
-        buff = self._file.read(MAX_EVENTS)
+        buff = self._file.readline(MAX_EVENTS)
         return buff
 
     def _set_file_position(self, offset, start=FILE_BEGIN):
