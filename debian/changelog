@@ -1,3 +1,12 @@
+logentries (1.4.15) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Fixing API mock PUT request
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Wed, 06 May 2015 13:31:49 +0000
+
 logentries (1.4.14) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Edward Kim ]
