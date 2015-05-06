@@ -1,3 +1,18 @@
+logentries (1.4.14) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Edward Kim ]
+  * add MIT license
+
+  [ Lee Netherton ]
+  * Read tail of file line by line
+
+  [ Viliam Holub ]
+  * Adding information about Python license
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Tue, 05 May 2015 23:30:51 +0000
+
 logentries (1.4.13) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
