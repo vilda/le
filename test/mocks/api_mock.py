@@ -12,6 +12,7 @@ import json
 
 from twisted.python import log
 from twisted.internet import reactor
+from cyclone.web import asynchronous
 
 CWD = os.getcwd()
 
@@ -180,6 +181,7 @@ class LogHandler( cyclone.web.RequestHandler):
 			self.write( response_ok( LOG0))
 
 class IngestionHandler( cyclone.web.RequestHandler):
+	@asynchronous
 	def put( self, account_id, host_id, log_id):
 		if log_id in [LOG0_KEY, LOG0['name']]:
 			pass
