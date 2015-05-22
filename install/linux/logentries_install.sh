@@ -23,8 +23,8 @@ then
 	exit 1
 fi
 
-KEY_CMD_MIT="gpg --homedir /root/.gnupg --keyserver pgp.mit.edu --recv-keys C43C79AD"
-KEY_CMD_UBUNTU="gpg --homedir /root/.gnupg --keyserver keyserver.ubuntu.com --recv-keys C43C79AD"
+KEY_CMD_MIT="gpg --homedir /root/.gnupg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD"
+KEY_CMD_UBUNTU="gpg --homedir /root/.gnupg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C43C79AD"
 KEY_CMD_EXPORT="gpg --homedir /root/.gnupg -a --export C43C79AD"
 KEY_CMD_COMPLETE="apt-key add /tmp/le.key"
 KEY_CMD_CLEAN="rm /tmp/le.key"
