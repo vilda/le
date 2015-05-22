@@ -77,6 +77,12 @@ release key:
 
 	gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 
+(Keyservers are not always reliable. In automated scripts do the following.)
+
+	(gpg --keyserver pgp.mit.edu --recv-keys C43C79AD \
+	|| gpg --keyserver keyserver.ubuntu.com --recv-keys C43C79AD) \
+	&& gpg -a --export C43C79AD | apt-key add -
+
 Then run `apt-get update` and `apt-get install logentries`. If you want to run
 the agent as daemon, install it via `apt-get install logentries-daemon`.
 
