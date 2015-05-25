@@ -2461,7 +2461,7 @@ def get_or_create_host(cache, host_name):
     return host_key
 
 
-def get_or_create_log(cache, host_key, log_name):
+def get_or_create_log(cache, host_key, log_name, destination):
     """ Gets or creates a log for the host given. It returns logs's token or
     None.
     """
@@ -2469,8 +2469,8 @@ def get_or_create_log(cache, host_key, log_name):
         return None
 
     # Find log in cache
-    if log_name in cache['log_tokens']:
-        return cache['log_tokens'][log_name]
+    if destination in cache['log_tokens']:
+        return cache['log_tokens'][destination]
 
     # Retrieve the log via API
     account_hosts = request_hosts(load_logs=True)
@@ -2486,7 +2486,7 @@ def get_or_create_log(cache, host_key, log_name):
 
     token = xlog.get('token', None)
     if token:
-        cache['log_tokens'][log_name] = token
+        cache['log_tokens'][destination] = token
     return token
 
 
@@ -2743,7 +2743,7 @@ def create_configured_logs(configured_logs):
             except ValueError:
                 log.error('Ignoring section %s since `%s\' does not contain host' % (clog.name, DESTINATION_PARAM))
             host_key = get_or_create_host(cache, hostname)
-            token = get_or_create_log(cache, host_key, logname)
+            token = get_or_create_log(cache, host_key, logname, clog.destination)
             if not token:
                 log.error('Ignoring section %s, cannot create log' % clog.name)
 
