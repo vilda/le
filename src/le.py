@@ -1413,12 +1413,16 @@ class Follower(object):
         while not self._shutdown:
             try:
                 line = self._get_line()
+                if line:
+                    self._send_line(line)
             except IOError, e:
                 if config.debug:
                     log.debug("IOError: %s", e)
                 self._open_log()
-            if line:
-                self._send_line(line)
+            except UnicodeError, e:
+                log.warn("Error sending line %s", line, exc_info=True)
+            except Exception, e:
+		log.error("Caught unknown error %s while sending line: %s", e, line, exc_info=True)
         self._close_log()
 
 
