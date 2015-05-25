@@ -1,3 +1,17 @@
+logentries (1.4.16) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Adding how-to to use multiple keyservers
+
+  [ Ulrich Dangel ]
+  * Do not interpret lines as a string
+  * Use the destination as cache key and not only log name
+  * Improve exception handling when sending data
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Mon, 25 May 2015 17:36:53 +0000
+
 logentries (1.4.15) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
