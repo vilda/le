@@ -38,9 +38,7 @@ class FormatSyslog(object):
     def format_line(self, line, msgid='-', token=''):
         if not token:
             token = self._token
-        return '{}<14>1 {}Z {} {} - {} - hostname={} appname={} {}'.format(
-                token, datetime.datetime.utcnow().isoformat('T'),
-                self._hostname, self._appname,
-                msgid,
-                self._hostname, self._appname,
-                line)
+        return '{token}<14>1 {dt}Z {hostname} {appname} - {msgid} - hostname={hostname} appname={appname} {line}'.format(
+            token=token, dt=datetime.datetime.utcnow().isoformat('T'),
+            hostname=self._hostname, appname=self._appname,
+            msgid=msgid, line=line)
