@@ -1,6 +1,8 @@
 Logentries agent
 ================
 
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://github.com/mdp/rotp/blob/master/LICENSE)
+
 A command line utility for a convenient access to Logentries logging
 infrastructure.
 
