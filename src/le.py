@@ -2408,8 +2408,10 @@ def load_cache():
     cache_filename = get_cache_filename()
     try:
         if os.path.exists(cache_filename):
-            with open(cache_filename, "r") as cache_file:
-                    return json_loads(cache_file.read())
+            fcache = open(cache_filename, 'r')
+            cache_content = fcache.read()
+            fcache.close()
+            return json_loads(cache_content)
     except ValueError:
         log.warn("Could not read cache, ignoring")
     except IOError:
@@ -2423,8 +2425,9 @@ def save_cache(cache):
     """
     cache_filename = get_cache_filename()
     try:
-        with open(cache_filename, 'w') as cache_file:
-                cache_file.write(json_dumps(cache, indent=4, separators=(',', ': ')))
+        fcache = open(cache_filename, 'w')
+        fcache.write(json_dumps(cache, indent=4, separators=(',', ': ')))
+        fcache.close()
     except IOError:
         log.warning("Cannot write to %s, consider adjusting XDG_CACHE_HOME" % cache_filename)
 
