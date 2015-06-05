@@ -177,6 +177,10 @@ of `host name/log name'. The agent will search for the host and log identified
 by their name and retrieve the token automatically. If the host or log does not
 exist, it is created.
 
+**Note**: When using the destination parameter it is advised not to initialize multiple agents
+with the same configuration file at the same time. This is to prevent a race condition where
+duplicate Log Sets may be created. 
+
 Example:
 
 	[name]
