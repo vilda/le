@@ -45,6 +45,7 @@ SYSSTAT_TOKEN_PARAM = 'system-stat-token'
 HOSTNAME_PARAM = 'hostname'
 TOKEN_PARAM = 'token'
 PATH_PARAM = 'path'
+INCLUDE_DIRECTORY = 'include_directory'
 DESTINATION_PARAM = 'destination'
 PULL_SERVER_SIDE_CONFIG_PARAM = 'pull-server-side-config'
 KEY_LEN = 36
@@ -1669,6 +1670,7 @@ class Config(object):
     def __init__(self):
         self.config_dir_name = self.get_config_dir()
         self.config_filename = self.config_dir_name + LE_CONFIG
+        self.include_dir = os.path.join(self.config_dir_name, "conf.d")
 
         # Configuration variables
         self.agent_key = NOT_SET
@@ -1763,11 +1765,15 @@ class Config(object):
     def basic_setup(self):
         pass
 
-    def load(self):
+    def load(self, load_include_dirs=True):
         """
         Initializes configuration parameters from the configuration
         file.  Returns True if successful, False otherwise. Does not
         touch already defined parameters.
+
+        Args:
+          load_include_dirs (bool): specify if files from the include
+                                    directory are loaded
         """
 
         try:
@@ -1782,9 +1788,15 @@ class Config(object):
                 DATAHUB_PARAM: '',
                 SYSSTAT_TOKEN_PARAM: '',
                 HOSTNAME_PARAM: '',
-                PULL_SERVER_SIDE_CONFIG_PARAM: 'True'
+                PULL_SERVER_SIDE_CONFIG_PARAM: 'True',
+                INCLUDE_DIRECTORY: self.include_dir
             })
             conf.read(self.config_filename)
+            self.include_dir = conf.get(MAIN_SECT, INCLUDE_DIRECTORY)
+
+            if load_include_dirs:
+                loaded_configs = conf.read(glob.glob(os.path.join(self.include_dir, "*.cfg")))
+                log.debug("Loaded %s as configuration files", ', '.join(loaded_configs))
 
             # Load parameters
             if self.user_key == NOT_SET:
@@ -2528,7 +2540,7 @@ def cmd_reinit(args):
     directory is created if it does not exit.
     """
     no_more_args(args)
-    config.load()
+    config.load(load_include_dirs=False)
     config.save()
     log.info("Reinitialized")
 
