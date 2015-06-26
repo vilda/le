@@ -3069,9 +3069,12 @@ def cmd_pull(args):
         params['filter'] = args[2]
     if len(args) > 3:
         try:
-            params['limit'] = int(args[3])
+            limit = int(args[3])
         except ValueError:
             die('Error: Limit must be integer')
+        if limit < 1:
+            die('Limit must be above 0')
+        params['limit'] = limit
 
     pull_request(addr, params)
 
