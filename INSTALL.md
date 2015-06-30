@@ -13,7 +13,7 @@ Debian 7.0 Wheezy
 ```
 su -
 echo 'deb http://rep.logentries.com/ wheezy main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
@@ -25,7 +25,7 @@ Debian 8.0 Jessie/SID
 ```
 su -
 echo 'deb http://rep.logentries.com/ jessie main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
@@ -37,7 +37,7 @@ Ubuntu 11.10 Oneiric Ocelot
 ```
 sudo -sH
 echo 'deb http://rep.logentries.com/ oneiric main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 apt-get update
 apt-get install logentries
 exit
@@ -49,7 +49,7 @@ Ubuntu 13.04 Raring Ringtail
 ```
 sudo -sH
 echo 'deb http://rep.logentries.com/ raring main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 apt-get update
 apt-get install logentries
 exit
@@ -61,7 +61,7 @@ Ubuntu 13.10 Saucy Salamander
 ```
 sudo -sH
 echo 'deb http://rep.logentries.com/ saucy main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 aptitude update
 aptitude install logentries
 exit
@@ -73,7 +73,7 @@ Ubuntu 14.04 Trusty Tahr
 ```
 sudo -sH
 echo 'deb http://rep.logentries.com/ trusty main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 apt-get update
 apt-get install logentries
 exit
@@ -85,7 +85,7 @@ Ubuntu 15.04 Vivid Vervet
 ```
 sudo -sH
 echo 'deb http://rep.logentries.com/ vivid main' >/etc/apt/sources.list.d/logentries.list
-gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 apt-get update
 apt-get install logentries
 exit
