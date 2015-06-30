@@ -80,6 +80,18 @@ exit
 ```
 
 
+Ubuntu 15.04 Vivid Vervet
+-------------------------
+```
+sudo -sH
+echo 'deb http://rep.logentries.com/ vivid main' >/etc/apt/sources.list.d/logentries.list
+gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+apt-get update
+apt-get install logentries
+exit
+```
+
+
 Fedora 14-19
 ------------
 ```

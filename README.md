@@ -74,8 +74,8 @@ For Debian/Ubuntu systems include this line in `/etc/apt/sources.list.d/logentri
 	deb http://rep.logentries.com/ XXX main
 
 Replace `XXX` with the name of your system, i.e. one of wheezy, jessie,
-lucid, precise, quantal, saucy, trusty, utopic. You also need to add Logentries
-release key:
+lucid, precise, quantal, saucy, trusty, utopic, vivid. You also need to add
+Logentries release key:
 
 	gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 
