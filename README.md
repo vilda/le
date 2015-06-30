@@ -74,15 +74,15 @@ For Debian/Ubuntu systems include this line in `/etc/apt/sources.list.d/logentri
 	deb http://rep.logentries.com/ XXX main
 
 Replace `XXX` with the name of your system, i.e. one of wheezy, jessie,
-lucid, precise, quantal, saucy, trusty, utopic. You also need to add Logentries
-release key:
+lucid, precise, quantal, saucy, trusty, utopic, vivid. You also need to add
+Logentries release key:
 
-	gpg --keyserver pgp.mit.edu --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+	gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
 
 (Keyservers are not always reliable. In automated scripts do the following.)
 
-	(gpg --keyserver pgp.mit.edu --recv-keys C43C79AD \
-	|| gpg --keyserver keyserver.ubuntu.com --recv-keys C43C79AD) \
+	(gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD \
+	|| gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C43C79AD) \
 	&& gpg -a --export C43C79AD | apt-key add -
 
 Then run `apt-get update` and `apt-get install logentries`. If you want to run
