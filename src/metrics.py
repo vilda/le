@@ -524,7 +524,7 @@ class Metrics(object):
         for x in self._items:
             try:
                 x.collect()
-            except Exception as e:
+            except Exception, e:
                 # Make sure we don't propagate any unexpected exceptions
                 # Typically `permission denied' on hard-ended systems
                 if self._debug:
