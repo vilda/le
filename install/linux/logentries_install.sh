@@ -68,7 +68,7 @@ declare -a LOGS_TO_FOLLOW=(
 /var/log/auth.log
 /var/log/boot.log
 /var/log/daemon.log
-/var/log/dkpg.log
+/var/log/dpkg.log
 /var/log/kern.log
 /var/log/lastlog
 /var/log/mail.log
