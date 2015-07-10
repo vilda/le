@@ -2581,7 +2581,7 @@ def get_filters(available_filters, filter_filenames, log_name, log_key, log_file
         " Looking for filters by log name, log id, and token")
 
     event_filter = None
-    if not event_filter and log_key:
+    if not event_filter and log_name:
         debug_filters(" Looking for filters by log name")
         event_filter = available_filters.get(log_name)
         if not event_filter:
