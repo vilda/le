@@ -204,6 +204,10 @@ or `reinit` commands:
 
 	sudo le reinit --pull-server-side-config=False
 
+By default, locally configured logs are sent to Logentries in Syslog format RFC 5424 which prepends a timestamp and other useful information. If you wish to disable this, you can set the formatter to 'plain' in the `[Main]` section of the configuration.
+
+	formatter = plain
+
 
 List IP addresses the agent uses
 --------------------------------
