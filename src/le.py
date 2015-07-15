@@ -36,6 +36,7 @@ MAIN_SECT = 'Main'
 USER_KEY_PARAM = 'user-key'
 AGENT_KEY_PARAM = 'agent-key'
 FILTERS_PARAM = 'filters'
+FORMATTER_PARAM = 'formatter'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
 USE_CA_PROVIDED_PARAM = 'use_ca_provided'
 FORCE_DOMAIN_PARAM = 'force_domain'
@@ -1685,6 +1686,7 @@ class Config(object):
         # Special options
         self.daemon = False
         self.filters = NOT_SET
+        self.formatter = NOT_SET
         self.force = False
         self.hostname = NOT_SET
         self.name = NOT_SET
@@ -1773,6 +1775,7 @@ class Config(object):
                 USER_KEY_PARAM: '',
                 AGENT_KEY_PARAM: '',
                 FILTERS_PARAM: '',
+                FORMATTER_PARAM: 'syslog',
                 SUPPRESS_SSL_PARAM: '',
                 FORCE_DOMAIN_PARAM: '',
                 USE_CA_PROVIDED_PARAM: '',
@@ -1796,6 +1799,10 @@ class Config(object):
                 new_filters = conf.get(MAIN_SECT, FILTERS_PARAM)
                 if new_filters != '':
                     self.filters = new_filters
+            if self.formatter == NOT_SET:
+                new_formatter = conf.get(MAIN_SECT, FORMATTER_PARAM)
+                if new_formatter != '':
+                    self.formatter = new_formatter
             if self.hostname == NOT_SET:
                 self.hostname = conf.get(MAIN_SECT, HOSTNAME_PARAM)
                 if not self.hostname:
@@ -1880,6 +1887,8 @@ class Config(object):
                 conf.set(MAIN_SECT, AGENT_KEY_PARAM, self.agent_key)
             if self.filters != NOT_SET:
                 conf.set(MAIN_SECT, FILTERS_PARAM, self.filters)
+            if self.formatter != NOT_SET:
+                conf.set(MAIN_SECT, FORMATTER_PARAM, self.formatter)
             if self.hostname != NOT_SET:
                 conf.set(MAIN_SECT, HOSTNAME_PARAM, self.hostname)
             if self.suppress_ssl:
@@ -2692,8 +2701,13 @@ def start_followers(default_transport):
             log.info("Following %s", log_filename)
 
             if log_token or config.datahub:
-                formatter = formatters.FormatSyslog(
-                    config.hostname, log_name, log_token)
+                if config.formatter == 'plain':
+                    formatter = formatters.FormatPlain(log_token)
+                elif config.formatter == 'syslog':
+                    formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
+                else:
+                    log.error("Ignoring unknown formatter %s, using syslog format instead", config.formatter)
+                    formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
                 transport = default_transport.get()
             elif log_key:
                 endpoint = Domain.API
