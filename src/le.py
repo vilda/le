@@ -1261,6 +1261,7 @@ class Follower(object):
             target=self.monitorlogs, name=self.name)
         self._worker.daemon = True
         self._worker.start()
+        self._read_file_rest = ""
 
     def _file_candidate(self):
         """
@@ -1335,8 +1336,18 @@ class Follower(object):
 
     def _read_log_line(self):
         """ Reads a line from the log. Checks maximal line size. """
-        buff = self._file.readline(MAX_EVENTS)
-        return buff
+        buff = self._file.read(MAX_EVENTS - len(self._read_file_rest))
+        buff_list = buff.split("\n")
+        if len(buff_list) == 1: # in case there is no "\n" in the buff.
+            tmp_read_file_rest = self._read_file_rest
+            self._read_file_rest = ""
+            return (tmp_read_file_rest + buff)
+        else:
+            tmp_read_file_rest = buff_list[-1]
+            # drop the last line if it is not ending by \n. prepend the previous _read_file_rest
+            ret = self._read_file_rest + (''.join(x+'\n' for x in buff_list[:-1]));
+            self._read_file_rest = tmp_read_file_rest;
+            return ret
 
     def _set_file_position(self, offset, start=FILE_BEGIN):
         """ Move the position of filepointers."""
@@ -1414,16 +1425,19 @@ class Follower(object):
         while not self._shutdown:
             try:
                 line = self._get_line()
-                if line:
-                    self._send_line(line)
-            except IOError, e:
-                if config.debug:
-                    log.debug("IOError: %s", e)
-                self._open_log()
-            except UnicodeError, e:
-                log.warn("Error sending line %s", line, exc_info=True)
+                try:
+                    if line:
+                        self._send_line(line)
+                except IOError, e:
+                    if config.debug:
+                        log.debug("IOError: %s", e)
+                    self._open_log()
+                except UnicodeError, e:
+                    log.warn("UnicodeError sending line %s", line, exc_info=True)
+                except Exception, e:
+                    log.error("Caught unknown error %s while sending line %s", e, line, exc_info=True)
             except Exception, e:
-		log.error("Caught unknown error %s while sending line: %s", e, line, exc_info=True)
+                log.error("Caught unknown error %s while reading line", e, exc_info=True)
         self._close_log()
 
 
