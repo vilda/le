@@ -1,3 +1,25 @@
+logentries (1.4.20) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Ulrich Dangel ]
+  * update install script to use port 80 for keyservers
+
+  [ Mike Neville-O'Neill ]
+  * Update logentries_install.sh
+
+  [ thomas morgan ]
+  * fix filter detection by log name
+
+  [ Bill Wiens ]
+  * Add new 'formatter' param allowing users to choose between plain and syslog formatters when using token-based logs.
+  * Add documentation on 'formatter' param
+
+  [ Viliam Holub ]
+  * Avoiding adding defult formatter into configuration
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Fri, 24 Jul 2015 21:37:10 +0000
+
 logentries (1.4.19) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Stephen Hynes ]
