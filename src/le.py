@@ -1775,7 +1775,7 @@ class Config(object):
                 USER_KEY_PARAM: '',
                 AGENT_KEY_PARAM: '',
                 FILTERS_PARAM: '',
-                FORMATTER_PARAM: 'syslog',
+                FORMATTER_PARAM: '',
                 SUPPRESS_SSL_PARAM: '',
                 FORCE_DOMAIN_PARAM: '',
                 USE_CA_PROVIDED_PARAM: '',
@@ -2703,7 +2703,7 @@ def start_followers(default_transport):
             if log_token or config.datahub:
                 if config.formatter == 'plain':
                     formatter = formatters.FormatPlain(log_token)
-                elif config.formatter == 'syslog':
+                elif config.formatter == 'syslog' or config.formatter == NOT_SET:
                     formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
                 else:
                     log.error("Ignoring unknown formatter %s, using syslog format instead", config.formatter)
