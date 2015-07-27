@@ -36,6 +36,7 @@ MAIN_SECT = 'Main'
 USER_KEY_PARAM = 'user-key'
 AGENT_KEY_PARAM = 'agent-key'
 FILTERS_PARAM = 'filters'
+FORMATTERS_PARAM = 'formatters'
 FORMATTER_PARAM = 'formatter'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
 USE_CA_PROVIDED_PARAM = 'use_ca_provided'
@@ -235,6 +236,7 @@ import getpass
 import atexit
 import logging.handlers
 from backports import CertificateError, match_hostname
+from functools import partial
 
 import formatters
 import metrics
@@ -258,6 +260,10 @@ log.addHandler(stream_handler)
 
 def debug_filters(msg, *args):
     if config.debug_filters:
+        print >> sys.stderr, msg % args
+
+def debug_formatters(msg, *args):
+    if config.debug_formatters:
         print >> sys.stderr, msg % args
 
 #
@@ -323,9 +329,17 @@ def filter_events(events):
 
 def default_filter_filenames(filename):
     """
-    By default we allow to follow any files specified in the condifuration.
+    By default we allow to follow any files specified in the configuration.
     """
     return True
+
+def format_events(default_formatter, events):
+    """
+    User-defined formattering code. Events passed are about to be sent to
+    logentries server. Make the required modifications to provide correct format.
+    """
+    # By default, this method is empty
+    return default_formatter.format_line(events)
 
 
 def call(command):
@@ -1247,21 +1261,21 @@ class Follower(object):
     The follower keeps an eye on the file specified and sends new events to the
     logentries infrastructure.  """
 
-    def __init__(self, name, event_filter, transport, formatter):
+    def __init__(self, name, event_filter, event_formatter, transport):
         """ Initializes the follower. """
         self.name = name
         self.flush = True
         self.event_filter = event_filter
-        self.formatter = formatter
+        self.event_formatter = event_formatter
         self.transport = transport
 
         self._file = None
         self._shutdown = False
+        self._read_file_rest = ""
         self._worker = threading.Thread(
             target=self.monitorlogs, name=self.name)
         self._worker.daemon = True
         self._worker.start()
-        self._read_file_rest = ""
 
     def _file_candidate(self):
         """
@@ -1411,7 +1425,11 @@ class Follower(object):
             return
         if config.debug_events:
             print >> sys.stderr, line,
-        self.transport.send(self.formatter.format_line(line))
+        if line:
+            line = self.event_formatter(line)
+        if not line:
+            return
+        self.transport.send(line)
 
     def close(self):
         """Closes the follower by setting the shutdown flag and waiting for the
@@ -1700,6 +1718,7 @@ class Config(object):
         # Special options
         self.daemon = False
         self.filters = NOT_SET
+        self.formatters = NOT_SET
         self.formatter = NOT_SET
         self.force = False
         self.hostname = NOT_SET
@@ -1724,6 +1743,8 @@ class Config(object):
         self.debug_transport_events = False
         # All filtering actions are logged
         self.debug_filters = False
+        # All formattering actions are logged
+        self.debug_formatters = False
         # All metrics actions are logged
         self.debug_metrics = False
         # Adapter connects to locahost
@@ -1789,6 +1810,7 @@ class Config(object):
                 USER_KEY_PARAM: '',
                 AGENT_KEY_PARAM: '',
                 FILTERS_PARAM: '',
+                FORMATTERS_PARAM: '',
                 FORMATTER_PARAM: '',
                 SUPPRESS_SSL_PARAM: '',
                 FORCE_DOMAIN_PARAM: '',
@@ -1813,6 +1835,10 @@ class Config(object):
                 new_filters = conf.get(MAIN_SECT, FILTERS_PARAM)
                 if new_filters != '':
                     self.filters = new_filters
+            if self.formatters == NOT_SET:
+                new_formatters = conf.get(MAIN_SECT, FORMATTERS_PARAM)
+                if new_formatters != '':
+                    self.formatters = new_formatters
             if self.formatter == NOT_SET:
                 new_formatter = conf.get(MAIN_SECT, FORMATTER_PARAM)
                 if new_formatter != '':
@@ -1901,6 +1927,8 @@ class Config(object):
                 conf.set(MAIN_SECT, AGENT_KEY_PARAM, self.agent_key)
             if self.filters != NOT_SET:
                 conf.set(MAIN_SECT, FILTERS_PARAM, self.filters)
+            if self.formatters != NOT_SET:
+                conf.set(MAIN_SECT, FORMATTERS_PARAM, self.formatters)
             if self.formatter != NOT_SET:
                 conf.set(MAIN_SECT, FORMATTER_PARAM, self.formatter)
             if self.hostname != NOT_SET:
@@ -2072,7 +2100,7 @@ class Config(object):
         """
         param_list = """user-key= account-key= agent-key= host-key= no-timestamps debug-events
                     debug-transport-events debug-metrics
-                    debug-filters debug-loglist local debug-stats debug-nostats
+                    debug-filters debug-formatters debug-loglist local debug-stats debug-nostats
                     debug-stats-only debug-cmds debug-system help version yes force uuid list
                     std std-all name= hostname= type= pid-file= debug no-defaults
                     suppress-ssl use-ca-provided force-api-host= force-domain=
@@ -2129,6 +2157,8 @@ class Config(object):
                 self.debug_transport_events = True
             elif name == "--debug-filters":
                 self.debug_filters = True
+            elif name == "--debug-formatters":
+                self.debug_formatters = True
             elif name == "--debug-metrics":
                 self.debug_metrics = True
             elif name == "--local":
@@ -2588,6 +2618,45 @@ def check_file_name(file_name):
     return file_name.startswith('/')
 
 
+def get_formatters(default_formatter, available_formatters, log_name, log_key, log_filename, log_token):
+    debug_formatters(
+        "Log name=%s id=%s filename=%s token=%s", log_name, log_key,
+        log_filename, log_token)
+    debug_formatters(
+        " Looking for formatters by log name, log id, and token")
+
+    event_formatter = None
+    if not event_formatter and log_name:
+        debug_formatters(" Looking for formatters by log name")
+        event_formatter = available_formatters.get(log_name)
+        if not event_formatter:
+            debug_formatters(" No formatter found by log name")
+
+    if not event_formatter and log_key:
+        debug_formatters(" Looking for formatters by log ID")
+        event_formatter = available_formatters.get(log_key)
+        if not event_formatter:
+            debug_formatters(" No formatter found by log ID")
+
+    if not event_formatter and log_token:
+        debug_formatters(" Looking for formatters by token")
+        event_formatter = available_formatters.get(log_token)
+        if not event_formatter:
+            debug_formatters(" No formatter found by token")
+
+    if event_formatter and not hasattr(event_formatter, '__call__'):
+        debug_formatters(
+            " Formatter found, but ignored because it's not a function")
+        event_formatter = None
+    if event_formatter:
+        event_formatter = partial(event_formatter, config.hostname, log_name, log_token)
+        debug_formatters(" Using formatter %s", event_formatter)
+    else:
+        event_formatter = partial(format_events, default_formatter)
+        debug_formatters(" No formatter found using default formatter")
+
+    return event_formatter
+
 def get_filters(available_filters, filter_filenames, log_name, log_key, log_filename, log_token):
     debug_filters(
         "Log name=%s id=%s filename=%s token=%s", log_name, log_key,
@@ -2690,6 +2759,19 @@ def start_followers(default_transport):
                       config.filters, sys.exc_info()[1])
             log.error('Details: %s', traceback.print_exc(sys.exc_info()))
 
+    available_formatters = {}
+    if config.formatters != NOT_SET:
+        sys.path.append(config.formatters)
+        try:
+            import user_formatters
+
+            available_formatters = getattr(user_formatters, 'formatters', {})
+            debug_formatters("Available formatters: %s", available_formatters)
+        except:
+            log.error('Cannot import event formatter module %s: %s',
+                      config.formatters, sys.exc_info()[1])
+            log.error('Details: %s', traceback.print_exc(sys.exc_info()))
+
     # Start followers
     for l in logs:
         # Note! Token-type logs have follow param == false by default, so we need to
@@ -2716,12 +2798,12 @@ def start_followers(default_transport):
 
             if log_token or config.datahub:
                 if config.formatter == 'plain':
-                    formatter = formatters.FormatPlain(log_token)
+                    default_formatter = formatters.FormatPlain(log_token)
                 elif config.formatter == 'syslog' or config.formatter == NOT_SET:
-                    formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
+                    default_formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
                 else:
-                    log.error("Ignoring unknown formatter %s, using syslog format instead", config.formatter)
-                    formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
+                    log.error("Ignoring unknown default_formatter %s, using syslog format instead", config.formatter)
+                    default_formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
                 transport = default_transport.get()
             elif log_key:
                 endpoint = Domain.API
@@ -2737,16 +2819,19 @@ def start_followers(default_transport):
                     use_ssl = False
                 preamble = 'PUT /%s/hosts/%s/%s/?realtime=1 HTTP/1.0\r\n\r\n' % (
                     config.user_key, config.agent_key, log_key)
-                formatter = formatters.FormatPlain('')
+                default_formatter = formatters.FormatPlain('')
                 transport = Transport(endpoint, port, use_ssl, preamble,
                                       config.debug_transport_events)
                 transports.append(transport)
             else:
                 continue
 
+            entry_formatter = get_formatters(default_formatter, available_formatters,
+                                             log_name, log_key, log_filename,
+                                             log_token)
+
             # Instantiate the follower
-            follower = Follower(log_filename, entry_filter, transport,
-                                formatter)
+            follower = Follower(log_filename, entry_filter, entry_formatter, transport)
             followers.append(follower)
     return (followers, transports)
 
