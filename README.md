@@ -219,7 +219,7 @@ addresses needs to be whitelisted in firewall.
 Follow logs that change their names
 --------------------------------------
 
-Certain log rollover policies does not allow to specify destination file name.
+Certain log rollover policies do not allow to specify destination file name.
 That is typical when log files are timestamped or assigned a sequential number.
 The Logentries agent can handle there cases for you.  The Logentries agent can
 be pointed at particular folders to gather any active logs from that directory
