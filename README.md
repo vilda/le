@@ -219,19 +219,24 @@ addresses needs to be whitelisted in firewall.
 Follow logs that change their names
 --------------------------------------
 
-Due to rollover policies logs are often renamed using a sequential number or
-the current timestamp. Luckily the Logentries agent can handle this for you.
-The Logentries agent can be pointed at particular folders to gather any active
-logs from that directory or its subdirectories using wildcards in file names.
-For example, the following patterns can be used with the follow command to
-gather logs from the given directories:
+Certain log rollover policies do not allow to specify destination file name.
+That is typical when log files are timestamped or assigned a sequential number.
+The Logentries agent can handle there cases for you.  The Logentries agent can
+be pointed at particular folders to gather any active logs from that directory
+or its subdirectories using wildcards in file names.  For example, the
+following patterns can be used with the follow command to gather logs from the
+given directories:
 
 	/var/log/mysystem/mylog-*.log
 
 Using wildcards when specifying the log to follow allows for situations where
-you need to follow the most recent log in a particular folder. The Logentries
-agent looks for any active log in the folder and will monitor the events in
-that log.
+you need to follow the most recent log in a particular folder. The agent looks
+for any active log in the folder and will monitor the events in that log.
+
+**Note** wildcards are NOT needed in typical syslog log rotation scheme, where
+log file named `xxx.log` is renamed to `xxx.log.0` and a new `xxx.log` file is
+created. In this situation follow the `xxx.log` file only, do not specify
+wildcards.
 
 
 Manipulate your data in transit
