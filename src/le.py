@@ -1423,7 +1423,7 @@ class Follower(object):
             except UnicodeError, e:
                 log.warn("Error sending line %s", line, exc_info=True)
             except Exception, e:
-		log.error("Caught unknown error %s while sending line: %s", e, line, exc_info=True)
+                log.error("Caught unknown error %s while sending line: %s", e, line, exc_info=True)
         self._close_log()
 
 
