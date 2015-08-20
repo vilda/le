@@ -1,3 +1,20 @@
+logentries (1.4.21) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Maksim Boyko ]
+  * Fix system log file in the logentries_install.sh
+  * Add gentoo support
+  * Replace all /tmp/logentriesDebug by
+  * Add /etc/portage/make.conf checking
+
+  [ Viliam Holub ]
+  * Improve documentation for wildcards in log file names
+  * Improve documentation for wildcards in log file names
+  * Replacing tab with spaces
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Thu, 20 Aug 2015 08:04:43 +0000
+
 logentries (1.4.20) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Ulrich Dangel ]
