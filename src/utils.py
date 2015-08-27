@@ -51,7 +51,7 @@ try:
 
     wrap_socket = ssl.wrap_socket
     FEAT_SSL = True
-    FEAT_SSL_CONTEXT = sys.version_info >= (2, 7, 9)
+    FEAT_SSL_CONTEXT = sys.version_info >= (2, 7, 8)
 except ImportError:
     FEAT_SSL = False
     FEAT_SSL_CONTEXT = False
@@ -195,7 +195,7 @@ def make_https_connection(config, s):
             cert_file = system_cert_file()
             if cert_file:
                 return ServerHTTPSConnection(config, s, cert_file)
-        except socket.error:
+        except socket.error, e:
             pass
 
     # Try to connect with our default certificate
