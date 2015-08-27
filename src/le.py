@@ -24,9 +24,9 @@ DEFAULT_AGENT_KEY = NOT_SET
 # Configuration files
 CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
-LE_CONFIG = 'config'
+LE_CONFIG = 'config' # Default configuration file
 CACHE_NAME = 'cache'
-DEFAULT_CONF_PATTERN = '*.conf'
+CONF_SUFFIX = '.conf' # Expected suffix of configuration files
 
 LOCAL_CONFIG_DIR_USER = '.le'
 LOCAL_CONFIG_DIR_SYSTEM = '/etc/le'
@@ -1776,7 +1776,12 @@ class Config(object):
         """
         Returns a list of configuration files located in the path.
         """
-        return glob.glob(os.path.join(path, DEFAULT_CONF_PATTERN))
+        configs = []
+        for root, _, files in os.walk(path):
+            for filename in files:
+                if filename.endswith(CONF_SUFFIX):
+                    configs.append(os.path.join(root, filename))
+        return sorted(configs)
 
     def _get_if_def(self, conf, param, param_name):
         if param == NOT_SET:
