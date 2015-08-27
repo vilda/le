@@ -32,6 +32,8 @@ $LE
 #e Where parameters are:
 #e   --help                  show usage help and exit
 #e   --version               display version number and exit
+#e   --config=               load specified configuration
+#e   --config.d=             load configurations from directory
 #e   --account-key=          set account key and exit
 #e   --host-key=             set local host key and exit, generate key if key is empty
 #e   --no-timestamps         no timestamps in agent reportings

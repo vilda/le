@@ -26,6 +26,7 @@ CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
 LE_CONFIG = 'config'
 CACHE_NAME = 'cache'
+DEFAULT_CONF_PATTERN = '*.conf'
 
 LOCAL_CONFIG_DIR_USER = '.le'
 LOCAL_CONFIG_DIR_SYSTEM = '/etc/le'
@@ -45,7 +46,7 @@ SYSSTAT_TOKEN_PARAM = 'system-stat-token'
 HOSTNAME_PARAM = 'hostname'
 TOKEN_PARAM = 'token'
 PATH_PARAM = 'path'
-INCLUDE_DIRECTORY = 'include_directory'
+INCLUDE_PARAM = 'include'
 DESTINATION_PARAM = 'destination'
 PULL_SERVER_SIDE_CONFIG_PARAM = 'pull-server-side-config'
 KEY_LEN = 36
@@ -179,6 +180,8 @@ Where command is one of:
 Where parameters are:
   --help                  show usage help and exit
   --version               display version number and exit
+  --config=               load specified configuration
+  --config.d=             load configurations from directory
   --account-key=          set account key and exit
   --host-key=             set local host key and exit, generate key if key is empty
   --no-timestamps         no timestamps in agent reportings
@@ -482,7 +485,7 @@ def collect_log_names(system_info):
     Collects standard local logs and identifies them.
     """
     logs = []
-    for root, dirs, files in os.walk(LOG_ROOT):
+    for root, _, files in os.walk(LOG_ROOT):
         for name in files:
             if name[-3:] != '.gz' and re.match(r'.*\.\d+$', name) is None:
                 logs.append(os.path.join(root, name))
@@ -1665,12 +1668,19 @@ class ConfiguredLog(object):
         return self.logset
 
 
+class FatalConfigurationError(Exception):
+
+    def __init__(self, msg):
+        self.msg = msg
+
+
 class Config(object):
 
     def __init__(self):
         self.config_dir_name = self.get_config_dir()
         self.config_filename = self.config_dir_name + LE_CONFIG
-        self.include_dir = os.path.join(self.config_dir_name, "conf.d")
+        self.config_d = os.path.join(self.config_dir_name, 'conf.d')
+        self.include = NOT_SET
 
         # Configuration variables
         self.agent_key = NOT_SET
@@ -1762,8 +1772,18 @@ class Config(object):
                 return False
         return True
 
-    def basic_setup(self):
-        pass
+    def _list_configs(self, path):
+        """
+        Returns a list of configuration files located in the path.
+        """
+        return glob.glob(os.path.join(path, DEFAULT_CONF_PATTERN))
+
+    def _get_if_def(self, conf, param, param_name):
+        if param == NOT_SET:
+            new_param = conf.get(MAIN_SECT, param_name)
+            if new_param != '':
+                return new_param
+        return param
 
     def load(self, load_include_dirs=True):
         """
@@ -1789,36 +1809,34 @@ class Config(object):
                 SYSSTAT_TOKEN_PARAM: '',
                 HOSTNAME_PARAM: '',
                 PULL_SERVER_SIDE_CONFIG_PARAM: 'True',
-                INCLUDE_DIRECTORY: self.include_dir
+                INCLUDE_PARAM: '',
             })
-            conf.read(self.config_filename)
-            self.include_dir = conf.get(MAIN_SECT, INCLUDE_DIRECTORY)
 
+            # Read configuration files from default directories
+            config_files = [self.config_filename]
             if load_include_dirs:
-                loaded_configs = conf.read(glob.glob(os.path.join(self.include_dir, "*.cfg")))
-                log.debug("Loaded %s as configuration files", ', '.join(loaded_configs))
+                config_files.extend(self._list_configs(self.config_d))
+            conf.read(config_files)
+
+            # Fail if no configuration file exist
+            if not conf.has_section(MAIN_SECT):
+                return False
+
+            # Get optional user-provided configuration directory
+            self.include = self._get_if_def(conf, self.include, INCLUDE_PARAM)
+
+            # Load configuration files from user-provided directory
+            if load_include_dirs and self.include:
+                config_files.extend(conf.read(self._list_configs(self.include)))
+
+            log.debug('Configuration files loaded: %s', ', '.join(config_files))
 
             # Load parameters
-            if self.user_key == NOT_SET:
-                new_user_key = conf.get(MAIN_SECT, USER_KEY_PARAM)
-                if new_user_key != '':
-                    self.user_key = new_user_key
-            if self.agent_key == NOT_SET:
-                new_agent_key = conf.get(MAIN_SECT, AGENT_KEY_PARAM)
-                if new_agent_key != '':
-                    self.agent_key = new_agent_key
-            if self.filters == NOT_SET:
-                new_filters = conf.get(MAIN_SECT, FILTERS_PARAM)
-                if new_filters != '':
-                    self.filters = new_filters
-            if self.formatter == NOT_SET:
-                new_formatter = conf.get(MAIN_SECT, FORMATTER_PARAM)
-                if new_formatter != '':
-                    self.formatter = new_formatter
-            if self.hostname == NOT_SET:
-                self.hostname = conf.get(MAIN_SECT, HOSTNAME_PARAM)
-                if not self.hostname:
-                    self.hostname = NOT_SET
+            self.user_key = self._get_if_def(conf, self.user_key, USER_KEY_PARAM)
+            self.agent_key = self._get_if_def(conf, self.agent_key, AGENT_KEY_PARAM)
+            self.filters = self._get_if_def(conf, self.filters, FILTERS_PARAM)
+            self.formatter = self._get_if_def(conf, self.formatter, FORMATTER_PARAM)
+            self.hostname = self._get_if_def(conf, self.hostname, HOSTNAME_PARAM)
             if self.pull_server_side_config == NOT_SET:
                 new_pull_server_side_config = conf.get(MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM)
                 self.pull_server_side_config = new_pull_server_side_config == 'True'
@@ -1844,12 +1862,12 @@ class Config(object):
 
             self.load_configured_logs(conf)
 
-        except ConfigParser.NoSectionError:
-            # TODO: Warning
-            return False
-        except ConfigParser.NoOptionError:
-            # TODO: Warning
-            return False
+        except ConfigParser.NoSectionError, e0:
+            raise FatalConfigurationError('%s'%e0)
+        except ConfigParser.NoOptionError, e1:
+            raise FatalConfigurationError('%s'%e1)
+        except ConfigParser.MissingSectionHeaderError, e2:
+            raise FatalConfigurationError('%s'%e2)
         return True
 
     def load_configured_logs(self, conf):
@@ -1868,10 +1886,15 @@ class Config(object):
                     if xtoken:
                         token = uuid_parse(xtoken)
                         if not token:
-                            log.warning("Invalid log token `%s' in section `%s'.", xtoken, name)
+                            log.warning("Invalid log token `%s' in application `%s'.", xtoken, name)
                 except ConfigParser.NoOptionError:
                     pass
-                path = conf.get(name, PATH_PARAM)
+
+                try:
+                    path = conf.get(name, PATH_PARAM)
+                except ConfigParser.NoOptionError:
+                    log.warning("Note: Required parameter `%s' not found in application `%s', skipping this application", PATH_PARAM, name)
+                    continue
 
                 destination = ''
                 try:
@@ -1880,7 +1903,6 @@ class Config(object):
                     pass
 
                 configured_log = ConfiguredLog(name, token, destination, path)
-
                 self.configured_logs.append(configured_log)
 
     def save(self):
@@ -2074,7 +2096,8 @@ class Config(object):
                     debug-stats-only debug-cmds debug-system help version yes force uuid list
                     std std-all name= hostname= type= pid-file= debug no-defaults
                     suppress-ssl use-ca-provided force-api-host= force-domain=
-                    system-stat-token= datahub= pull-server-side-config= config="""
+                    system-stat-token= datahub= pull-server-side-config= config=
+                    config.d="""
         try:
             optlist, args = getopt.gnu_getopt(params, '', param_list.split())
         except getopt.GetoptError, err:
@@ -2086,6 +2109,8 @@ class Config(object):
                 print_usage(True)
             if name == "--config":
                 self.config_filename = value
+            if name == "--config.d":
+                self.config_d = value
             if name == "--yes":
                 self.yes = True
             elif name == "--user-key":
@@ -2800,7 +2825,7 @@ def cmd_monitor(args):
 
     # Ensure all configured logs are created
     if config.configured_logs and not config.datahub:
-        create_configured_logs( config.configured_logs)
+        create_configured_logs(config.configured_logs)
 
     if config.daemon:
         daemonize()
@@ -3156,5 +3181,8 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except FatalConfigurationError, e:
+        log.error("Fatal: %s", e.msg)
     except KeyboardInterrupt:
         die("Terminated", EXIT_TERMINATED)
+

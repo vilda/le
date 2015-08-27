@@ -42,6 +42,7 @@ Testcase 'Monitoring'
 touch example.log
 echo 'Skip this message' >> example.log
 $LE --debug-events monitor &
+#e Configuration files loaded: sandbox_config
 #e Following $TMP/example.log
 #e Opening connection 127.0.0.1:10000 
 LE_PID=$!

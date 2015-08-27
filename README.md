@@ -110,12 +110,12 @@ The agent stores configuration in `~/.le/config` for ordinary users and in
 `/etc/le/config` for root (daemon). It is created with `init` or `reinit`
 commands and can be created or modified manually.
 
-The agent supports a configuration directory which is, per default
-`~/.le/conf.d/` for ordinary users and `/etc/le/conf.d` for root (daemon).
-Files matching `*.cfg` will be loaded and used as configuration from the
-config directory. The order of the loaded files depends on the naming.
+The agent supports loading multiple configuration files from a configuration
+directory. By default the configuration directory is `~/.le/conf.d/` for
+ordinary users and `/etc/le/conf.d` for root (daemon). Only files with `.conf`
+extension are recognized as configuration files.
 
-The structure of the configuration file follows standard similar to what you
+The structure of a configuration file follows standard similar to what you
 find in `.git/config` or Windows INI files. For example:
 
 	[Main]
@@ -135,17 +135,17 @@ In the main section, `user-key` (account key) which identifies account, and
 
 Note the `monitor` command requires both `user-key` and `agent-key` defined.
 
-### Modifying the configuration directory
+### User-specified configuration directory
 
-The configuration directory is set per default to `~/.le/conf.d/` for ordinary
-users and to `/etc/le/conf.d` for root. To change the configuration directory,
-specify the `include_directory` in the main section as follows:
+Additionaly to the default configuration directory, the agent allows to specify
+a secondary configuration directory. Just specify the `include` parameter in
+the main section as follows:
 
 	[Main]
 	user-key = e720a1e8-a7d5-4f8b-8879-854e51c9290d
-	include_directory = /opt/configurations/logentries/
+	include = /opt/configurations/logentries/conf.d
 
-which will load the configuration files matching `*.cfg` from `/opt/configurations/logentries/`
+Again, the agent recognizes all files with `.conf` extension.
 
 
 Follow log files through server-side configuration

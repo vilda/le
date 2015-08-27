@@ -77,6 +77,7 @@ destination=Name2/Log name 1
 EOF
 
 $LE reinit --pull-server-side-config=False
+#e Configuration files loaded: sandbox_config
 #e Reinitialized
 
 cat $CONFIG
@@ -103,7 +104,7 @@ cat $CONFIG
 #o
 
 
-Scenario 'Re-init with lcoally configured log'
+Scenario 'Re-init with locally configured log'
 
 $LE reinit --pull-server-side-config=False --suppress-ssl --datahub="127.0.0.1:10000" --hostname "abarakedabra"
 #e Reinitialized
@@ -115,6 +116,7 @@ token=629cc7e9-3344-4cef-b364-7fb6baeb74f2
 EOF
 
 $LE reinit --pull-server-side-config=False --suppress-ssl --datahub="127.0.0.1:10000"
+#e Configuration files loaded: sandbox_config
 #e Reinitialized
 
 cat $CONFIG
