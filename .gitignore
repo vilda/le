@@ -1,7 +1,7 @@
-le.py
 **.pyc
-le2
-HOWTO
 **~
+HOWTO
 lecheck
 /sandbox
+*.egg-info
+/.idea
