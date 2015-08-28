@@ -98,7 +98,7 @@ class ServerHTTPSConnection(httplib.HTTPSConnection):
             try:
                 match_hostname(self.sock.getpeercert(), self.host)
             except CertificateError, ce:
-                die("Could not validate SSL certificate for {0}: {1}".format(
+                die("Could not validate SSL certificate for %s: %s" % (
                     self.host, ce.message))
 
 

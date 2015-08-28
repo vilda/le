@@ -44,9 +44,11 @@ class FormatSyslog(object):
         lines = []
         for l in filter(None, line.split("\n")):
             lines.append(
-                '{token}<14>1 {dt}Z {hostname} {appname} - {msgid} - hostname={hostname} appname={appname} {line}'.format(
-                    token=token, dt=datetime.datetime.utcnow().isoformat('T'),
-                    hostname=self._hostname, appname=self._appname,
-                    msgid=msgid, line=l)
+                '%s<14>1 %sZ %s %s - %s - hostname=%s appname=%s %s'%(
+                    token, datetime.datetime.utcnow().isoformat('T'),
+                    self._hostname, self._appname,
+                    msgid,
+                    self._hostname, self._appname,
+                    l)
             )
         return (''.join(x+"\n" for x in lines))

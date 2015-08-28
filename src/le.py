@@ -1643,7 +1643,7 @@ class Transport(object):
             except Queue.Empty:
                 pass
             except Exception:
-                log.error("Exception in run: {0}".format(traceback.format_exc()))
+                log.error("Exception in run: %s", traceback.format_exc())
         self._close_connection()
 
 
@@ -2893,14 +2893,14 @@ def create_configured_logs(configured_logs):
     cache = load_cache()
     for clog in configured_logs:
         if not clog.destination and not clog.token:
-            log.error('Ignoring section {} as neither {} nor {} is specified'.format(clog.name, TOKEN_PARAM, DESTINATION_PARAM))
+            log.error('Ignoring section %s as neither %s nor %s is specified', clog.name, TOKEN_PARAM, DESTINATION_PARAM)
             continue
 
         if clog.destination and not clog.token:
             try:
                 (hostname, logname) = clog.destination.split('/', 1)
             except ValueError:
-                log.error('Ignoring section %s since `%s\' does not contain host' % (clog.name, DESTINATION_PARAM))
+                log.error('Ignoring section %s since `%s\' does not contain host', clog.name, DESTINATION_PARAM)
             host_key = get_or_create_host(cache, hostname)
             token = get_or_create_log(cache, host_key, logname, clog.destination)
             if not token:
