@@ -19,7 +19,10 @@ class FormatPlain(object):
         self._token = token
 
     def format_line(self, line):
-        return self._token + line
+        lines = []
+        for l in filter(None, line.split("\n")):
+            lines.append(self._token + l)
+        return (''.join(x+"\n" for x in lines))
 
 
 class FormatSyslog(object):
@@ -38,7 +41,12 @@ class FormatSyslog(object):
     def format_line(self, line, msgid='-', token=''):
         if not token:
             token = self._token
-        return '{token}<14>1 {dt}Z {hostname} {appname} - {msgid} - hostname={hostname} appname={appname} {line}'.format(
-            token=token, dt=datetime.datetime.utcnow().isoformat('T'),
-            hostname=self._hostname, appname=self._appname,
-            msgid=msgid, line=line)
+        lines = []
+        for l in filter(None, line.split("\n")):
+            lines.append(
+                '{token}<14>1 {dt}Z {hostname} {appname} - {msgid} - hostname={hostname} appname={appname} {line}'.format(
+                    token=token, dt=datetime.datetime.utcnow().isoformat('T'),
+                    hostname=self._hostname, appname=self._appname,
+                    msgid=msgid, line=l)
+            )
+        return (''.join(x+"\n" for x in lines))
