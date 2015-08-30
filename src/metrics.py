@@ -42,7 +42,10 @@ PROCESS = 'process'
 
 def _psutil_cpu_count():
     """Replaces cpu_count which is missing in older version."""
-    return psutil.NUM_CPUS
+    try:
+        return psutil.NUM_CPUS
+    except AttributeError:
+        return psutil.cpu_count()
 
 class CpuMetrics(object):
 
