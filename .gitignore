@@ -5,3 +5,4 @@ lecheck
 /sandbox
 *.egg-info
 /.idea
+/test/env

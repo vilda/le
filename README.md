@@ -15,6 +15,7 @@ infrastructure.
   * [List IP addresses the agent uses](#list-ip-addresses-the-agent-uses)
   * [Follow logs that change their names](#follow-logs-that-change-their-names)
   * [Manipulate your data in transit](#manipulate-your-data-in-transit)
+  * [Format output entries](#format-output-entries)
   * [Filtering file names](#filtering-file-names)
   * [System metrics (beta)](#system-metrics-beta)
     * [CPU](#cpu)
@@ -260,42 +261,35 @@ Manipulate your data in transit
 -------------------------------
 
 If you want to modify log entries before they are sent to Logentries, the agent
-enabled you to do so via filters. Filters are useful for filtering sensitive
+enables you to do so via filters. Filters are useful for filtering sensitive
 information, obfuscating, or explicit parsing (adding key-value pairs).
 
 Specify a Python module directory in your configuration by adding a line in the form of:
 
-	filters=/opt/le/le_filters
+	filters = /opt/le/le_filters
 
 Create empty `__init__.py` to set up a module. Then add filters.py file which
 contains filters dictionary. The dictionary informs the agent that for the
 given log name, log ID, or token, the specified filtering function should be
 used. For example the following dictionary:
 
-	filters={
+	filters = {
 		"example.log": filter_logname,
 		"7e518e54-40e4-4c5a-88df-4559d03126e6": filter_logid,
 	}
 
 Where `filter_logname` and `filter_loguuid` are functions which filters events
 for the respective log. Filtering functions receive a single string containing
-log entries terminated with a new line. Function can modify lines in any way
-and return them back for sending to Logentries servers. Do not forget to keep
-new line termination. The following skeleton displays typical structure of the
+log entries terminated with a new line. Function can modify input entry in any way
+and return is back for sending to Logentries servers.
+The following skeleton displays typical structure of the
 filtering function:
 
-	def filter_example( events):
-		# Split the block into individual log entries
-		parts = events.split( '\n')[:-1]
-		# Collect modified parts
-		new_parts = []
-		for entry in parts:
-			# Do something with entry
-			new_entry = entry # XXX
-			# Append new entry
-			new_parts.append( new_entry)
+	def filter_example(entry):
+		# Do something with entry
+		new_entry = entry # XXX
 		# Return modified output
-		return ''.join( x+'\n' for x in new_parts)
+		return new_entry
 
 Typical filtering function is much simpler though. For example the following
 filtering function removes all occurrences of credit card numbers:
@@ -309,6 +303,70 @@ filtering function removes all occurrences of credit card numbers:
 
 	def filter_credit_card( events):
 		return CREDIT_CARD.sub( CC_REPLACEMENT, events)
+
+Format output entries
+---------------------
+
+The agent allows to format log entries on transit. By default the agent formats entries according to syslog format specification RFC 5424 for locally configured log and plain format for server-side logs.
+
+Default formatter can be overriden by global formatter specified in `[Main]` section. Formatter can be also specified for each application which has a precedence. Lastly, formatters can be implemented by a user-specified code.
+
+### Standard formatters
+
+Standard formatter are `plain` which does not format entries at all, and `syslog` which formats log entries according to syslog format RFC 5424:
+
+	formatter = syslog
+
+### Custom formatters
+
+Format of log entry can be specified directly as a simple substitution template. Selected $-prepended variables are substituted with real values. Recognized variables are:
+
+	$isodatetime ISO date time, for example `2015-08-31T23:05:34.159291`
+	$appname application's name
+	$hostname local hostname
+	$line log entry
+
+For example, the following specification:
+
+	formatter = $isodatetime $app[$hostname]: $line
+
+Will result in the following log entry:
+
+	2015-08-31T23:05:34.159350 web[myhost]: GET /
+
+### User-implemented formatters
+
+If the standard set of formatters or custom templates do not satisfy your needs, you may provide your own Python implementation.
+
+Specify a Python module directory in your configuration by adding a line in the form of:
+
+		formatters = /opt/le/le_formatters
+
+Create empty `__init__.py` to set up a module. The add `formatters.py` file which contains the `formatters` dictionary. The dictionary informs the agent that for the given log name, log ID, or token, the specified formatting function should be used. For example the following dictionary:
+
+	formatters: {
+		'apache': setup_apache_filter,
+		'ba543c25-844c-4505-be10-b5aa0b678328': setup_cassandra_filter,
+	}
+
+will assign a filter crated by `setup_apache_filter` function to any log with `apache` name. Similarly, log with the token `ba543c25-844c-4505-be10-b5aa0b678328` will be formatted by output of the `setup_cassandra_filter` function.
+
+Setup functions must accept hostname, log name, and token and return a function that accepts log entry. For example:
+
+
+class Form(object):
+	def __init__(self, hostname, log_name, token):
+		self.hostname = hostname
+		self.log_name = log_name
+		self.token = token
+
+	def format_line(self, line):
+		return '%sapache on %s: %s'%(self.token, self.hostname, line)
+
+formatters = {
+	'apache' : lambda hostname, log_name, token: Form( hostname, log_name, token).format_line,
+}
+
 
 Filtering file names
 --------------------

@@ -240,9 +240,8 @@ import getpass
 import atexit
 import logging.handlers
 from backports import CertificateError, match_hostname
-from functools import partial
 
-import formatters
+import formats
 import metrics
 
 #
@@ -337,13 +336,13 @@ def default_filter_filenames(filename):
     """
     return True
 
-def format_events(default_formatter, events):
+def format_entries(default_formatter, entries):
     """
     User-defined formattering code. Events passed are about to be sent to
     logentries server. Make the required modifications to provide correct format.
     """
     # By default, this method is empty
-    return default_formatter.format_line(events)
+    return default_formatter.format_line(entries)
 
 
 def call(command):
@@ -1265,17 +1264,17 @@ class Follower(object):
     The follower keeps an eye on the file specified and sends new events to the
     logentries infrastructure.  """
 
-    def __init__(self, name, event_filter, event_formatter, transport):
+    def __init__(self, name, entry_filter, entry_formatter, transport):
         """ Initializes the follower. """
         self.name = name
         self.flush = True
-        self.event_filter = event_filter
-        self.event_formatter = event_formatter
+        self.entry_filter = entry_filter
+        self.entry_formatter = entry_formatter
         self.transport = transport
 
         self._file = None
         self._shutdown = False
-        self._read_file_rest = ""
+        self._read_file_rest = ''
         self._worker = threading.Thread(
             target=self.monitorlogs, name=self.name)
         self._worker.daemon = True
@@ -1352,20 +1351,21 @@ class Follower(object):
 
         return False
 
-    def _read_log_line(self):
-        """ Reads a line from the log. Checks maximal line size. """
+    def _read_log_lines(self):
+        """ Reads a block of lines from the log. Checks maximal line size. """
         buff = self._file.read(MAX_EVENTS - len(self._read_file_rest))
-        buff_list = buff.split("\n")
-        if len(buff_list) == 1: # in case there is no "\n" in the buff.
-            tmp_read_file_rest = self._read_file_rest
-            self._read_file_rest = ""
-            return (tmp_read_file_rest + buff)
-        else:
-            tmp_read_file_rest = buff_list[-1]
-            # drop the last line if it is not ending by \n. prepend the previous _read_file_rest
-            ret = self._read_file_rest + (''.join(x+'\n' for x in buff_list[:-1]));
-            self._read_file_rest = tmp_read_file_rest;
-            return ret
+        buff_lines = buff.split('\n')
+        if len(self._read_file_rest) > 0:
+            buff_lines[0] = self._read_file_rest + buff_lines[0]
+
+        self._read_file_rest = buff_lines[-1]
+
+        # Limit size of _read_file_rest
+        if len(self._read_file_rest) > MAX_EVENTS:
+            buff_lines.append(self._read_file_rest[:MAX_EVENTS])
+            self._read_file_rest = self._read_file_rest[MAX_EVENTS:]
+
+        return buff_lines[:-1]
 
     def _set_file_position(self, offset, start=FILE_BEGIN):
         """ Move the position of filepointers."""
@@ -1376,7 +1376,7 @@ class Follower(object):
         pos = self._file.tell()
         return pos
 
-    def _get_line(self):
+    def _get_lines(self):
         """
         Returns a block of newly detected line from the log. Returns None in case of timeout.
         """
@@ -1388,11 +1388,11 @@ class Follower(object):
         # TODO: investigate select-like approach?
         idle_cnt = 0
         iaa_cnt = 0
-        line = None
+        lines = []
         while iaa_cnt != IAA_INTERVAL and not self._shutdown:
-            # Collect line
-            line = self._read_log_line()
-            if len(line) != 0:
+            # Collect lines
+            lines = self._read_log_lines()
+            if lines:
                 break
 
             # No line, wait
@@ -1419,21 +1419,22 @@ class Follower(object):
                 self._set_file_position(self._get_file_position())
             iaa_cnt += 1
 
-        return line
+        return lines
 
-    def _send_line(self, line):
-        """ Sends the line. """
-        if line:
-            line = self.event_filter(line)
-        if not line:
-            return
-        if config.debug_events:
-            print >> sys.stderr, line,
-        if line:
-            line = self.event_formatter(line)
-        if not line:
-            return
-        self.transport.send(line)
+    def _send_lines(self, lines):
+        """ Sends lines. """
+        for line in lines:
+            if not line:
+                continue
+            line = self.entry_filter(line)
+            if not line:
+                continue
+            if config.debug_events:
+                print >> sys.stderr, line
+            line = self.entry_formatter(line)
+            if not line:
+                continue
+            self.transport.send(line)
 
     def close(self):
         """Closes the follower by setting the shutdown flag and waiting for the
@@ -1446,20 +1447,19 @@ class Follower(object):
         self._open_log()
         while not self._shutdown:
             try:
-                line = self._get_line()
+                lines = self._get_lines()
                 try:
-                    if line:
-                        self._send_line(line)
+                    self._send_lines(lines)
                 except IOError, e:
                     if config.debug:
                         log.debug("IOError: %s", e)
                     self._open_log()
                 except UnicodeError, e:
-                    log.warn("UnicodeError sending line %s", line, exc_info=True)
+                    log.warn("UnicodeError sending lines `%s'", lines, exc_info=True)
                 except Exception, e:
-                    log.error("Caught unknown error %s while sending line %s", e, line, exc_info=True)
+                    log.error("Caught unknown error `%s' while sending lines %s", e, lines, exc_info=True)
             except Exception, e:
-                log.error("Caught unknown error %s while sending line: %s", e, line, exc_info=True)
+                log.error("Caught unknown error `%s' while sending line", e, exc_info=True)
         self._close_log()
 
 
@@ -1509,6 +1509,7 @@ class Transport(object):
     def _connect_ssl(self, plain_socket):
         """Connects the socket and wraps in SSL. Returns the wrapped socket
         or None in case of IO or other errors."""
+        # FIXME this code ignores --local
         self._socket = None
         try:
             address = '-'
@@ -1639,7 +1640,7 @@ class Transport(object):
         while not self._shutdown:
             try:
                 entry = self._entries.get(True, 1)
-                self._send_entry(entry)
+                self._send_entry(entry + '\n')
             except Queue.Empty:
                 pass
             except Exception:
@@ -1684,11 +1685,12 @@ class DefaultTransport(object):
 
 class ConfiguredLog(object):
 
-    def __init__(self, name, token, destination, path):
+    def __init__(self, name, token, destination, path, formatter):
         self.name = name
         self.token = token
         self.destination = destination
         self.path = path
+        self.formatter = formatter
         self.logset = None
         self.set_key = None
         self.log_key = None
@@ -1944,7 +1946,13 @@ class Config(object):
                 except ConfigParser.NoOptionError:
                     pass
 
-                configured_log = ConfiguredLog(name, token, destination, path)
+                formatter = ''
+                try:
+                    formatter = conf.get(name, FORMATTER_PARAM)
+                except ConfigParser.NoOptionError:
+                    pass
+
+                configured_log = ConfiguredLog(name, token, destination, path, formatter)
                 self.configured_logs.append(configured_log)
 
     def save(self):
@@ -2657,50 +2665,7 @@ def check_file_name(file_name):
     return file_name.startswith('/')
 
 
-def get_formatters(default_formatter, available_formatters, log_name, log_key, log_filename, log_token):
-    debug_formatters(
-        "Log name=%s id=%s filename=%s token=%s", log_name, log_key,
-        log_filename, log_token)
-    debug_formatters(
-        " Looking for formatters by log name, log id, and token")
-
-    event_formatter = None
-    if not event_formatter and log_name:
-        debug_formatters(" Looking for formatters by log name")
-        event_formatter = available_formatters.get(log_name)
-        if not event_formatter:
-            debug_formatters(" No formatter found by log name")
-
-    if not event_formatter and log_key:
-        debug_formatters(" Looking for formatters by log ID")
-        event_formatter = available_formatters.get(log_key)
-        if not event_formatter:
-            debug_formatters(" No formatter found by log ID")
-
-    if not event_formatter and log_token:
-        debug_formatters(" Looking for formatters by token")
-        event_formatter = available_formatters.get(log_token)
-        if not event_formatter:
-            debug_formatters(" No formatter found by token")
-
-    if event_formatter and not hasattr(event_formatter, '__call__'):
-        debug_formatters(
-            " Formatter found, but ignored because it's not a function")
-        event_formatter = None
-    if event_formatter:
-        event_formatter = partial(event_formatter, config.hostname, log_name, log_token)
-        debug_formatters(" Using formatter %s", event_formatter)
-    else:
-        event_formatter = partial(format_events, default_formatter)
-        debug_formatters(" No formatter found using default formatter")
-
-    return event_formatter
-
-def get_filters(available_filters, filter_filenames, log_name, log_key, log_filename, log_token):
-    debug_filters(
-        "Log name=%s id=%s filename=%s token=%s", log_name, log_key,
-        log_filename, log_token)
-
+def get_filters(available_filters, filter_filenames, log_name, log_id, log_filename, log_token):
     # Check filters
     if not filter_filenames(log_filename):
         debug_filters(
@@ -2709,38 +2674,75 @@ def get_filters(available_filters, filter_filenames, log_name, log_key, log_file
             'Not following %s, blocked by filter_filenames', log_name)
         return None
     debug_filters(
-        " Looking for filters by log name, log id, and token")
+        " Looking for filters by log_name=%s log_id=%s token=%s", log_name, log_id, log_token)
 
-    event_filter = None
-    if not event_filter and log_name:
+    entry_filter = None
+    if not entry_filter and log_name:
         debug_filters(" Looking for filters by log name")
-        event_filter = available_filters.get(log_name)
-        if not event_filter:
+        entry_filter = available_filters.get(log_name)
+        if not entry_filter:
             debug_filters(" No filter found by log name")
 
-    if not event_filter and log_key:
+    if not entry_filter and log_id:
         debug_filters(" Looking for filters by log ID")
-        event_filter = available_filters.get(log_key)
-        if not event_filter:
+        entry_filter = available_filters.get(log_id)
+        if not entry_filter:
             debug_filters(" No filter found by log ID")
 
-    if not event_filter and log_token:
+    if not entry_filter and log_token:
         debug_filters(" Looking for filters by token")
-        event_filter = available_filters.get(log_token)
-        if not event_filter:
+        entry_filter = available_filters.get(log_token)
+        if not entry_filter:
             debug_filters(" No filter found by token")
 
-    if event_filter and not hasattr(event_filter, '__call__'):
+    if entry_filter and not hasattr(entry_filter, '__call__'):
         debug_filters(
             " Filter found, but ignored because it's not a function")
-        event_filter = None
-    if not event_filter:
-        event_filter = filter_events
+        entry_filter = None
+    if not entry_filter:
+        entry_filter = filter_events
         debug_filters(" No filter found")
     else:
-        debug_filters(" Using filter %s", event_filter)
-    return event_filter
+        debug_filters(" Using filter %s", entry_filter)
+    return entry_filter
 
+
+def get_formatters(default_formatter, available_formatters, log_name, log_id, log_filename, log_token):
+    debug_formatters(
+        " Looking for formatters by log_name=%s id=%s token=%s", log_name, log_id, log_token)
+
+    entry_formatter = None
+    if not entry_formatter and log_name:
+        debug_formatters(" Looking for formatters by log name")
+        entry_formatter = available_formatters.get(log_name)
+        if not entry_formatter:
+            debug_formatters(" No formatter found by log name")
+
+    if not entry_formatter and log_id:
+        debug_formatters(" Looking for formatters by log ID")
+        entry_formatter = available_formatters.get(log_id)
+        if not entry_formatter:
+            debug_formatters(" No formatter found by log ID")
+
+    if not entry_formatter and log_token:
+        debug_formatters(" Looking for formatters by token")
+        entry_formatter = available_formatters.get(log_token)
+        if not entry_formatter:
+            debug_formatters(" No formatter found by token")
+
+    if entry_formatter and not hasattr(entry_formatter, '__call__'):
+        debug_formatters(
+            " Formatter found, but ignored because it's not a function")
+        entry_formatter = None
+
+    if entry_formatter:
+        form = entry_formatter(config.hostname, log_name, log_token)
+        debug_formatters(" Formatter found")
+    else:
+        form = default_formatter
+        debug_formatters(" No formatter found")
+
+    return form
 
 def start_followers(default_transport):
     """
@@ -2753,7 +2755,8 @@ def start_followers(default_transport):
 
     if config.pull_server_side_config:
         # Use LE server as the source for list of followed logs
-        while not logs:
+        server_logs = []
+        while not server_logs:
             resp = request('hosts/%s/' %
                            config.agent_key, False, False, retry=True)
             if resp['response'] != 'ok':
@@ -2763,22 +2766,21 @@ def start_followers(default_transport):
                     noticed = True
                 time.sleep(SRV_RECON_TIMEOUT)
                 continue
-            logs = resp['list']
-            if not logs:
+            server_logs = resp['list']
+            if not server_logs:
                 time.sleep(SRV_RECON_TIMEOUT)
         # Select logs for the agent
-        logs = [l for l in logs if l.get('follow') == 'true']
+        for l in server_logs:
+            if l.get('follow') == 'true':
+                l['formatter'] = ''
+                logs.append( l)
 
     for cl in config.configured_logs:
-        # Unpack log dictionary
-        log_path = cl.path
-        log_name = cl.name
-        log_token = cl.token
         # Construct response-like item which has the same structure as ones
         # returned by LE Server.
         logs.append(
-            {'type': 'token', 'name': log_name, 'filename': log_path, 'key': '', 'token': log_token,
-                     'follow': 'true'})
+            {'type': 'token', 'name': cl.name, 'filename': cl.path, 'key': '', 'token': cl.token,
+                     'formatter': cl.formatter, 'follow': 'true'})
 
     available_filters = {}
     filter_filenames = default_filter_filenames
@@ -2791,7 +2793,7 @@ def start_followers(default_transport):
             filter_filenames = getattr(
                 filters, 'filter_filenames', default_filter_filenames)
 
-            debug_filters("Available filters: %s", available_filters)
+            debug_filters("Available filters: %s", available_filters.keys())
             debug_filters("Filter filenames: %s", filter_filenames)
         except:
             log.error('Cannot import event filter module %s: %s',
@@ -2802,10 +2804,10 @@ def start_followers(default_transport):
     if config.formatters != NOT_SET:
         sys.path.append(config.formatters)
         try:
-            import user_formatters
+            import formatters
 
-            available_formatters = getattr(user_formatters, 'formatters', {})
-            debug_formatters("Available formatters: %s", available_formatters)
+            available_formatters = getattr(formatters, 'formatters', {})
+            debug_formatters("Available formatters: %s", available_formatters.keys())
         except:
             log.error('Cannot import event formatter module %s: %s',
                       config.formatters, sys.exc_info()[1])
@@ -2833,16 +2835,18 @@ def start_followers(default_transport):
             if not entry_filter:
                 continue
 
+            # Formatter is taken according to local specification, global specification
+            # and user-provided formatter
+            entry_formatter = formats.get_formatter(l['formatter'], config.hostname, log_name, log_token)
+            if not entry_formatter:
+                entry_formatter = formats.get_formatter(config.formatter, config.hostname, log_name, log_token)
+            entry_formatter = get_formatters(entry_formatter, available_formatters,
+                                             log_name, log_key, log_filename,
+                                             log_token)
+
             log.info("Following %s", log_filename)
 
             if log_token or config.datahub:
-                if config.formatter == 'plain':
-                    default_formatter = formatters.FormatPlain(log_token)
-                elif config.formatter == 'syslog' or config.formatter == NOT_SET:
-                    default_formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
-                else:
-                    log.error("Ignoring unknown default_formatter %s, using syslog format instead", config.formatter)
-                    default_formatter = formatters.FormatSyslog(config.hostname, log_name, log_token)
                 transport = default_transport.get()
             elif log_key:
                 endpoint = Domain.API
@@ -2858,16 +2862,20 @@ def start_followers(default_transport):
                     use_ssl = False
                 preamble = 'PUT /%s/hosts/%s/%s/?realtime=1 HTTP/1.0\r\n\r\n' % (
                     config.user_key, config.agent_key, log_key)
-                default_formatter = formatters.FormatPlain('')
+                # Special case for HTTP PUT
+                # Use plain formatter if no formatter is defined
                 transport = Transport(endpoint, port, use_ssl, preamble,
                                       config.debug_transport_events)
                 transports.append(transport)
+                # Default formatter is plain
+                if not entry_formatter:
+                    entry_formatter = formats.get_formatter('plain', config.hostname, log_name, log_token)
             else:
                 continue
 
-            entry_formatter = get_formatters(default_formatter, available_formatters,
-                                             log_name, log_key, log_filename,
-                                             log_token)
+            # Default formatter is syslog
+            if not entry_formatter:
+                entry_formatter = formats.get_formatter('syslog', config.hostname, log_name, log_token)
 
             # Instantiate the follower
             follower = Follower(log_filename, entry_filter, entry_formatter, transport)
@@ -2938,8 +2946,8 @@ def cmd_monitor(args):
     if config.agent_key != NOT_SET:
         stats = Stats()
         stats.start()
-    formatter = formatters.FormatSyslog(config.hostname, 'le',
-                                        config.metrics.token)
+    formatter = formats.FormatSyslog(config.hostname, 'le',
+                                     config.metrics.token)
     smetrics = metrics.Metrics(config.metrics, default_transport,
                                 formatter, config.debug_metrics)
     smetrics.start()

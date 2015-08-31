@@ -24,7 +24,7 @@ function Scenario {
 	echo -e "$X"
 	[ -z "$AUTO_TEST" ] || echo -e "$X" >&2
 
-	rm -f "$CONFIG"
+	rm -rf "$CONFIG" "$CONFIG_D/*"
 }
 
 function Testcase {

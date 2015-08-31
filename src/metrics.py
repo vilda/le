@@ -10,7 +10,7 @@ import time
 import traceback
 import uuid
 
-import formatters
+import formats
 from utils import report
 from __init__ import __version__
 
@@ -650,7 +650,7 @@ if __name__ == '__main__':
         conf.__dict__[DISK] = 'sum all'
         conf.__dict__[TOKEN] = uuid.uuid4()
         metrics = Metrics(conf, None,
-                formatters.FormatSyslog('', 'le', ''), True)
+                formats.FormatSyslog('', 'le', ''), True)
         metrics.start()
         time.sleep(600)  # Is there a better way?
     except KeyboardInterrupt:
