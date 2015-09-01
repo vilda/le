@@ -7,7 +7,7 @@ Scenario 'Creating log from configuration'
 $LE init --account-key=$ACCOUNT_KEY --host-key=$HOST_KEY
 #e Initialized
 
-tee >>$CONFIG <<EOF
+tee >>"$CONFIG" <<EOF
 [cassandra]
 path=$TMP/system.out
 destination=Name2/Log name 1
