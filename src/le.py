@@ -45,6 +45,7 @@ FORCE_DOMAIN_PARAM = 'force_domain'
 DATAHUB_PARAM = 'datahub'
 SYSSTAT_TOKEN_PARAM = 'system-stat-token'
 HOSTNAME_PARAM = 'hostname'
+V1_METRICS_PARAM = 'v1_metrics'
 TOKEN_PARAM = 'token'
 PATH_PARAM = 'path'
 INCLUDE_PARAM = 'include'
@@ -1741,6 +1742,7 @@ class Config(object):
         self.formatter = NOT_SET
         self.force = False
         self.hostname = NOT_SET
+        self.v1_metrics = NOT_SET
         self.name = NOT_SET
         self.no_timestamps = False
         self.pid_file = PID_FILE
@@ -1856,6 +1858,7 @@ class Config(object):
                 DATAHUB_PARAM: '',
                 SYSSTAT_TOKEN_PARAM: '',
                 HOSTNAME_PARAM: '',
+                V1_METRICS_PARAM: 'True',
                 PULL_SERVER_SIDE_CONFIG_PARAM: 'True',
                 INCLUDE_PARAM: '',
             })
@@ -1886,6 +1889,7 @@ class Config(object):
             self.formatters = self._get_if_def(conf, self.formatters, FORMATTERS_PARAM)
             self.formatter = self._get_if_def(conf, self.formatter, FORMATTER_PARAM)
             self.hostname = self._get_if_def(conf, self.hostname, HOSTNAME_PARAM)
+            self.v1_metrics = self._get_if_def(conf, self.v1_metrics, V1_METRICS_PARAM)
             if self.pull_server_side_config == NOT_SET:
                 new_pull_server_side_config = conf.get(MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM)
                 self.pull_server_side_config = new_pull_server_side_config == 'True'
@@ -1980,6 +1984,10 @@ class Config(object):
                 conf.set(MAIN_SECT, FORMATTERS_PARAM, self.formatters)
             if self.formatter != NOT_SET:
                 conf.set(MAIN_SECT, FORMATTER_PARAM, self.formatter)
+            if self.v1_metrics != NOT_SET:
+                conf.set(MAIN_SECT, V1_METRICS_PARAM, self.v1_metrics)
+            else:
+                conf.set(MAIN_SECT, V1_METRICS_PARAM, 'False')
             if self.hostname != NOT_SET:
                 conf.set(MAIN_SECT, HOSTNAME_PARAM, self.hostname)
             if self.suppress_ssl:
@@ -2153,8 +2161,8 @@ class Config(object):
                     debug-stats-only debug-cmds debug-system help version yes force uuid list
                     std std-all name= hostname= type= pid-file= debug no-defaults
                     suppress-ssl use-ca-provided force-api-host= force-domain=
-                    system-stat-token= datahub= pull-server-side-config= config=
-                    config.d="""
+                    system-stat-token= datahub= legacy_v1_metrics
+                    pull-server-side-config= config= config.d="""
         try:
             optlist, args = getopt.gnu_getopt(params, '', param_list.split())
         except getopt.GetoptError, err:
@@ -2188,6 +2196,8 @@ class Config(object):
                 self.name = value
             elif name == "--hostname":
                 self.hostname = value
+            elif name == "--legacy_v1_metrics":
+                self.v1_metrics = 'True'
             elif name == "--pid-file":
                 if value == '':
                     self.pid_file = None
@@ -2948,9 +2958,12 @@ def cmd_monitor(args):
     default_transport = DefaultTransport(config)
 
     # Register resource monitoring
-    if config.agent_key != NOT_SET:
+    if config.agent_key != NOT_SET and config.v1_metrics != 'False':
+        log.debug("Enabling V1 metrics")
         stats = Stats()
         stats.start()
+    else:
+        log.debug("V1 metrics disabled")
     formatter = formats.FormatSyslog(config.hostname, 'le',
                                      config.metrics.token)
     smetrics = metrics.Metrics(config.metrics, default_transport,
