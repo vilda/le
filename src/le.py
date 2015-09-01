@@ -39,6 +39,7 @@ AGENT_KEY_PARAM = 'agent-key'
 FILTERS_PARAM = 'filters'
 FORMATTERS_PARAM = 'formatters'
 FORMATTER_PARAM = 'formatter'
+ENTRY_IDENTIFIER_PARAM = 'entry_identifier'
 SUPPRESS_SSL_PARAM = 'suppress_ssl'
 USE_CA_PROVIDED_PARAM = 'use_ca_provided'
 FORCE_DOMAIN_PARAM = 'force_domain'
@@ -53,6 +54,8 @@ PULL_SERVER_SIDE_CONFIG_PARAM = 'pull-server-side-config'
 KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
+
+LINE_SEPARATOR = '\xe2\x80\xa8'
 
 # Maximal queue size for events sent
 SEND_QUEUE_SIZE = 32000
@@ -789,7 +792,7 @@ def parse_timestamp_range(text):
     if text in ['y', 'yesterday']:
         yesterday = int(time.mktime(
             (datetime.datetime(now.year, now.month, now.day) -
-                datetime.timedelta(days=1)).timetuple())) * 1000
+            datetime.timedelta(days=1)).timetuple())) * 1000
         return [yesterday, yesterday + DAY]
 
     # Range spec
@@ -1264,17 +1267,19 @@ class Follower(object):
     The follower keeps an eye on the file specified and sends new events to the
     logentries infrastructure.  """
 
-    def __init__(self, name, entry_filter, entry_formatter, transport):
+    def __init__(self, name, entry_filter, entry_formatter, entry_identifier, transport):
         """ Initializes the follower. """
         self.name = name
         self.flush = True
         self.entry_filter = entry_filter
         self.entry_formatter = entry_formatter
+        self.entry_identifier = entry_identifier
         self.transport = transport
 
         self._file = None
         self._shutdown = False
         self._read_file_rest = ''
+        self._entry_rest = []
         self._worker = threading.Thread(
             target=self.monitorlogs, name=self.name)
         self._worker.daemon = True
@@ -1376,9 +1381,37 @@ class Follower(object):
         pos = self._file.tell()
         return pos
 
-    def _get_lines(self):
+    def _collect_lines(self, lines):
+        """Accepts lines received and merges them to multiline events.
         """
-        Returns a block of newly detected line from the log. Returns None in case of timeout.
+        # Fast track
+        if not self.entry_identifier:
+            return lines
+        if not lines:
+            if self._entry_rest:
+                x = [LINE_SEPARATOR.join(self._entry_rest)]
+                self._entry_rest = []
+            else:
+                x = []
+            return x
+        # Entry separator is specified
+        new_lines = []
+        new_entry = self._entry_rest
+        self._entry_rest = []
+        for line in lines:
+            if self.entry_identifier.search(line):
+                if new_entry:
+                    new_lines.append(LINE_SEPARATOR.join(new_entry))
+                    new_entry = []
+                new_entry.append(line)
+            else:
+                new_entry.append(line)
+        self._entry_rest = new_entry
+        return new_lines
+
+    def _get_lines(self):
+        """Returns a block of newly detected line from the log. Returns None in
+        case of timeout.
         """
         # Moves at the end of the log file
         if self.flush:
@@ -1392,11 +1425,16 @@ class Follower(object):
         while iaa_cnt != IAA_INTERVAL and not self._shutdown:
             # Collect lines
             lines = self._read_log_lines()
+            lines = self._collect_lines(lines)
             if lines:
                 break
 
             # No line, wait
             time.sleep(TAIL_RECHECK)
+
+            lines = self._collect_lines([])
+            if lines:
+                break
 
             # Log rename check
             idle_cnt += 1
@@ -1685,12 +1723,13 @@ class DefaultTransport(object):
 
 class ConfiguredLog(object):
 
-    def __init__(self, name, token, destination, path, formatter):
+    def __init__(self, name, token, destination, path, formatter, entry_identifier):
         self.name = name
         self.token = token
         self.destination = destination
         self.path = path
         self.formatter = formatter
+        self.entry_identifier = entry_identifier
         self.logset = None
         self.set_key = None
         self.log_key = None
@@ -1734,6 +1773,7 @@ class Config(object):
         self.filters = NOT_SET
         self.formatters = NOT_SET
         self.formatter = NOT_SET
+        self.entry_identifier = NOT_SET
         self.force = False
         self.hostname = NOT_SET
         self.name = NOT_SET
@@ -1845,6 +1885,7 @@ class Config(object):
                 FILTERS_PARAM: '',
                 FORMATTERS_PARAM: '',
                 FORMATTER_PARAM: '',
+                ENTRY_IDENTIFIER_PARAM: '',
                 SUPPRESS_SSL_PARAM: '',
                 FORCE_DOMAIN_PARAM: '',
                 USE_CA_PROVIDED_PARAM: '',
@@ -1880,6 +1921,7 @@ class Config(object):
             self.filters = self._get_if_def(conf, self.filters, FILTERS_PARAM)
             self.formatters = self._get_if_def(conf, self.formatters, FORMATTERS_PARAM)
             self.formatter = self._get_if_def(conf, self.formatter, FORMATTER_PARAM)
+            self.entry_identifier = self._get_if_def(conf, self.entry_identifier, ENTRY_IDENTIFIER_PARAM)
             self.hostname = self._get_if_def(conf, self.hostname, HOSTNAME_PARAM)
             if self.pull_server_side_config == NOT_SET:
                 new_pull_server_side_config = conf.get(MAIN_SECT, PULL_SERVER_SIDE_CONFIG_PARAM)
@@ -1952,7 +1994,13 @@ class Config(object):
                 except ConfigParser.NoOptionError:
                     pass
 
-                configured_log = ConfiguredLog(name, token, destination, path, formatter)
+                entry_identifier = ''
+                try:
+                    entry_identifier = conf.get(name, ENTRY_IDENTIFIER_PARAM)
+                except ConfigParser.NoOptionError:
+                    pass
+
+                configured_log = ConfiguredLog(name, token, destination, path, formatter, entry_identifier)
                 self.configured_logs.append(configured_log)
 
     def save(self):
@@ -2744,6 +2792,15 @@ def get_formatters(default_formatter, available_formatters, log_name, log_id, lo
 
     return form
 
+def _init_entry_identifier(entry_identifier):
+    """Compiles entry separator defined by regular expression. If the
+    compilation is not successfull, it return None.
+    """
+    try:
+        return re.compile(entry_identifier)
+    except re.error:
+        return None
+
 def start_followers(default_transport):
     """
     Loads logs from the server (or configuration) and initializes followers.
@@ -2773,14 +2830,15 @@ def start_followers(default_transport):
         for l in server_logs:
             if l.get('follow') == 'true':
                 l['formatter'] = ''
-                logs.append( l)
+                l['entry_identifier'] = ''
+                logs.append(l)
 
     for cl in config.configured_logs:
         # Construct response-like item which has the same structure as ones
         # returned by LE Server.
         logs.append(
             {'type': 'token', 'name': cl.name, 'filename': cl.path, 'key': '', 'token': cl.token,
-                     'formatter': cl.formatter, 'follow': 'true'})
+                     'formatter': cl.formatter, 'entry_identifier': cl.entry_identifier, 'follow': 'true'})
 
     available_filters = {}
     filter_filenames = default_filter_filenames
@@ -2844,6 +2902,16 @@ def start_followers(default_transport):
                                              log_name, log_key, log_filename,
                                              log_token)
 
+            s_entry_identifier = l['entry_identifier']
+            if not s_entry_identifier:
+                s_entry_identifier = config.entry_identifier
+            if s_entry_identifier:
+                entry_identifier = _init_entry_identifier(s_entry_identifier)
+                if not entry_identifier:
+                    log.error("Invalid entry separator `%s' ignored", s_entry_identifier)
+            else:
+                entry_identifier = None
+
             log.info("Following %s", log_filename)
 
             if log_token or config.datahub:
@@ -2878,7 +2946,7 @@ def start_followers(default_transport):
                 entry_formatter = formats.get_formatter('syslog', config.hostname, log_name, log_token)
 
             # Instantiate the follower
-            follower = Follower(log_filename, entry_filter, entry_formatter, transport)
+            follower = Follower(log_filename, entry_filter, entry_formatter, entry_identifier, transport)
             followers.append(follower)
     return (followers, transports)
 
