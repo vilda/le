@@ -8,7 +8,6 @@ import sys
 import threading
 import time
 import traceback
-import uuid
 
 import formats
 from utils import report
@@ -648,7 +647,7 @@ if __name__ == '__main__':
         conf.__dict__[VCPU] = 'core'
         conf.__dict__[NET] = 'sum all'
         conf.__dict__[DISK] = 'sum all'
-        conf.__dict__[TOKEN] = uuid.uuid4()
+        conf.__dict__[TOKEN] = 'e2b405df-858b-4148-92a5-37d06dbd50f5'
         metrics = Metrics(conf, None,
                 formats.FormatSyslog('', 'le', ''), True)
         metrics.start()

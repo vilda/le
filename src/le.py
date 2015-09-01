@@ -296,6 +296,7 @@ except ImportError:
 
 # FIXME
 no_ssl = False
+FEAT_SSL = True
 try:
     import ssl
 
@@ -304,6 +305,7 @@ try:
 
 except ImportError:
     no_ssl = True
+    FEAT_SSL = False
 
     try:
         _ = httplib.HTTPSConnection
@@ -1556,22 +1558,25 @@ class Transport(object):
             s = plain_socket
             s.connect((address, self.port))
 
-            try:
-                s = ssl.wrap_socket(
-                    plain_socket, ca_certs=self._certs,
-                    cert_reqs=ssl.CERT_REQUIRED, ssl_version=ssl.PROTOCOL_TLSv1,
-                    ciphers="HIGH:-aNULL:-eNULL:-PSK:RC4-SHA:RC4-MD5")
-            except TypeError:
-                s = ssl.wrap_socket(
-                    plain_socket, ca_certs=self._certs, cert_reqs=ssl.CERT_REQUIRED,
-                    ssl_version=ssl.PROTOCOL_TLSv1)
+            if FEAT_SSL:
+                try:
+                    s = wrap_socket(
+                        plain_socket, ca_certs=self._certs,
+                        cert_reqs=ssl.CERT_REQUIRED, ssl_version=ssl.PROTOCOL_TLSv1,
+                        ciphers="HIGH:-aNULL:-eNULL:-PSK:RC4-SHA:RC4-MD5")
+                except TypeError:
+                    s = wrap_socket(
+                        plain_socket, ca_certs=self._certs, cert_reqs=ssl.CERT_REQUIRED,
+                        ssl_version=ssl.PROTOCOL_TLSv1)
 
-            try:
-                match_hostname(s.getpeercert(), self.endpoint)
-            except CertificateError, ce:
-                report("Could not validate SSL certificate for %s: %s" %
-                       (self.endpoint, ce.message))
-                return None
+                try:
+                    match_hostname(s.getpeercert(), self.endpoint)
+                except CertificateError, ce:
+                    report("Could not validate SSL certificate for %s: %s" %
+                        (self.endpoint, ce.message))
+                    return None
+            else:
+                s = wrap_socket(plain_socket, ca_certs=self._certs)
             return s
 
         except IOError, e:

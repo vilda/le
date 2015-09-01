@@ -8,7 +8,11 @@ import os
 import re
 import socket
 import sys
-import uuid
+try:
+    import uuid
+    FEAT_UUID = True
+except ImportError:
+    FEAT_UUID = False
 from backports import match_hostname, CertificateError
 
 import logging
@@ -271,7 +275,7 @@ def expr_match(expr, text):
         if re.match(expr[1:], text):
             return True
     else:
-        if expr[0:2] == '\/':
+        if expr[0:2] == '\\/':
             return text == expr[1:]
         else:
             return text == expr
@@ -379,7 +383,6 @@ def rm_pidfile(config):
 def set_proc_title(title):
     try:
         import setproctitle
-
         setproctitle.setproctitle(title)
     except ImportError:
         pass
@@ -403,9 +406,15 @@ def uuid_parse(text):
     """Returns uuid given or None in case of syntax error.
     """
     try:
-        return uuid.UUID(text).__str__()
+        if FEAT_UUID:
+            return uuid.UUID(text).__str__()
+        else:
+            low_text = text.lower()
+            if re.match( r'^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}', low_text):
+                return low_text
     except ValueError:
-        return None
+        pass
+    return None
 
 
 #
