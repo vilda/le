@@ -9,7 +9,7 @@ import threading
 import time
 import traceback
 
-import formatters
+import formats
 from utils import report
 from __init__ import __version__
 
@@ -41,7 +41,10 @@ PROCESS = 'process'
 
 def _psutil_cpu_count():
     """Replaces cpu_count which is missing in older version."""
-    return psutil.NUM_CPUS
+    try:
+        return psutil.NUM_CPUS
+    except AttributeError:
+        return psutil.cpu_count()
 
 class CpuMetrics(object):
 
@@ -646,7 +649,7 @@ if __name__ == '__main__':
         conf.__dict__[DISK] = 'sum all'
         conf.__dict__[TOKEN] = 'e2b405df-858b-4148-92a5-37d06dbd50f5'
         metrics = Metrics(conf, None,
-                formatters.FormatSyslog('', 'le', ''), True)
+                formats.FormatSyslog('', 'le', ''), True)
         metrics.start()
         time.sleep(600)  # Is there a better way?
     except KeyboardInterrupt:

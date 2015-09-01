@@ -48,6 +48,9 @@ for A in ${TESTS[*]} ; do
 
 	bash $A >"$REAL_STDOUT" 2>"$REAL_STDERR" || true
 
+	# From output replace any ISO dates
+	sed -i 's/20[0-9]\{2\}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-6][0-9]\.[0-9]\{6\}Z\?/ISODATETIME/g' "$REAL_STDERR"
+
 	# Display differences
 	diff -u -- "$EXPECTED_STDERR" "$REAL_STDERR"
 	diff -u -- "$EXPECTED_STDOUT" "$REAL_STDOUT"

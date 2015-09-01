@@ -2,7 +2,9 @@
 
 . vars
 
-Scenario 'Recognizes configuration directory provided on command line'
+Scenario 'Configuration directory'
+
+Testcase 'Recognizes configuration directory provided on command line'
 
 mkdir $CONFIG_D
 touch $CONFIG_D/abraka.conf # Accepted
@@ -23,7 +25,7 @@ $LE ls
 #e List response: {"object": "rootlist", "list": [{"name": "logs", "key": ""}, {"name": "hosts", "key": ""}, {"name": "hostnames", "key": ""}, {"name": "apps", "key": ""}, {"name": "clusters", "key": ""}, {"name": "logtypes", "key": ""}], "response": "ok"}
 #e 6 items
 
-Scenario 'Recognizes configuration directory from main configuration'
+Testcase 'Recognizes configuration directory from main configuration'
 
 $LE init --account-key=$ACCOUNT_KEY --host-key=$HOST_KEY
 #e Initialized
@@ -48,10 +50,10 @@ $LE ls
 #e 6 items
 
 
-Scenario 'The reinit command does not load configuration from directories'
+Testcase 'The reinit command does not load configuration from directories'
 
-$LE init --account-key=$ACCOUNT_KEY --host-key=$HOST_KEY
-#e Initialized
+##$LE init --account-key=$ACCOUNT_KEY --host-key=$HOST_KEY
+##e Initialized
 
 $LE reinit --pull-server-side-config=False --suppress-ssl --datahub="127.0.0.1:10000" --hostname "abarakedabra"
 #e Configuration files loaded: sandbox_config
