@@ -11,6 +11,7 @@ cat $CONFIG
 #o [Main]
 #o user-key = f720fe54-879a-11e4-81ac-277d856f873e
 #o agent-key = 41ae887a-284a-4d78-91fe-56485b076148
+#o v1_metrics = False
 #o metrics-mem = system
 #o metrics-token = 
 #o metrics-disk = sum
@@ -32,6 +33,7 @@ cat $CONFIG
 #o [Main]
 #o user-key = f720fe54-879a-11e4-81ac-277d856f873e
 #o agent-key = 41ae887a-284a-4d78-91fe-56485b076148
+#o v1_metrics = False
 #o hostname = abarakedabra
 #o suppress_ssl = True
 #o datahub = localhost:5000
@@ -55,6 +57,7 @@ $LE init --account-key=$ACCOUNT_KEY
 cat $CONFIG
 #o [Main]
 #o user-key = f720fe54-879a-11e4-81ac-277d856f873e
+#o v1_metrics = False
 #o metrics-mem = system
 #o metrics-token = 
 #o metrics-disk = sum
@@ -83,6 +86,7 @@ $LE reinit --pull-server-side-config=False
 cat $CONFIG
 #o [Main]
 #o user-key = f720fe54-879a-11e4-81ac-277d856f873e
+#o v1_metrics = False
 #o pull-server-side-config = False
 #o metrics-mem = system
 #o metrics-token = 
@@ -121,6 +125,7 @@ $LE reinit --pull-server-side-config=False --suppress-ssl --datahub="127.0.0.1:1
 
 cat $CONFIG
 #o [Main]
+#o v1_metrics = False
 #o hostname = abarakedabra
 #o suppress_ssl = True
 #o pull-server-side-config = False
