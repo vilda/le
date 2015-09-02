@@ -17,6 +17,7 @@ infrastructure.
   * [Manipulate your data in transit](#manipulate-your-data-in-transit)
   * [Format output entries](#format-output-entries)
   * [Filtering file names](#filtering-file-names)
+  * [Multiline log entries](#multiline-log-entries)
   * [System metrics (beta)](#system-metrics-beta)
     * [CPU](#cpu)
     * [VCPU](#vcpu)
@@ -389,6 +390,19 @@ file outside /var/log/ directory:
 		return filename.startswith( '/var/log/')
 
 Note the examples above do not take into account symbolic links.
+
+
+Multiline log entries
+---------------------
+
+If you want to merge multiple lines into one entry, use the `entry_identifier` parameter. It defines via regular expression beginning of a new entry. In most cases it is a timestamp.
+
+The `entry_identifier` can be used in global `Main` section to be applied for all logs, or in individual sections.
+
+For example, the following pattern identifies entries based on timestamp encoded in regular expression:
+
+	[cassandra]
+	entry_identifier = \d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3}
 
 
 System metrics (beta)
