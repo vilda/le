@@ -1,3 +1,35 @@
+logentries (1.4.22) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Marc Simon ]
+  * [fix] read lines as block and not line by line
+  * [improv] treat formatters like filters
+
+  [ Ulrich Dangel ]
+  * Support configuration directory for the linux agent
+
+  [ Viliam Holub ]
+  * Fixing certificate verification for Python 2.4.8
+  * Adding files to ignore by git
+  * Support for configuration directories
+  * Support for nested configuration directories
+  * Fixes for Python 2.4
+  * Removing any use of src.format()
+  * Fixing cpu_count in metrics
+  * Implementing custom formatters
+  * Adding contributors file
+  * Deprecating V1 metrics
+  * Support for multiline entries
+  * Support for multiline entries
+  * Adding documentation for tests
+  * Fixing tests
+
+  [ Stephen Hynes ]
+  * Update README.md
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Thu, 03 Sep 2015 14:09:14 +0000
+
 logentries (1.4.21) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Maksim Boyko ]
