@@ -5,7 +5,7 @@ This directory contains a simple testing framework together with a set of tests.
 
 All features must be covered.
 
-Tests are located in `tests.d` directory. Particular feature must be in a separate file. If there are too many test cases, it's advisable to split them into multiple files.
+Tests are located in `tests.d` directory. Specific features are split into separate files. If there are too many test cases per single file, it's advisable to split them into more fine-grained scenarios.
 
 Tests requires some Python packages which are not included in standard installations. Best option is to run tests in a separate environment created by `virtualenv`. You may need to install packages from `requirements.apt` files. Then run the following commands to create and activate one:
 
@@ -31,7 +31,7 @@ Or, if you are interested in full output, run the test directly:
 
 	tests.d/formatters.sh
 
-The `testd.sh` script extracts expected output and compares it against actual output. Their difference are displayed then; unless they are the same in which case `SUCCESS` is displayed.
+The `testd.sh` script extracts expected output and compares it against actual output. The difference is then displayed; unless they are the same in which case `SUCCESS` is displayed.
 
 
 Writing tests
@@ -49,9 +49,9 @@ Then a set of test cases:
 
 	Testcase 'Default formatter for HTTP PUT is plain'
 
-Each scenario clears configuration files, but leaves others untouched. Test cases does not modify the environment.
+Each scenario clears configuration files, but leaves other files untouched. Test cases do not modify the environment.
 
-Expected output is specified as bash comment `#` followed by `e` for standard error or `o` for standard output. ISO dates must be replaced with `ISODATETIME` keyword. Since home directory is generated, replace any occurrence with `$TMP`.
+Expected output is specified as a bash comment `#` followed by `e` for standard error or `o` for standard output. ISO dates must be replaced with `ISODATETIME` keyword. Since home directory is generated, replace any occurrence with `$TMP`.
 
 Common (useful) variables and functions:
 
