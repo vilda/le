@@ -395,9 +395,9 @@ Note the examples above do not take into account symbolic links.
 Multiline log entries
 ---------------------
 
-If you want to merge multiple lines into one entry, use the `entry_identifier` parameter. It defines via regular expression beginning of a new entry. In most cases it is a timestamp.
+If you want to merge multiple lines into one entry, use the `entry_identifier` parameter. It defines via regular expression the beginning of a new entry. In most cases it is a timestamp.
 
-The `entry_identifier` can be used in global `Main` section to be applied for all logs, or in individual sections.
+The `entry_identifier` can be used in the global `Main` section to be applied for all logs, or in individual sections.
 
 For example, the following pattern identifies entries based on timestamp encoded in regular expression:
 
