@@ -329,7 +329,7 @@ Format of log entry can be specified directly as a simple substitution template.
 
 For example, the following specification:
 
-	formatter = $isodatetime $app[$hostname]: $line
+	formatter = $isodatetime $appname[$hostname]: $line
 
 Will result in the following log entry:
 
