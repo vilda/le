@@ -2932,7 +2932,7 @@ def start_followers(default_transport):
             if log_token or config.datahub:
                 transport = default_transport.get()
             elif log_key:
-                endpoint = Domain.API
+                endpoint = Domain.DATA
                 port = 443
                 use_ssl = not config.suppress_ssl
                 if not use_ssl:
