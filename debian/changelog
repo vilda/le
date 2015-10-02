@@ -1,3 +1,16 @@
+logentries (1.4.23) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Fixing language
+  * Moving the agent from api to data endpoint
+
+  [ JTBuchanan ]
+  * Corrected formatter example
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Fri, 02 Oct 2015 09:19:54 +0000
+
 logentries (1.4.22) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Marc Simon ]
