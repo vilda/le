@@ -326,7 +326,7 @@ elif [ -f /etc/gentoo-release ] ; then
 	fi
 
 	echo "\n"
-	printf "***** Step 2 of 4 - Login *****\n"
+	printf "***** Step 2 of 3 - Login *****\n"
 
 	# Prompt the user for their Logentries credentials and register the agent
 	if [[ -z "$LE_ACCOUNT_KEY" ]];then
@@ -386,102 +386,7 @@ if [ $FOUND == "1" ]; then
 	fi
 	eval $DAEMON_RESTART_CMD >$LOGFILE 2>&1
 	printf "\n\n"
-
-	printf "***** Step 4 of 4 - Sample Data *****\n"
-	read -p "Would you like us to seed some default log entries, Tags & Graphs in your ${SYSLOG} log?..(y) or (n): "
-	printf "\n"
-	if [[ $REPLY =~ ^[Yy]$ ]];then
-
-		printf "We will now send some sample events to your new Logentries account. This will take about 10 seconds\n\n"
-		if [ ! -f /etc/le/config ];then
-			printf "Logentries config not found, unable to continue with seeding data.\n"
-			exit 0
-		fi
-		USER_KEY_LINE=$(sed -n '2p' /etc/le/config)
-		USER_KEY=${USER_KEY_LINE#*= }
-		LE_COMMAND=$(le ls /hosts/`python -c "import socket; print socket.getfqdn().split('.')[0]"`/${SYSLOG} | grep key)
-		LOG_KEY=${LE_COMMAND#key = }
-
-		printf "Creating Events & Tags \n"
-		$CURL -O "https://raw.github.com/logentries/le/master/install/linux/seeding.py"
-		TAG_ID=$(python seeding.py createEvent $USER_KEY $LOG_KEY)
-
-		echo "Seeding data, this can take up to 15 seconds"
-		if hash logger 2>/dev/null; then
-
-			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."
-			$LOGGER_CMD "mongodb main process (127x) terminated with status 100)"
-			$LOGGER_CMD "Out of Memory: Killed process 2592 (oracle)"
-			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "kernel: imklog 5.8.6, log source = /proc/kmsg started."
-
-			$LOGGER_CMD "kernel: Kernel logging (proc) stopped."
-			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x "
-			$LOGGER_CMD "sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x"
-			$LOGGER_CMD "sshd[562x]: Invalid user root from 5x.x.x.5x"
-			$LOGGER_CMD "sshd[562x]: Invalid user admin from 5x.x.x.5x"
-			$LOGGER_CMD "CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)"
-			$LOGGER_CMD "sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2"
-			$LOGGER_CMD "kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38"
-
-		else
-			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: dhclient: bound to x.3x.18.1x -- renewal in 41975 seconds."  >> $logfile
-			echo "Logentries Test Event: mongodb main process (127x) terminated with status 100)" >> $logfile
-			echo "Logentries Test Event: Out of Memory: Killed process 2592 (oracle)" >> $logfile
-			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: kernel: imklog 5.8.6, log source = /proc/kmsg started." >> $logfile
-
-			echo "Logentries Test Event: kernel: Kernel logging (proc) stopped." >> $logfile
-			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29222]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[12345]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu1 from 5x.x.x.5x " >> $logfile
-			echo "Logentries Test Event: sshd[562x]: Invalid user ubuntu2 from 5x.x.x.5x" >> $logfile
-			echo "Logentries Test Event: sshd[562x]: Invalid user root from 5x.x.x.5x" >> $logfile
-			echo "Logentries Test Event: sshd[562x]: Invalid user admin from 5x.x.x.5x" >> $logfile
-			echo "Logentries Test Event: CRON[29258]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29261]: (root) CMD (   cd / && run-parts -le -report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: CRON[29252]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)" >> $logfile
-			echo "Logentries Test Event: sshd[564x]: Accepted publickey for ubuntu from 50.x.x.x port 22xxx ssh2" >> $logfile
-			echo "Logentries Test Event: kernel: [    1.351600] rtc_cmos: probe of rtc_cmos failed with error -38" >> $logfile
-
-		fi
-
-		printf "Creating Graphs.\n\n"
-		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API >$LOGFILE 2>&1
-		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API >$LOGFILE 2>&1
-		$CURL -s $HEADER $CONTENT_HEADER $DATA "request=set_dashboard&log_key="$LOG_KEY"&dashboard=%7B%22widgets%22%3A%5B%7B%22descriptor_id%22%3A%22le.plot-pie-descriptor%22%2C%22options%22%3A%7B%22title%22%3A%22Process+Activity%22%2C%22tags_to_show%22%3A%5B%22Kernel+-+Process+Killed%22%2C%22Kernel+-+Process+Started%22%2C%22Kernel+-+Process+Terminated%22%5D%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%221%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.event-text-widget%22%2C%22options%22%3A%7B%22title%22%3A%22Failed+Login+Attempts%22%2C%22event%22%3A%22Error%22%2C%22text%22%3A%22%22%2C%22value_display%22%3A%22Total+Events%22%2C%22position%22%3A%7B%22width%22%3A%222%22%2C%22height%22%3A%222%22%2C%22row%22%3A%222%22%2C%22column%22%3A%223%22%7D%7D%7D%2C%7B%22descriptor_id%22%3A%22le.plot-timeline%22%2C%22options%22%3A%7B%22title%22%3A%22User+Logins+Vs+Failed+Logins%22%2C%22tags_to_show%22%3A%5B%22Invalid+User+Login+attempt%22%2C%22User+Logged+In%22%5D%2C%22style%22%3A%5B%5D%2C%22position%22%3A%7B%22width%22%3A%224%22%2C%22height%22%3A%221%22%2C%22row%22%3A%221%22%2C%22column%22%3A%221%22%7D%7D%7D%5D%2C%22custom_widget_descriptors%22%3A%7B%7D%7D" $API >$LOGFILE 2>&1
-		printf "\n"
-		printf "Finished creating default data.\n\n"
-		printf "***** Install Complete! *****\n"
-		printf "Please note that it may take a few moments for the log data to show in your account.\n\n"
-		printf "This will be automatically detected within 60 seconds.\n"
-	else
-		printf "***** Install Complete! *****\n"
-		printf "Please note that it may take a few moments for the log data to show in your account.\n\n"
-	fi
-
+	printf "***** Install Complete! *****\n"
 
 else
 	printf "Unknown distribution. Please contact support@logentries.com with your system details\n\n"
