@@ -18,7 +18,7 @@ fi
 TMP_DIR=$(mktemp -d -t logentries.XXXXX)
 trap "rm -rf "$TMP_DIR"" EXIT
 
-FILES="le.py backports.py utils.py __init__.py metrics.py formatters.py"
+FILES="le.py backports.py utils.py __init__.py metrics.py formats.py"
 LE_PARENT="https://raw.githubusercontent.com/logentries/le/master/src/"
 CURL="/usr/bin/env curl -O"
 
@@ -76,16 +76,6 @@ do
     i=$[$i+1]
 done
 
-printf "DONE\n\nWe will now send some sample events to your new Logentries account. This will take about 10 seconds.\n\n"
-
-l=1
-while [ $l -le 100 ]
-do
-	logger "Logentries Test Event ${l}"
-        printf "."
-	sleep 0.1
-	l=$(( $l + 1 ))
-done
 printf "DONE\n"
 
 exit 0
