@@ -56,7 +56,7 @@ KEY_LEN = 36
 ACCOUNT_KEYS_API = '/agent/account-keys/'
 ID_LOGS_API = '/agent/id-logs/'
 
-LINE_SEPARATOR = '\xe2\x80\xa8'
+LINE_SEPARATOR = '\xe2\x80\xa8'.decode('utf8')
 
 # Maximal queue size for events sent
 SEND_QUEUE_SIZE = 32000
@@ -247,6 +247,10 @@ from backports import CertificateError, match_hostname
 
 import formats
 import metrics
+
+# Option to avoid issues around encodings
+#reload(sys)
+#sys.setdefaultencoding('utf8')
 
 #
 # Start logging
@@ -1373,7 +1377,7 @@ class Follower(object):
             buff_lines.append(self._read_file_rest[:MAX_EVENTS])
             self._read_file_rest = self._read_file_rest[MAX_EVENTS:]
 
-        return buff_lines[:-1]
+        return [line.decode('utf-8', errors='ignore') for line in buff_lines[:-1]]
 
     def _set_file_position(self, offset, start=FILE_BEGIN):
         """ Move the position of filepointers."""
@@ -1649,9 +1653,9 @@ class Transport(object):
         # Keep sending data until successful
         while not self._shutdown:
             try:
-                self._socket.send(entry)
+                self._socket.send(entry.encode('utf8'))
                 if self._debug_transport_events:
-                    print >> sys.stderr, entry,
+                    print >> sys.stderr, entry.encode('utf8'),
                 break
             except socket.error:
                 self._open_connection()
