@@ -115,7 +115,7 @@ IAA_INTERVAL = 100
 IAA_TOKEN = "###LE-IAA###\n"
 
 # Maximal size of a block of events
-MAX_EVENTS = 65536
+MAX_BLOCK_SIZE = 65536
 
 # Interval between attampts to open a file
 REOPEN_INT = 1  # Seconds
@@ -1365,7 +1365,7 @@ class Follower(object):
 
     def _read_log_lines(self):
         """ Reads a block of lines from the log. Checks maximal line size. """
-        buff = self._file.read(MAX_EVENTS - len(self._read_file_rest))
+        buff = self._file.read(MAX_BLOCK_SIZE - len(self._read_file_rest))
         buff_lines = buff.split('\n')
         if len(self._read_file_rest) > 0:
             buff_lines[0] = self._read_file_rest + buff_lines[0]
@@ -1373,9 +1373,9 @@ class Follower(object):
         self._read_file_rest = buff_lines[-1]
 
         # Limit size of _read_file_rest
-        if len(self._read_file_rest) > MAX_EVENTS:
-            buff_lines.append(self._read_file_rest[:MAX_EVENTS])
-            self._read_file_rest = self._read_file_rest[MAX_EVENTS:]
+        if len(self._read_file_rest) >= MAX_BLOCK_SIZE:
+            buff_lines.append(self._read_file_rest[:MAX_BLOCK_SIZE])
+            self._read_file_rest = self._read_file_rest[MAX_BLOCK_SIZE:]
 
         return [line.decode('utf-8', errors='ignore') for line in buff_lines[:-1]]
 
