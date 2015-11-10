@@ -115,7 +115,7 @@ IAA_INTERVAL = 100
 IAA_TOKEN = "###LE-IAA###\n"
 
 # Maximal size of a block of events
-MAX_BLOCK_SIZE = 65536
+MAX_BLOCK_SIZE = 65536 - 512 # Space for formatting
 
 # Interval between attampts to open a file
 REOPEN_INT = 1  # Seconds
