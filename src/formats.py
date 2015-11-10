@@ -55,8 +55,8 @@ class FormatCustom(object):
             self._hostname = _sanitize_syslog_name(socket.gethostname())
         self._appname = _sanitize_syslog_name(appname)
         self._token = token
-        self._pattern = pattern
-        self._template = string.Template(token + pattern)
+        self._pattern = pattern.decode('utf8', errors='ignore')
+        self._template = string.Template(token + self._pattern)
 
     def format_line(self, line):
         # Convert the pattern into output string
@@ -87,5 +87,5 @@ def get_formatter(definition, hostname, log_name, log_token):
 def _sanitize_syslog_name(original):
     """Replaces invalid characters from syslog name entry.
     """
-    return original.replace(' ', '_')
+    return original.decode('utf8', 'ignore').replace(' ', '_')
 
