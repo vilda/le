@@ -1,3 +1,18 @@
+logentries (1.4.24) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ StephenHynes7 ]
+  * Download formats.py, remove sample data
+  * Remove seeding data
+
+  [ Viliam Holub ]
+  * Fixing issues around charset encoding
+  * Avoid being stuck on too long lines
+  * Reducing block size to accommodate format
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Wed, 11 Nov 2015 14:53:09 +0000
+
 logentries (1.4.23) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
