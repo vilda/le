@@ -1377,7 +1377,7 @@ class Follower(object):
             buff_lines.append(self._read_file_rest[:MAX_BLOCK_SIZE])
             self._read_file_rest = self._read_file_rest[MAX_BLOCK_SIZE:]
 
-        return [line.decode('utf-8', errors='ignore') for line in buff_lines[:-1]]
+        return [line.decode('utf-8', 'ignore') for line in buff_lines[:-1]]
 
     def _set_file_position(self, offset, start=FILE_BEGIN):
         """ Move the position of filepointers."""

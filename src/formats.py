@@ -55,7 +55,7 @@ class FormatCustom(object):
             self._hostname = _sanitize_syslog_name(socket.gethostname())
         self._appname = _sanitize_syslog_name(appname)
         self._token = token
-        self._pattern = pattern.decode('utf8', errors='ignore')
+        self._pattern = pattern.decode('utf8', 'ignore')
         self._template = string.Template(token + self._pattern)
 
     def format_line(self, line):
