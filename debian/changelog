@@ -1,3 +1,12 @@
+logentries (1.4.25) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Avoiding keyword parameter in decode (causing issues in Python <=2.6)
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Wed, 18 Nov 2015 13:13:50 +0000
+
 logentries (1.4.24) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ StephenHynes7 ]
