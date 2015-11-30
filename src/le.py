@@ -317,7 +317,7 @@ except ImportError:
         die('NOTE: Please install Python "ssl" module.')
 
     def wrap_socket(sock, ca_certs=None, cert_reqs=None):
-        return socket.ssl(sock) # FIXME - pass ca_certs
+        return socket.ssl(sock)
 
     CERT_REQUIRED = 0
 
