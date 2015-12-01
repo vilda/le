@@ -1,3 +1,14 @@
+logentries (1.4.26) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Using write instead of send in TLS socket wrapper
+  * Removing incorrect FIXME comment about ca_certs
+  * Removing arbitrary try block
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Tue, 01 Dec 2015 15:09:48 +0000
+
 logentries (1.4.25) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
