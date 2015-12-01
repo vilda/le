@@ -1520,7 +1520,8 @@ class Transport(object):
         self.use_ssl = use_ssl
         self.preamble = preamble
         self._entries = Queue.Queue(SEND_QUEUE_SIZE)
-        self._socket = None
+        self._socket = None # Socket with TLS encyption
+        self._orig_socket = None # Original, unencrypted socket
         self._debug_transport_events = debug_transport_events
 
         self._shutdown = False
@@ -1555,7 +1556,6 @@ class Transport(object):
         """Connects the socket and wraps in SSL. Returns the wrapped socket
         or None in case of IO or other errors."""
         # FIXME this code ignores --local
-        self._socket = None
         try:
             address = '-'
             address = self._get_address()
@@ -1593,7 +1593,6 @@ class Transport(object):
 
     def _connect_plain(self, plain_socket):
         """Connects the socket with the socket given. Returns the socket or None in case of IO errors."""
-        self._socket = None
         address = self._get_address()
         try:
             plain_socket.connect((address, self.port))
@@ -1610,14 +1609,15 @@ class Transport(object):
         """ Opens a push connection to logentries. """
         log.debug("Opening connection %s:%s %s",
                   self.endpoint, self.port, self.preamble.strip())
-        self._close_connection()
         retry = 0
         delay = SRV_RECON_TO_MIN
         # Keep trying to open the connection
         while not self._shutdown:
+            self._close_connection()
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.settimeout(TCP_TIMEOUT)
+                self._orig_socket = s
                 if self.use_ssl:
                     self._socket = self._connect_ssl(s)
                 else:
@@ -1626,7 +1626,7 @@ class Transport(object):
                 # If the socket is open, send preamble and leave
                 if self._socket:
                     if self.preamble:
-                        self._socket.send(self.preamble)
+                        self._socket.write(self.preamble)
                     break
             except socket.error:
                 if self._shutdown:
@@ -1643,9 +1643,17 @@ class Transport(object):
         if self._socket:
             try:
                 self._socket.close()
+            except AttributeError:
+                pass
             except socket.error:
                 pass
-            self._socket = None
+        if self._orig_socket:
+            try:
+                self._orig_socket.close()
+            except socket.error:
+                pass
+        self._socket = None
+        self._orig_socket = None
 
     def _send_entry(self, entry):
         """Sends the entry. If the connection fails it will re-open it and try
@@ -1653,7 +1661,7 @@ class Transport(object):
         # Keep sending data until successful
         while not self._shutdown:
             try:
-                self._socket.send(entry.encode('utf8'))
+                self._socket.write(entry.encode('utf8'))
                 if self._debug_transport_events:
                     print >> sys.stderr, entry.encode('utf8'),
                 break
