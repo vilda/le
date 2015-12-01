@@ -298,7 +298,19 @@ except ImportError:
     json_loads = simplejson.loads
     json_dumps = simplejson.dumps
 
-# FIXME
+class LegacySslWrapper(object):
+    """Wrapper around legacy SSL support in Python 2.4. We mimic certain
+    socket's functions."""
+
+    def __init__(self, sock):
+        self._socket = socket.ssl(sock)
+
+    def send(self, data):
+        self._socket.write(data)
+
+    def close(self):
+        self._socket.close()
+
 no_ssl = False
 FEAT_SSL = True
 try:
@@ -317,7 +329,7 @@ except ImportError:
         die('NOTE: Please install Python "ssl" module.')
 
     def wrap_socket(sock, ca_certs=None, cert_reqs=None):
-        return socket.ssl(sock)
+        return LegacySslWrapper(sock)
 
     CERT_REQUIRED = 0
 
@@ -1520,8 +1532,7 @@ class Transport(object):
         self.use_ssl = use_ssl
         self.preamble = preamble
         self._entries = Queue.Queue(SEND_QUEUE_SIZE)
-        self._socket = None # Socket with TLS encyption
-        self._orig_socket = None # Original, unencrypted socket
+        self._socket = None # Socket with optional TLS encyption
         self._debug_transport_events = debug_transport_events
 
         self._shutdown = False
@@ -1617,7 +1628,6 @@ class Transport(object):
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.settimeout(TCP_TIMEOUT)
-                self._orig_socket = s
                 if self.use_ssl:
                     self._socket = self._connect_ssl(s)
                 else:
@@ -1626,7 +1636,7 @@ class Transport(object):
                 # If the socket is open, send preamble and leave
                 if self._socket:
                     if self.preamble:
-                        self._socket.write(self.preamble)
+                        self._socket.send(self.preamble)
                     break
             except socket.error:
                 if self._shutdown:
@@ -1647,13 +1657,7 @@ class Transport(object):
                 pass
             except socket.error:
                 pass
-        if self._orig_socket:
-            try:
-                self._orig_socket.close()
-            except socket.error:
-                pass
-        self._socket = None
-        self._orig_socket = None
+            self._socket = None
 
     def _send_entry(self, entry):
         """Sends the entry. If the connection fails it will re-open it and try
@@ -1661,7 +1665,7 @@ class Transport(object):
         # Keep sending data until successful
         while not self._shutdown:
             try:
-                self._socket.write(entry.encode('utf8'))
+                self._socket.send(entry.encode('utf8'))
                 if self._debug_transport_events:
                     print >> sys.stderr, entry.encode('utf8'),
                 break
