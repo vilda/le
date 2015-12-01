@@ -1642,8 +1642,7 @@ class Transport(object):
     def _close_connection(self):
         if self._socket:
             try:
-                try:
-                    self._socket.close()
+                self._socket.close()
             except AttributeError:
                 pass
             except socket.error:
