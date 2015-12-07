@@ -596,7 +596,9 @@ def system_detect(details):
         return system_info
 
     if sys == "SunOS":
-        pass
+        system_info['distname'] = call('cat /etc/product | sed -n "s/Name: \\(.*\\)/\\1/p"')
+        system_info['distver'] = call('cat /etc/product | sed -n "s/Image: \\(.*\\)/\\1/p"')
+        system_info['kernel'] = uname[2]
     elif sys == "AIX":
         system_info['distver'] = call("oslevel -r")
     elif sys == "Darwin":
@@ -1178,6 +1180,131 @@ class Stats(object):
                     log.warning("Error: could not parse disk stats "
                                 "in top output line %s", line)
 
+    def sunos_top_stats(self, data):
+        """
+        SunOS/SmartOS doesn't seem to provide nearly the same amount of
+        detail as the /proc filesystem under Linux -- at least not
+        easily accessible to the command line.  The headers from
+        top(1) seem to be the quickest & most detailed source of data
+        about CPU, and disk transfer as separated into reads & writes.
+        (vs. iostat, which shows CPU less granularly; it shows more
+         detail about per-disk IO, but does not split IO into reads and
+         writes)
+
+        Frustratingly, the level of per-disk statistics from top is
+        incredibly un-granular
+
+        We'll get physical memory details from here too
+        """
+        cpure = re.compile(r'CPU states:\s+([\d.]+)\% idle,\s+([\d.]+)\% user,\s+'
+                           r'([\d.]+)\% kernel,\s+([\d.]+)\% iowait')
+        memre = re.compile(r'Memory:\s+(\d+\w+) phys mem, (\d+\w+) free mem, '
+                           r'(\d+\w+) total swap, (\d+\w+) free swap')
+
+        # scaling routine for use in map() later
+        def scaletokb(value):
+            # take a value like 1209M or 10G and return an integer
+            # representing the value in kilobytes
+
+            (size, scale) = re.split('([A-z]+)', value)[:2]
+            size = int(size)
+            if scale:
+                if scale in self.scale2kb:
+                    size *= self.scale2kb[scale]
+                else:
+                    log.warning("Error: value in %s expressed in "
+                                "dimension I can't translate to kb: %s %s",
+                                line, size, scale)
+            return size
+
+        # the first set of 'top' headers display average values over
+        # system uptime.  so we only want to read the second set that we
+        # see.
+        toppass = 0
+
+        # we should really do this first, so that we don't waste any time
+        # if top fails to work.  however, it 'reads' better at this point
+        try:
+            proc = subprocess.Popen(['top',
+                                     '-i', '2', '-l', '2', '-n', '0'],
+                                    stdout=subprocess.PIPE)
+        except:
+            return
+
+        for line in proc.stdout:
+            # skip the first output
+            if line.startswith('load averages: '):
+                toppass += 2
+            elif line.startswith('CPU states: ') and toppass == 2:
+                cpuresult = cpure.match(line)
+                """
+                the data we send to logentries is expected to be in terms
+                of centiseconds of (idle/user/kernel/etc) time as all we
+                have is %, multiply that % by the EPOCH and 100.
+                """
+                if cpuresult:
+                    (ci, cu, cs, cio) = map(lambda x: int(float(x) * 100 * EPOCH * 100),
+                                       cpuresult.group(1, 2, 3, 4))
+                    self.save_data(data, 'cu', cu)
+                    self.save_data(data, 'cs', cs)
+                    self.save_data(data, 'ci', ci)
+                    # send zero in case all must be present
+                    self.save_data(data, 'cl', 0)
+                    self.save_data(data, 'cio', cio)
+                    self.save_data(data, 'cq', 0)
+                    self.save_data(data, 'csq', 0)
+                else:
+                    log.warning("Error: could not parse CPU stats "
+                                "in top output line %s", line)
+
+            elif line.startswith('Memory: ') and toppass == 2:
+                """
+                Top is inaccurate on SmartOS and states the free memory of
+                the entire node, rather than just the virtual instance.
+                """
+                memresult = memre.match(line)
+                if memresult:
+                    # logentries is expecting values in kilobytes
+                    (total, falsefree, swap, freeswap) = map(
+                        scaletokb, memresult.group(1, 2, 3, 4))
+                    self.save_data(data, 'mt', total)
+                    self.save_data(data, 'ma', swap - freeswap)
+                    self.save_data(data, 'mc', 0)
+                else:
+                    log.warning("Error: could not parse memory stats "
+                                "in top output line %s", line)
+
+    def sunos_disk_stats(self, data):
+        """
+        the data we send to logentries is expected to be in bytes
+        """
+
+        sd0 = call('kstat -n sd0 | egrep "nread|nwritten"')
+        sd1 = call('kstat -n sd1 | egrep "nread|nwritten"')
+        sd2 = call('kstat -n sd2 | egrep "nread|nwritten"')
+
+        reads = 0L
+        writes = 0L
+
+        for disk in [sd0, sd1, sd2]:
+            for line in disk.split("\n"):
+                parts = line.split()
+                if len(parts) != 2:
+                    continue
+                if not parts[1].isdigit():
+                    continue
+
+                if parts[0] == "nread":
+                    reads += long(parts[1])
+                elif parts[0] == "nwritten":
+                    writes += long(parts[1])
+
+        self.save_data(data, 'dr',
+                       reads - self.prev_disk_stats[0])
+        self.save_data(data, 'dw',
+                       writes - self.prev_disk_stats[1])
+        self.prev_disk_stats = [reads, writes]
+
     def netstats_stats(self, data):
         """
         Read network bytes in/out from the output of "netstat -s"
@@ -1218,6 +1345,35 @@ class Stats(object):
         self.save_data(data, 'no', transmit - self.prev_net_stats[1])
         self.prev_net_stats = [receive, transmit]
 
+    def sunos_netstats_stats(self, data):
+        """
+        Read network bytes in/out from the output of "netstat -i"
+        Not exact, as on SunOS it doesn't display bytes for every protocol,
+        but more exact than using 'top' or 'netstat <interval>'
+        """
+        net0 = call('kstat -n net0 | grep "bytes64"')
+        net1 = call('kstat -n net1 | grep "bytes64"')
+
+        receive = 0L
+        transmit = 0L
+
+        for network in [net0, net1]:
+            for line in network.split("\n"):
+                parts = line.split()
+                if len(parts) != 2:
+                    continue
+                if not parts[1].isdigit():
+                    continue
+
+                if parts[0] == "ibytes64":
+                    receive += long(parts[1])
+                elif parts[0] == "obytes64":
+                    transmit += long(parts[1])
+
+        self.save_data(data, 'ni', receive - self.prev_net_stats[0])
+        self.save_data(data, 'no', transmit - self.prev_net_stats[1])
+        self.prev_net_stats = [receive, transmit]
+
     def stats(self):
         """Collects statistics."""
         data = {}
@@ -1231,6 +1387,10 @@ class Stats(object):
             if self.sys == "Darwin":
                 self.osx_top_stats(data)
                 self.netstats_stats(data)
+            if self.sys == "SunOS":
+                self.sunos_top_stats(data)
+                self.sunos_disk_stats(data)
+                self.sunos_netstats_stats(data)
         return data
 
     @staticmethod
