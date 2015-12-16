@@ -78,17 +78,38 @@ class ServerHTTPSConnection(httplib.HTTPSConnection):
     A slight modification of HTTPSConnection to verify the certificate
     """
 
-    def __init__(self, config, server, cert_file):
+    def __init__(self, config, server, port, cert_file):
         self.no_ssl = config.suppress_ssl or not FEAT_SSL
         if self.no_ssl:
-            httplib.HTTPSConnection.__init__(self, server)
+            if config.use_proxy == True:
+                httplib.HTTPSConnection.__init__(self, config.proxy_url, config.proxy_port, context=context)
+                if hasattr(httplib.HTTPSConnection, "set_tunnel"):
+                    httplib.HTTPSConnection.set_tunnel(self, server, port)
+                else:
+                    httplib.HTTPSConnection._set_tunnel(self, server, port)
+            else:
+                httplib.HTTPSConnection.__init__(self, server, port)
         else:
             self.cert_file = cert_file
             if FEAT_SSL_CONTEXT:
                 context = ssl.create_default_context(cafile=cert_file)
-                httplib.HTTPSConnection.__init__(self, server, context=context)
+                if config.use_proxy == True:
+                    httplib.HTTPSConnection.__init__(self, config.proxy_url, config.proxy_port, context=context)
+                    if hasattr(httplib.HTTPSConnection, "set_tunnel"):
+                        httplib.HTTPSConnection.set_tunnel(self, server, port)
+                    else:
+                        httplib.HTTPSConnection._set_tunnel(self, server, port)
+                else:
+                    httplib.HTTPSConnection.__init__(self, server, port, context=context)
             else:
-                httplib.HTTPSConnection.__init__(self, server, cert_file=cert_file)
+                if config.use_proxy == True:
+                    httplib.HTTPSConnection.__init__(self, config.proxy_url, config.proxy_port, cert_file=cert_file)
+                    if hasattr(httplib.HTTPSConnection, "set_tunnel"):
+                        httplib.HTTPSConnection.set_tunnel(self, server, port)
+                    else:
+                        httplib.HTTPSConnection._set_tunnel(self, server, port)
+                else:
+                    httplib.HTTPSConnection.__init__(self, server, port, cert_file=cert_file)
 
     def connect(self):
         if FEAT_SSL_CONTEXT:
@@ -195,7 +216,7 @@ def create_connection(host, port):
     raise socket.error, "Cannot make connection to %s:%s" % (host, port)
 
 
-def make_https_connection(config, s):
+def make_https_connection(config, s, port):
     """
     Makes HTTPS connection. Tried all available certificates.
     """
@@ -204,7 +225,7 @@ def make_https_connection(config, s):
         try:
             cert_file = system_cert_file()
             if cert_file:
-                return ServerHTTPSConnection(config, s, cert_file)
+                return ServerHTTPSConnection(config, s, port, cert_file)
         except socket.error, e:
             pass
 
@@ -212,7 +233,7 @@ def make_https_connection(config, s):
     cert_file = default_cert_file(config)
     if not cert_file:
         die('Error: Cannot find suitable CA certificate.')
-    return ServerHTTPSConnection(config, s, cert_file)
+    return ServerHTTPSConnection(config, s, port, cert_file)
 
 
 def domain_connect(config, domain, Domain):
@@ -254,14 +275,22 @@ def domain_connect(config, domain, Domain):
             port = 8000
         else:
             port = 8081
-    s = '%s:%s' % (s, port)
-    log.debug('Connecting to %s', s)
+    log.debug('Connecting to %s:%s', s, port)
 
     # Pass the connection
     if use_ssl:
-        return make_https_connection(config, s)
+        return make_https_connection(config, s, port)
     else:
-        return httplib.HTTPConnection(s)
+        if config.use_proxy == True:
+            conn = httplib.HTTPConnection(config.proxy_url, config.proxy_port)
+            if hasattr(httplib.HTTPConnection, "set_tunnel"):
+                conn.set_tunnel(s, port)
+            else:
+                conn._set_tunnel(s, port)
+            return conn
+        else:
+            return httplib.HTTPConnection(s, port)
+
 
 
 def no_more_args(args):
@@ -556,4 +585,3 @@ c4g/VhsxOBi0cQ+azcgOno4uG+GMmIPLHzHxREzGBHNJdmAPx/i9F4BrLunMTA5a
 mnkPIAou1Z5jJh5VkpTYghdae9C8x49OhgQ=
 -----END CERTIFICATE-----
 """
-

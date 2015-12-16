@@ -58,6 +58,10 @@ ID_LOGS_API = '/agent/id-logs/'
 
 LINE_SEPARATOR = '\xe2\x80\xa8'.decode('utf8')
 
+PROXY_TYPE_PARAM = "proxy-type"
+PROXY_URL_PARAM = "proxy-url"
+PROXY_PORT_PARAM = "proxy-port"
+
 # Maximal queue size for events sent
 SEND_QUEUE_SIZE = 32000
 
@@ -247,6 +251,7 @@ from backports import CertificateError, match_hostname
 
 import formats
 import metrics
+import socks
 
 # Option to avoid issues around encodings
 #reload(sys)
@@ -1688,7 +1693,7 @@ class Transport(object):
     """Encapsulates simple connection to a remote host. The connection may be
     encrypted. Each communication is started with the preamble."""
 
-    def __init__(self, endpoint, port, use_ssl, preamble, debug_transport_events):
+    def __init__(self, endpoint, port, use_ssl, preamble, debug_transport_events, proxy):
         # Copy transport configuration
         self.endpoint = endpoint
         self.port = port
@@ -1699,6 +1704,27 @@ class Transport(object):
         self._debug_transport_events = debug_transport_events
 
         self._shutdown = False
+
+        # proxy setup
+        self._use_proxy = False
+
+        (proxy_type_str, self._proxy_url, self._proxy_port) = proxy
+
+        if proxy_type_str != NOT_SET and self._proxy_url != NOT_SET and self._proxy_port != NOT_SET:
+            self._use_proxy = True
+            if proxy_type_str == "HTTP":
+                self._proxy_type = socks.PROXY_TYPE_HTTP
+            elif proxy_type_str == "SOCKS5":
+                self._proxy_type = socks.PROXY_TYPE_SOCKS5
+            elif proxy_type_str == "SOCKS4":
+                self._proxy_type = socks.PROXY_TYPE_SOCKS4
+            else:
+                self._use_proxy = False
+                log.error("Invalide proxy type. Only HTTP, SOCKS5 and SOCKS4 are accepted")
+
+        if self._use_proxy:
+            log.info("Using proxy with proxy_type: %s, proxy-url: %s, proxy-port: %s",
+                     proxy_type_str, self._proxy_url, self._proxy_port)
 
         # Get certificate name
         cert_name = None
@@ -1719,12 +1745,15 @@ class Transport(object):
         self._worker.daemon = True
         self._worker.start()
 
-    def _get_address(self):
-        """Returns an IP address of the endpoint. If the endpoint resolves to
-        multiple addresses, a random one is selected. This works better than
-        default selection."""
-        return random.choice(
-            socket.getaddrinfo(self.endpoint, self.port))[4][0]
+    def _get_address(self, use_proxy):
+        if use_proxy:
+            return self.endpoint
+        else:
+            """Returns an IP address of the endpoint. If the endpoint resolves to
+            multiple addresses, a random one is selected. This works better than
+            default selection."""
+            return random.choice(
+                socket.getaddrinfo(self.endpoint, self.port))[4][0]
 
     def _connect_ssl(self, plain_socket):
         """Connects the socket and wraps in SSL. Returns the wrapped socket
@@ -1732,7 +1761,7 @@ class Transport(object):
         # FIXME this code ignores --local
         try:
             address = '-'
-            address = self._get_address()
+            address = self._get_address(self._use_proxy)
             s = plain_socket
             s.connect((address, self.port))
 
@@ -1767,7 +1796,7 @@ class Transport(object):
 
     def _connect_plain(self, plain_socket):
         """Connects the socket with the socket given. Returns the socket or None in case of IO errors."""
-        address = self._get_address()
+        address = self._get_address(self._use_proxy)
         try:
             plain_socket.connect((address, self.port))
         except IOError, e:
@@ -1789,7 +1818,13 @@ class Transport(object):
         while not self._shutdown:
             self._close_connection()
             try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s = None
+                if self._use_proxy:
+                    s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.setproxy(self._proxy_type, self._proxy_url, self._proxy_port)
+                else:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
                 s.settimeout(TCP_TIMEOUT)
                 if self.use_ssl:
                     self._socket = self._connect_ssl(s)
@@ -1898,7 +1933,8 @@ class DefaultTransport(object):
                 port = 10000
                 use_ssl = False
             self._transport = Transport(
-                endpoint, port, use_ssl, '', self._config.debug_transport_events)
+                endpoint, port, use_ssl, '', self._config.debug_transport_events,
+                (self._config.proxy_type, self._config.proxy_url, self._config.proxy_port))
         return self._transport
 
     def close(self):
@@ -1972,6 +2008,12 @@ class Config(object):
         self.uuid = False
         self.xlist = False
         self.yes = False
+
+        #proxy
+        self.use_proxy = NOT_SET
+        self.proxy_type = NOT_SET
+        self.proxy_url = NOT_SET
+        self.proxy_port = NOT_SET
 
         # Debug options
 
@@ -2081,6 +2123,9 @@ class Config(object):
                 V1_METRICS_PARAM: 'True',
                 PULL_SERVER_SIDE_CONFIG_PARAM: 'True',
                 INCLUDE_PARAM: '',
+                PROXY_TYPE_PARAM: '',
+                PROXY_URL_PARAM: '',
+                PROXY_PORT_PARAM: '',
             })
 
             # Read configuration files from default directories
@@ -2116,6 +2161,27 @@ class Config(object):
                 self.pull_server_side_config = new_pull_server_side_config == 'True'
                 if new_pull_server_side_config is None:
                     self.pull_server_side_config = True
+
+            # Proxy configuration
+            if self.proxy_type == NOT_SET:
+                self.proxy_type = conf.get(MAIN_SECT, PROXY_TYPE_PARAM)
+                if not self.proxy_type:
+                    self.proxy_type = NOT_SET
+            if self.proxy_url == NOT_SET:
+                self.proxy_url = conf.get(MAIN_SECT, PROXY_URL_PARAM)
+                if not self.proxy_url:
+                    self.proxy_url = NOT_SET
+            if self.proxy_port == NOT_SET:
+                proxy_port = conf.get(MAIN_SECT, PROXY_PORT_PARAM)
+                if not proxy_port:
+                    self.proxy_port = NOT_SET
+                else:
+                    self.proxy_port = int(proxy_port)
+
+            if self.proxy_type != NOT_SET and self.proxy_url != NOT_SET and self.proxy_port != NOT_SET:
+                self.use_proxy = True
+            else:
+                self.use_proxy = False
 
             new_suppress_ssl = conf.get(MAIN_SECT, SUPPRESS_SSL_PARAM)
             if new_suppress_ssl == 'True':
@@ -3129,10 +3195,11 @@ def start_followers(default_transport):
                     use_ssl = False
                 preamble = 'PUT /%s/hosts/%s/%s/?realtime=1 HTTP/1.0\r\n\r\n' % (
                     config.user_key, config.agent_key, log_key)
+
                 # Special case for HTTP PUT
                 # Use plain formatter if no formatter is defined
-                transport = Transport(endpoint, port, use_ssl, preamble,
-                                      config.debug_transport_events)
+                transport = Transport(endpoint, port, use_ssl, preamble, config.debug_transport_events,
+                                      (config.proxy_type, config.proxy_url, config.proxy_port))
                 transports.append(transport)
                 # Default formatter is plain
                 if not entry_formatter:
@@ -3567,4 +3634,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
