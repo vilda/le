@@ -92,6 +92,18 @@ exit
 ```
 
 
+Ubuntu 15.10 Wily Werewolf
+--------------------------
+```
+sudo -sH
+echo 'deb http://rep.logentries.com/ wily main' >/etc/apt/sources.list.d/logentries.list
+gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+apt-get update
+apt-get install logentries
+exit
+```
+
+
 Fedora 14-19
 ------------
 ```
