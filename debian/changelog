@@ -1,3 +1,20 @@
+logentries (1.4.28) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Charles Phillips ]
+  * Update install to latest Logentries and SmartOS base image
+  * v1 metrics for SmartOS [#60]
+
+  [ Jimmy Tang ]
+  * Initial add of reference homebrew packaging.
+  * create a small script for generating an updated formula
+
+  [ Viliam Holub ]
+  * Adding instructions for Ubuntu Wily Werewolf
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Tue, 05 Jan 2016 13:58:41 +0000
+
 logentries (1.4.27) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
