@@ -3505,7 +3505,7 @@ def cmd_pull(args):
 # Main method
 #
 
-def main():
+def main_root():
     """Serious business starts here.
     """
     # Read command line parameters
@@ -3549,11 +3549,14 @@ def main():
     die('Error: Unknown command "%s".' % args[0])
 
 
-if __name__ == '__main__':
+def main():
     try:
-        main()
+        main_root()
     except FatalConfigurationError, e:
         log.error("Fatal: %s", e.msg)
     except KeyboardInterrupt:
-        die("Terminated", EXIT_TERMINATED)
+        die("\nTerminated", EXIT_TERMINATED)
+
+if __name__ == '__main__':
+    main()
 

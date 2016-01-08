@@ -151,8 +151,8 @@ exit
 ```
 
 
-CentOS 5
---------
+CentOS 5, 6
+-----------
 ```
 su -
 tee /etc/yum.repos.d/logentries.repo <<EOF
@@ -169,16 +169,17 @@ exit
 ```
 
 
-CentOS 6
+CentOS 7
 --------
 ```
 su -
+rpm --import https://rep.logentries.com/RPM-GPG-KEY-logentries
 tee /etc/yum.repos.d/logentries.repo <<EOF
 [logentries]
 name=Logentries repo
 enabled=1
 metadata_expire=1d
-gpgcheck=0
+gpgcheck=1
 baseurl=http://rep.logentries.com/centos\$releasever/\$basearch
 EOF
 yum update
@@ -186,6 +187,4 @@ yum install logentries
 exit
 ```
 
-
-### You will need to install python packages separately
 

@@ -42,7 +42,7 @@ authority_certificate_files = [  # Debian 5.x, 6.x, 7.x, Ubuntu 9.10, 10.4, 13.0
                                  "/etc/ssl/certs/ca-certificates.crt",
                                  # Fedora 12, Fedora 13, CentOS 5
                                  "/usr/share/purple/ca-certs/GeoTrust_Global_CA.pem",
-                                 # Amazon AMI
+                                 # Amazon AMI, CentOS 7, recent RHs
                                  "/etc/pki/tls/certs/ca-bundle.crt",
 ]
 
@@ -55,7 +55,11 @@ try:
 
     wrap_socket = ssl.wrap_socket
     FEAT_SSL = True
-    FEAT_SSL_CONTEXT = sys.version_info >= (2, 7, 8)
+    try:
+        ssl.create_default_context
+        FEAT_SSL_CONTEXT = True
+    except AttributeError:
+        FEAT_SSL_CONTEXT = False
 except ImportError:
     FEAT_SSL = False
     FEAT_SSL_CONTEXT = False
