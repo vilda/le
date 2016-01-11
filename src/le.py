@@ -898,6 +898,9 @@ def retrieve_account_key():
             print >> sys.stderr, 'Error: Invalid response from the server (Parsing error %s)' % msg
         except KeyError:
             print >> sys.stderr, 'Error: Invalid response from the server, user key not present.'
+        except EOFError:
+            # Ctrl+D in get_pass, simulate Ctrl+C
+            raise KeyboardInterrupt()
 
         print >> sys.stderr, 'Try to log in again, or press Ctrl+C to break'
 
@@ -3505,7 +3508,7 @@ def cmd_pull(args):
 # Main method
 #
 
-def main():
+def main_root():
     """Serious business starts here.
     """
     # Read command line parameters
@@ -3549,11 +3552,14 @@ def main():
     die('Error: Unknown command "%s".' % args[0])
 
 
-if __name__ == '__main__':
+def main():
     try:
-        main()
+        main_root()
     except FatalConfigurationError, e:
         log.error("Fatal: %s", e.msg)
     except KeyboardInterrupt:
-        die("Terminated", EXIT_TERMINATED)
+        die("\nTerminated", EXIT_TERMINATED)
+
+if __name__ == '__main__':
+    main()
 
