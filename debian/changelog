@@ -1,3 +1,15 @@
+logentries (1.4.29) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Adding support for CentOS7
+  * Improving style, adding instructions for FreeBSD 10.2
+  * Not dumping stact trace for Ctrl+D in get_pass
+  * Updating internal list of root CAs
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Tue, 12 Jan 2016 11:05:26 +0000
+
 logentries (1.4.28) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Charles Phillips ]
