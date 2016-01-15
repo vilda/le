@@ -2573,7 +2573,12 @@ def api_request(request, required=False, check_status=False, silent=False, die_o
             d_response = None
 
     if check_status and d_response['response'] != 'ok':
-        error = "Error: %s" % d_response['reason']
+        reason = d_response['reason']
+
+        # Special compatibility case: change group to host
+        reason = reason.replace( 'The group with ID', 'The host with ID')
+
+        error = "Error: %s" % reason
         if die_on_error:
             die(error)
         else:
