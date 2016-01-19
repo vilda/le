@@ -3289,7 +3289,7 @@ def cmd_follow(args):
         return
 
     if len(glob.glob(filename)) == 0:
-        log.warning('\nWARNING: File %s does not exist', filename)
+        log.warning('\nWarning: File %s does not exist\n', filename)
 
     request_follow(filename, name, type_opt)
 
