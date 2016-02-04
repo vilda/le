@@ -2,7 +2,7 @@ import os
 from setuptools import setup
 
 setup(name='logentries',
-      version="1.4.29",
+      version="1.4.30",
       description='Logentries Linux agent',
       author='Logentries',
       author_email='hello@logentries.com',

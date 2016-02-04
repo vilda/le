@@ -9,7 +9,7 @@ Scenario 'Help'
 Testcase 'List help usage'
 
 $LE
-#e Logentries agent version 1.4.29
+#e Logentries agent version 1.4.30
 #e usage: le COMMAND [ARGS]
 #e 
 #e Where command is one of:

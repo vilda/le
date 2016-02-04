@@ -1,3 +1,16 @@
+logentries (1.4.30) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Improving error response when host is not found
+  * Improving "File does not exist" warning
+
+  [ Ulrich Dangel ]
+  * Adjust configuration file permissions
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Thu, 04 Feb 2016 17:05:57 +0000
+
 logentries (1.4.29) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
