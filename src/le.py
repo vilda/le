@@ -2096,6 +2096,9 @@ class Config(object):
             # Adjust configuration file permissions to be only readable by onwer + group
             for _config in config_files:
                 try:
+                    if not os.path.exists(_config):
+                        continue
+
                     world_readable = bool(os.stat(_config).st_mode & stat.S_IROTH)
                     if world_readable:
                         os.chmod(_config, 0640)
