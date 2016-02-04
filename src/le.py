@@ -233,6 +233,7 @@ import os.path
 import platform
 import socket
 import subprocess
+import stat
 import traceback
 import sys
 import threading
@@ -251,6 +252,10 @@ import metrics
 # Option to avoid issues around encodings
 #reload(sys)
 #sys.setdefaultencoding('utf8')
+
+
+# Explicitely set umask to allow user rw + group read
+os.umask(stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH)
 
 #
 # Start logging
@@ -2087,6 +2092,16 @@ class Config(object):
             config_files = [self.config_filename]
             if load_include_dirs:
                 config_files.extend(self._list_configs(self.config_d))
+
+            # Adjust configuration file permissions to be only readable by onwer + group
+            for _config in config_files:
+                try:
+                    world_readable = bool(os.stat(_config).st_mode & stat.S_IROTH)
+                    if world_readable:
+                        os.chmod(_config, 0640)
+                except OSError:
+                    log.warn('Could not adjust permissions for config file %s', _config, exc_info=True)
+
             conf.read(config_files)
 
             # Fail if no configuration file exist
