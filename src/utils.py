@@ -231,7 +231,7 @@ def domain_connect(config, domain, Domain):
 
     # Special case for local debugging
     if config.debug_local:
-        if Domain == Domain.API:
+        if s == Domain.API:
             s = Domain.API_LOCAL
         else:
             s = Domain.MAIN_LOCAL
@@ -241,7 +241,7 @@ def domain_connect(config, domain, Domain):
     use_ssl = True
     if config.debug_local:
         use_ssl = False
-    elif Domain == Domain.API:
+    elif s == Domain.API:
         use_ssl = not config.suppress_ssl
 
     # Connect to server with SSL in untrusted network
@@ -250,7 +250,7 @@ def domain_connect(config, domain, Domain):
     else:
         port = 80
     if config.debug_local:
-        if Domain == Domain.API:
+        if s == Domain.API:
             port = 8000
         else:
             port = 8081
