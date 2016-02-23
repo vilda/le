@@ -118,7 +118,7 @@ if [ -f /etc/le/config ]; then
 		exit 0
 	fi
 fi
-		
+
 printf "\n"
 
 # Check if curl is installed, if not, mark it for installation
@@ -251,7 +251,7 @@ elif [ -f /etc/debian_version ]; then
 	$DEBIAN_DAEMON_INSTALL >$LOGFILE 2>&1
 
 	FOUND=1
-        SYSLOG=syslog
+	SYSLOG=syslog
 
 elif [ -f /etc/redhat-release ]; then
 	# CentOS 6  /  RHEL 6 / Fedora / Amazon Linux AMI
@@ -302,20 +302,20 @@ EOL
 
 elif [ -f /etc/gentoo-release ] ; then
 
-        if [ -d ${GENTOO_PORTAGE} ] ; then
-            rm -fr ${GENTOO_PORTAGE}
-        fi
-        mkdir -p ${GENTOO_PORTAGE}/profiles ${GENTOO_PORTAGE}/${GENTOO_OVERLAY}
+	if [ -d ${GENTOO_PORTAGE} ] ; then
+		rm -fr ${GENTOO_PORTAGE}
+	fi
+	mkdir -p ${GENTOO_PORTAGE}/profiles ${GENTOO_PORTAGE}/${GENTOO_OVERLAY}
 
-        echo 'le' > ${GENTOO_PORTAGE}/profiles/repo_name
-        $WGET -A "*.ebuild","Manifest","logentries" -P ${GENTOO_PORTAGE}/${GENTOO_OVERLAY} ${GENTOO_REPO}
+	echo 'le' > ${GENTOO_PORTAGE}/profiles/repo_name
+	$WGET -A "*.ebuild","Manifest","logentries" -P ${GENTOO_PORTAGE}/${GENTOO_OVERLAY} ${GENTOO_REPO}
 
-        for makeconf in /etc/portage/make.conf /etc/make.conf ; do
-            if [ -f $makeconf ] && [ -z "`grep \"${GENTOO_PORTAGE}\" $makeconf`" ] ; then
-                echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} ${GENTOO_PORTAGE}\"" >> $makeconf
-                break
-            fi
-        done
+	for makeconf in /etc/portage/make.conf /etc/make.conf ; do
+		if [ -f $makeconf ] && [ -z "`grep \"${GENTOO_PORTAGE}\" $makeconf`" ] ; then
+			echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} ${GENTOO_PORTAGE}\"" >> $makeconf
+			break
+		fi
+	done
 
 	printf "Installing logentries package...\n"
 	$GENTOO_AGENT_INSTALL &> $LOGFILE
@@ -342,7 +342,7 @@ fi
 if [ $FOUND == "1" ]; then
 	printf "Logentries Install Complete\n\n"
 
-        logfile=/var/log/${SYSLOG}
+	logfile=/var/log/${SYSLOG}
 
 	if [ -f $logfile ]; then
 		$FOLLOW_CMD $logfile >$LOGFILE 2>&1
@@ -373,7 +373,7 @@ if [ $FOUND == "1" ]; then
 			printf "."
 		done
 		printf "\n"
-	else	
+	else
 		for j in "${LOGS_TO_FOLLOW[@]}"
 		do
 			if [ -f $j ]; then
