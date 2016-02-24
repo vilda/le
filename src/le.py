@@ -2767,9 +2767,11 @@ def get_cache_filename():
     return os.path.join(cache_dir, CACHE_NAME)
 
 
-def load_cache():
+def load_cache(empty=False):
     """Loads or creates cache.
     """
+    if empty:
+        return {'host_keys':{}, 'log_tokens':{}}
     cache_filename = get_cache_filename()
     try:
         if os.path.exists(cache_filename):
@@ -3183,7 +3185,8 @@ def create_configured_logs(configured_logs):
     """ Get tokens for all configured logs. Logs with no token specified are
     retrieved via API and created if needed.
     """
-    cache = load_cache()
+    # Load loca cache unless we are allowed to load server side configuration
+    cache = load_cache(config.pull_server_side_config)
     for clog in configured_logs:
         if not clog.destination and not clog.token:
             log.error('Ignoring section %s as neither %s nor %s is specified', clog.name, TOKEN_PARAM, DESTINATION_PARAM)
@@ -3200,7 +3203,8 @@ def create_configured_logs(configured_logs):
                 log.error('Ignoring section %s, cannot create log' % clog.name)
 
             clog.token = token
-    save_cache(cache)
+    if not config.pull_server_side_config:
+        save_cache(cache)
 
 
 def cmd_monitor(args):
