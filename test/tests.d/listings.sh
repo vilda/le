@@ -52,10 +52,10 @@ $LE ls hosts/Name1/
 #e Configuration files loaded: sandbox_config
 #e Connecting to 127.0.0.1:8081
 #e Domain request: GET /f720fe54-879a-11e4-81ac-277d856f873e/hosts/Name1/ None {}
-#e List response: {"object": "loglist", "list": [{"name": "Log name 0", "key": "400da462-36fa-48f4-bb4e-87f96ad34e8a", "created": 1414611930412, "retention": -1, "follow": "true", "object": "log", "type": "agent", "filename": "$TMP/example.log"}, {"token": "120fb800-94c0-446a-be28-cfbbc36b52eb", "name": "Log name 1", "key": "ee0489cc-41ce-41cf-9bb6-4cdf5e5acf32", "created": 1418775058756, "retention": -1, "follow": "false", "object": "log", "type": "token", "filename": "$TMP/example2.log"}], "response": "ok"}
+#e List response: {"object": "loglist", "list": [{"name": "Log name 0", "key": "400da462-36fa-48f4-bb4e-87f96ad34e8a", "created": 1414611930412, "retention": -1, "follow": "true", "object": "log", "type": "agent", "filename": "$TMP/example.log"}, {"logtype": "444e607f-14bd-405e-a2ce-c4892b5a3b15", "token": "120fb800-94c0-446a-be28-cfbbc36b52eb", "name": "Log name 1", "key": "ee0489cc-41ce-41cf-9bb6-4cdf5e5acf32", "created": 1418775058756, "retention": -1, "follow": "false", "object": "log", "type": "token", "filename": "$TMP/example2.log"}], "response": "ok"}
 #e 2 logs
 
-Testcase 'List log in a host'
+Testcase 'List log in a host (1)'
 $LE ls hosts/Name1/Log\ name\ 0
 #o name = Log name 0
 #o filename = $TMP/example.log
@@ -66,4 +66,18 @@ $LE ls hosts/Name1/Log\ name\ 0
 #e Connecting to 127.0.0.1:8081
 #e Domain request: GET /f720fe54-879a-11e4-81ac-277d856f873e/hosts/Name1/Log%20name%200 None {}
 #e List response: {"name": "Log name 0", "created": 1414611930412, "object": "log", "filename": "$TMP/example.log", "key": "400da462-36fa-48f4-bb4e-87f96ad34e8a", "follow": "true", "type": "agent", "response": "ok", "retention": -1}
+
+Testcase 'List log in a host (2)'
+$LE ls hosts/Name1/Log\ name\ 1
+#o name = Log name 1
+#o filename = $TMP/example2.log
+#o key = ee0489cc-41ce-41cf-9bb6-4cdf5e5acf32
+#o type = token
+#o follow = false
+#o token = 120fb800-94c0-446a-be28-cfbbc36b52eb
+#o logtype = json
+#e Configuration files loaded: sandbox_config
+#e Connecting to 127.0.0.1:8081
+#e Domain request: GET /f720fe54-879a-11e4-81ac-277d856f873e/hosts/Name1/Log%20name%201 None {}
+#e List response: {"name": "Log name 1", "created": 1418775058756, "object": "log", "filename": "$TMP/example2.log", "logtype": "444e607f-14bd-405e-a2ce-c4892b5a3b15", "token": "120fb800-94c0-446a-be28-cfbbc36b52eb", "key": "ee0489cc-41ce-41cf-9bb6-4cdf5e5acf32", "follow": "false", "type": "token", "response": "ok", "retention": -1}
 

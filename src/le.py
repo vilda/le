@@ -67,6 +67,16 @@ LE_SERVER_API = '/'
 LE_DEFAULT_SSL_PORT = 20000
 LE_DEFAULT_NON_SSL_PORT = 10000
 
+# Structures embedded (beta)
+EMBEDDED_STRUCTURES = {
+    # JSON with support for nested objects
+    "json": "444e607f-14bd-405e-a2ce-c4892b5a3b15",
+    # General kvp parser
+    "kvp": "380d3f36-1a8d-45ad-972f-3001768870ca",
+    # Apache access log
+    "http": "803fe7ba-bd2e-44bd-8ee7-f02fa253ef5f",
+}
+
 
 class Domain(object):
 
@@ -3357,11 +3367,20 @@ def cmd_whoami(args):
 
 
 def logtype_name(logtype_uuid):
+    """ Provides name for the logtype given.
+    """
+    # Look for embedded structures
+    for structure_name, structure_id in EMBEDDED_STRUCTURES.iteritems():
+        if structure_id == logtype_uuid:
+            return structure_name
+
+    # Search for logtypes provided by the backend
     response = request('logtypes', True, True)
     all_logtypes = response['list']
     for logtype in all_logtypes:
         if logtype_uuid == logtype['key']:
             return logtype['shortcut']
+
     return 'unknown'
 
 

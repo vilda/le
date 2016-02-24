@@ -40,6 +40,7 @@ LOG1 = {
 	"filename":CWD +"/example2.log",
 	"created":1418775058756,
 	"type":"token",
+	"logtype":"444e607f-14bd-405e-a2ce-c4892b5a3b15",
 	"follow":"false",
 	"retention":-1,
 	"token": "120fb800-94c0-446a-be28-cfbbc36b52eb"
@@ -172,6 +173,11 @@ class HostLogsHandler( cyclone.web.RequestHandler):
 				"object":"loglist",
 				"list":[ LOG0, LOG1],
 			}))
+		elif host_id in [HOST1_KEY, HOST1['name']]:
+			self.write( response_ok( {
+				"object":"loglist",
+				"list":[],
+			}))
 		else:
 			raise cyclone.web.HTTPError( 403)
 
@@ -179,11 +185,15 @@ class LogHandler( cyclone.web.RequestHandler):
 	def get( self, account_id, host_id, log_id):
 		if log_id in [LOG0_KEY, LOG0['name']]:
 			self.write( response_ok( LOG0))
+		elif log_id in [LOG1_KEY, LOG1['name']]:
+			self.write( response_ok( LOG1))
 
 class IngestionHandler( cyclone.web.RequestHandler):
 	@asynchronous
 	def put( self, account_id, host_id, log_id):
 		if log_id in [LOG0_KEY, LOG0['name']]:
+			pass
+		elif log_id in [LOG1_KEY, LOG1['name']]:
 			pass
 
 def response_ok( x):
