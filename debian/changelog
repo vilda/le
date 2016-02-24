@@ -1,3 +1,19 @@
+logentries (1.4.32) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Ulrich Dangel ]
+  * Fix comparison against server names
+
+  [ Aurelio Jargas ]
+  * Fix indentation
+
+  [ Viliam Holub ]
+  * Avoid cache when server side configuration is enabled
+  * Removing local cache
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Wed, 24 Feb 2016 19:12:58 +0000
+
 logentries (1.4.31) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Ulrich Dangel ]
