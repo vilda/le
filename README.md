@@ -196,9 +196,9 @@ of `host name/log name'. The agent will search for the host and log identified
 by their name and retrieve the token automatically. If the host or log does not
 exist, it is created.
 
-**Note**: When using the destination parameter it is advised not to initialize multiple agents
-with the same configuration file at the same time. This is to prevent a race condition where
-duplicate Log Sets may be created.
+**Note**: When using the destination parameter it is advised not to initialize
+multiple agents with the same configuration file at the same time. This is to
+prevent a race condition where duplicate Log Sets may be created.
 
 Example:
 
@@ -210,8 +210,8 @@ Example:
 Using local configuration only
 ------------------------------
 
-In an auto scaling environment you may not want to create a Host each time you
-install the agent.
+In an auto scaling environment you may not want to create a Host (log set) each
+time you install the agent.
 
 To disable pulling server-side configuration (and thus avoiding communication
 with Logentries API) add this line in the `[Main]` section of the configuration:
@@ -223,7 +223,14 @@ or `reinit` commands:
 
 	sudo le reinit --pull-server-side-config=False
 
-By default, locally configured logs are sent to Logentries in Syslog format RFC 5424 which prepends a timestamp and other useful information. If you wish to disable this, you can set the formatter to 'plain' in the `[Main]` section of the configuration.
+When set to False, the agent requires token for all configured logs. Tokens may
+be specified in the configuration file, or--in case of logs created by the
+agent--it is stored in local cache file.
+
+By default, locally configured logs are sent to Logentries in Syslog format RFC
+5424 which prepends a timestamp and other useful information. If you wish to
+disable this, you can set the formatter to 'plain' in the `[Main]` section of
+the configuration.
 
 	formatter = plain
 
