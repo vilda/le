@@ -132,7 +132,7 @@ Amazon Linux AMI
 	name=Logentries repo
 	enabled=1
 	metadata_expire=1d
-	baseurl=http://rep.logentries.com/amazon\$releasever/\$basearch
+	baseurl=http://rep.logentries.com/amazonlatest/\$basearch
 	gpgkey=http://rep.logentries.com/RPM-GPG-KEY-logentries
 	EOF
 	yum update
