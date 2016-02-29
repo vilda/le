@@ -25,7 +25,6 @@ DEFAULT_AGENT_KEY = NOT_SET
 CONFIG_DIR_SYSTEM = '/etc/le'
 CONFIG_DIR_USER = '.le'
 LE_CONFIG = 'config' # Default configuration file
-CACHE_NAME = 'cache'
 CONF_SUFFIX = '.conf' # Expected suffix of configuration files
 
 LOCAL_CONFIG_DIR_USER = '.le'
@@ -66,6 +65,16 @@ LE_SERVER_API = '/'
 
 LE_DEFAULT_SSL_PORT = 20000
 LE_DEFAULT_NON_SSL_PORT = 10000
+
+# Structures embedded (beta)
+EMBEDDED_STRUCTURES = {
+    # JSON with support for nested objects
+    "json": "444e607f-14bd-405e-a2ce-c4892b5a3b15",
+    # General kvp parser
+    "kvp": "380d3f36-1a8d-45ad-972f-3001768870ca",
+    # Apache access log
+    "http": "803fe7ba-bd2e-44bd-8ee7-f02fa253ef5f",
+}
 
 
 class Domain(object):
@@ -2748,55 +2757,6 @@ def request_follow(filename, name, type_opt):
     return followed_log
 
 
-def get_cache_dir():
-    """Returns a directory suitable for cached data.
-    """
-    # XXX For daemon use system cache directory
-    home = os.path.expanduser('~')
-    cache_home = os.environ.get('XDG_CACHE_HOME') or os.path.join(home, '.cache')
-    path = os.path.join(cache_home, CORP)
-    if not os.path.isdir(path):
-        os.makedirs(path)
-    return path
-
-
-def get_cache_filename():
-    """Gets full cache filename.
-    """
-    cache_dir = get_cache_dir()
-    return os.path.join(cache_dir, CACHE_NAME)
-
-
-def load_cache():
-    """Loads or creates cache.
-    """
-    cache_filename = get_cache_filename()
-    try:
-        if os.path.exists(cache_filename):
-            fcache = open(cache_filename, 'r')
-            cache_content = fcache.read()
-            fcache.close()
-            return json_loads(cache_content)
-    except ValueError:
-        log.warn("Could not read cache, ignoring")
-    except IOError:
-        log.warn("Error while reading cache, ignoring")
-
-    return {'host_keys':{}, 'log_tokens':{}}
-
-
-def save_cache(cache):
-    """Saves cache given.
-    """
-    cache_filename = get_cache_filename()
-    try:
-        fcache = open(cache_filename, 'w')
-        fcache.write(json_dumps(cache, indent=4, separators=(',', ': ')))
-        fcache.close()
-    except IOError:
-        log.warning("Cannot write to %s, consider adjusting XDG_CACHE_HOME" % cache_filename)
-
-
 def request_hosts(load_logs=False):
     """Returns list of registered hosts.
     """
@@ -2813,13 +2773,9 @@ def request_hosts(load_logs=False):
     return response['hosts']
 
 
-def get_or_create_host(cache, host_name):
-    """Gets or creates a new host and refreshes the cache if necessary
+def get_or_create_host(host_name):
+    """Gets or creates a new host.
     """
-    # Find the host in cache
-    if host_name in cache['host_keys']:
-        return cache['host_keys'][host_name]
-
     # Retrieve the host via API
     account_hosts = request_hosts(load_logs=True)
     host = find_api_obj_by_name(account_hosts, host_name)
@@ -2828,21 +2784,15 @@ def get_or_create_host(cache, host_name):
         # If it does not exist, create a new one
         host = create_host(host_name, '', '', '', '')
 
-    host_key = host['key']
-    cache['host_keys'][host_name] = host_key
-    return host_key
+    return host['key']
 
 
-def get_or_create_log(cache, host_key, log_name, destination):
+def get_or_create_log(host_key, log_name, destination):
     """ Gets or creates a log for the host given. It returns logs's token or
     None.
     """
     if not host_key:
         return None
-
-    # Find log in cache
-    if destination in cache['log_tokens']:
-        return cache['log_tokens'][destination]
 
     # Retrieve the log via API
     account_hosts = request_hosts(load_logs=True)
@@ -2856,10 +2806,7 @@ def get_or_create_log(cache, host_key, log_name, destination):
         if not xlog:
             return None
 
-    token = xlog.get('token', None)
-    if token:
-        cache['log_tokens'][destination] = token
-    return token
+    return xlog.get('token', None)
 
 
 #
@@ -3183,7 +3130,6 @@ def create_configured_logs(configured_logs):
     """ Get tokens for all configured logs. Logs with no token specified are
     retrieved via API and created if needed.
     """
-    cache = load_cache()
     for clog in configured_logs:
         if not clog.destination and not clog.token:
             log.error('Ignoring section %s as neither %s nor %s is specified', clog.name, TOKEN_PARAM, DESTINATION_PARAM)
@@ -3194,13 +3140,12 @@ def create_configured_logs(configured_logs):
                 (hostname, logname) = clog.destination.split('/', 1)
             except ValueError:
                 log.error('Ignoring section %s since `%s\' does not contain host', clog.name, DESTINATION_PARAM)
-            host_key = get_or_create_host(cache, hostname)
-            token = get_or_create_log(cache, host_key, logname, clog.destination)
+            host_key = get_or_create_host(hostname)
+            token = get_or_create_log(host_key, logname, clog.destination)
             if not token:
                 log.error('Ignoring section %s, cannot create log' % clog.name)
 
             clog.token = token
-    save_cache(cache)
 
 
 def cmd_monitor(args):
@@ -3357,11 +3302,20 @@ def cmd_whoami(args):
 
 
 def logtype_name(logtype_uuid):
+    """ Provides name for the logtype given.
+    """
+    # Look for embedded structures
+    for structure_name, structure_id in EMBEDDED_STRUCTURES.iteritems():
+        if structure_id == logtype_uuid:
+            return structure_name
+
+    # Search for logtypes provided by the backend
     response = request('logtypes', True, True)
     all_logtypes = response['list']
     for logtype in all_logtypes:
         if logtype_uuid == logtype['key']:
             return logtype['shortcut']
+
     return 'unknown'
 
 
