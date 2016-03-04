@@ -47,9 +47,9 @@ LE_PID=$!
 
 sleep 1
 echo 'First message' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web First message
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - First message
 echo 'Second message' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web Second message
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - Second message
 sleep 1
 
 kill $LE_PID
@@ -76,9 +76,9 @@ LE_PID=$!
 
 sleep 1
 echo 'First message' >> example.log
-#e <14>1 ISODATETIME myhost Log_name_0 - - - hostname=myhost appname=Log_name_0 First message
+#e <14>1 ISODATETIME myhost Log_name_0 - - - First message
 echo 'Second message' >> example.log
-#e <14>1 ISODATETIME myhost Log_name_0 - - - hostname=myhost appname=Log_name_0 Second message
+#e <14>1 ISODATETIME myhost Log_name_0 - - - Second message
 sleep 1
 
 kill $LE_PID
