@@ -29,13 +29,13 @@ LE_PID=$!
 sleep 1
 echo 'First message' >> example.log
 echo 'Second message' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web First message
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web Second message
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - First message
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - Second message
 sleep 1
 echo 'Third message' >> example.log
 echo 'Fourth message' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web Third message
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web Fourth message
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - Third message
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - Fourth message
 sleep 1
 
 kill $LE_PID
@@ -74,13 +74,13 @@ echo 'Line 1' >> example.log
 echo 'separatorLine 2' >> example.log
 echo 'Line 3' >> example.log
 echo 'Line 4' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web separatorLine 0 Line 1
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web separatorLine 2 Line 3 Line 4
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - separatorLine 0 Line 1
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - separatorLine 2 Line 3 Line 4
 sleep 1
 echo 'Line 5' >> example.log
 echo 'separatorLine 6' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web Line 5
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web separatorLine 6
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - Line 5
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - separatorLine 6
 sleep 1
 
 kill $LE_PID
@@ -126,8 +126,8 @@ echo 'separatorLine 0' >> example.log
 echo 'Line 1' >> example.log
 echo 'separatorLine 2' >> example.log
 echo 'Line 3' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web separatorLine 0 Line 1
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web separatorLine 2 Line 3
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - separatorLine 0 Line 1
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - separatorLine 2 Line 3
 sleep 1
 
 kill $LE_PID
@@ -162,8 +162,8 @@ echo 'separatorLine 0' >> example.log
 echo 'Line 1' >> example.log
 echo 'separatorLine 2' >> example.log
 echo 'Line 3' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web separatorLine 0 Line 1
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web separatorLine 2 Line 3
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - separatorLine 0 Line 1
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - separatorLine 2 Line 3
 sleep 1
 
 kill $LE_PID
@@ -199,8 +199,8 @@ echo 'abrakaLine 0' >> example.log
 echo 'dabraLine 1' >> example.log
 echo 'abrakaLine 2' >> example.log
 echo 'dabraLine 3' >> example.log
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web abrakaLine 0 dabraLine 1
-#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - hostname=myhost appname=Web abrakaLine 2 dabraLine 3
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - abrakaLine 0 dabraLine 1
+#e 89caf699-8fb7-45b1-a41f-ae111ec99148<14>1 ISODATETIME myhost Web - - - abrakaLine 2 dabraLine 3
 sleep 1
 
 kill $LE_PID
