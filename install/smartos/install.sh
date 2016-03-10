@@ -27,13 +27,16 @@ INSTALL_DIR="/opt/local/lib/logentries"
 LOGGER_CMD="logger -t LogentriesTest Test Message Sent By LogentriesAgent"
 DAEMON="svc-logentries"
 DAEMON_DL_LOC="$SMARTOS_INSTALL$DAEMON"
-DAEMON_PATH="/opt/local/lib/svc/method/$DAEMON"
+DAEMON_PATH_ROOT="/opt/local/lib/svc/method"
+DAEMON_PATH="$DAEMON_PATH_ROOT/$DAEMON"
 
 SMF_CONFIG="logentries.xml"
 SMF_CONFIG_DL_LOC="$SMARTOS_INSTALL$SMF_CONFIG"
-SMF_CONFIG_PATH="/opt/local/lib/svc/manifest/$SMF_CONFIG"
+SMF_CONFIG_PATH_ROOT="/opt/local/lib/svc/manifest"
+SMF_CONFIG_PATH="$SMF_CONFIG_PATH_ROOT/$SMF_CONFIG"
 
-INSTALL_PATH="/opt/local/bin/le"
+INSTALL_PATH_ROOT="/opt/local/bin"
+INSTALL_PATH="$INSTALL_PATH_ROOT/le"
 REGISTER_CMD="$INSTALL_PATH register"
 LE_FOLLOW="$INSTALL_PATH follow"
 
@@ -56,11 +59,17 @@ mkdir -p "$INSTALL_DIR"/logentries || true
 mv *.py "$INSTALL_DIR"/logentries
 chown -R root:root "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR"/logentries/le.py
+
 chown root:root $DAEMON
+mkdir -p $DAEMON_PATH_ROOT
 mv $DAEMON $DAEMON_PATH
 chmod +x $DAEMON_PATH
+
 rm -f "$INSTALL_PATH" || true
+mkdir -p $INSTALL_PATH_ROOT
 ln -s "$INSTALL_DIR"/logentries/le.py "$INSTALL_PATH" 2>/dev/null || true
+
+mkdir -p $SMF_CONFIG_PATH_ROOT
 mv $SMF_CONFIG $SMF_CONFIG_PATH
 
 echo "Adding logentries agent to svcadm  (Services)"
