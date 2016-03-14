@@ -1643,9 +1643,10 @@ class Follower(object):
                     position = self._get_file_position()
                     self._set_file_position(0, FILE_END)
                     file_size = self._get_file_position()
+
                     if file_size < position:
                         # File has been externaly modified
-                        position = file_size
+                        position = 0
                     self._set_file_position(position)
                 idle_cnt = 0
             else:
