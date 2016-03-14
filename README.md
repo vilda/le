@@ -79,13 +79,12 @@ Replace `XXX` with the name of your system, i.e. one of wheezy, jessie,
 lucid, precise, quantal, saucy, trusty, utopic, vivid. You also need to add
 Logentries release key:
 
-	gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD && gpg -a --export C43C79AD | apt-key add -
+	apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C43C79AD
 
 (Keyservers are not always reliable. In automated scripts do the following.)
 
-	(gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys C43C79AD \
-	|| gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C43C79AD) \
-	&& gpg -a --export C43C79AD | apt-key add -
+	apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C43C79AD \
+	|| apt-key adv --keyserver hkp://pgp.mit.com:80 --recv-keys C43C79AD
 
 Then run `apt-get update` and `apt-get install logentries`. If you want to run
 the agent as daemon, install it via `apt-get install logentries-daemon`.
