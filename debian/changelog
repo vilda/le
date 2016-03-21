@@ -1,3 +1,22 @@
+logentries (1.4.33) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Resolve embedded structure names
+  * Set Amazon\'s repository to a fixed address
+  * FTR-59 Remove explicit hostname and appname from default format
+  * Use apt-key to get GPG keys
+  * Read log from the beginning when it shrinks
+
+  [ Marc Simon ]
+  * [improv] using proxy for http request
+
+  [ Jon Tibble ]
+  * Cleanup directory creation assumptions
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Mon, 21 Mar 2016 15:10:18 +0000
+
 logentries (1.4.32) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Ulrich Dangel ]
