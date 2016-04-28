@@ -14,6 +14,7 @@ infrastructure.
   * [Using local configuration only](#using-local-configuration-only)
   * [List IP addresses the agent uses](#list-ip-addresses-the-agent-uses)
   * [Follow logs that change their names](#follow-logs-that-change-their-names)
+  * [Follow a log that appears across multiple directories](#follow-a-log-that-appears-across-multiple-directories)
   * [Manipulate your data in transit](#manipulate-your-data-in-transit)
   * [Format output entries](#format-output-entries)
   * [Filtering file names](#filtering-file-names)
@@ -66,6 +67,7 @@ How to use
 	--suppress-ssl    do not use SSL with API server
 	--yes	          always respond yes
 	--pull-server-side-config=False do not use server-side config for following files
+	--multilog        option used with directory wildcard (restricted behaviour - see below for details)
 
 
 Repositories
@@ -262,6 +264,116 @@ for any active log in the folder and will monitor the events in that log.
 log file named `xxx.log` is renamed to `xxx.log.0` and a new `xxx.log` file is
 created. In this situation follow the `xxx.log` file only, do not specify
 wildcards.
+
+Follow a log that appears across multiple directories
+-----------------------------------------------------
+When using the 'follow' command to set up which log file to be followed, a special
+wildcard with restricted behaviour can be used for (or as part of) a directory 
+name. This option is intended for where multiple log files, with the same filename 
+but with each log file in a different directory, are to be followed. The log 
+events captured in all these log files are then sent to a single destination log in 
+the Logentries infrastructure. Note that this behaviour is different from where
+a wildcard is used in the log filename - which is not allowed in this case.
+
+Example:
+For this example there is a number of directories in /var/log/, each called 'apache-xx',
+where the xx is a number that varies for each directory, such as 'apache-01', 
+'apache-02' and so on. In addition, within each directory, is a file called 'apache.log'.
+
+We want to follow all 'apache.log' files in each of these directories, with the log
+events from all log files sent to a destination log in the Logentries infrastructure 
+that we want to name 'Apache'.
+
+The command 'follow' is combined with the '--multilog' option to use the wildcard 
+in the directory name in the path that is passed to the agent.
+  
+    le follow '/var/log/apache-*/apache.log' --multilog [--name Apache]
+
+#### Usage
+The agent behaviour when usage of the --multilog is made is dependant on
+the rules below: 
+
+-   The pathname to be passed to the agent must be in single quotes as shown
+    in the example. This is necessary, so that the wildcard is not expanded 
+    by the shell, but processed by the agent internally. 
+-   The wildcard * is the only one allowed for this behaviour.
+-   Only one wildcard is allowed in the pathname.
+-   The wildcard can be used in place of a directory name or in place of part 
+    of a directory name.
+-   At all times a full filename must be given.
+-   No wildcard is allowed in the filename.
+-   Only the one file in each directory found that matches the pattern with 
+    the wildcard is followed.
+-   The wildcard is not required, but then only a single file is followed. 
+    In such a case, the --multilog option is unnecessary as the default 
+    behaviour of the 'follow' command can be used to follow a single file.
+-   Where the --name is not used, the filename is used to name the destination
+    log - which in the case of the example above is 'apache.log'
+-   The agent expects the last / as being followed by a filename - it cannot
+    be blank - the log filename does not need to have an extension such 
+    as .log; a log file named 'apache', such as '/var/log/apache*/apache' 
+    is accepted - as long as it is a full and valid filename.
+
+#### Displayed Lists
+If the pathname with the wildcard is valid and accepted by the agent, it will 
+display to the user two lists that are shown as an aid to help the user
+make the most of the wildcard usage.
+
+The first list will display all the existing destination logs for that host found 
+in use from the server with the pathname of the local log file (or files) associated
+with each log. Where there is a log with a pathname that was set up using the --multilog 
+option a prefix to the pathname 'Multiple:' is shown. This list may show a mix of pathnames - 
+as some will have been set-up using the --mulitlog option and some not.
+
+So as per the example above, for the log 'Apache', may return a list like this:
+
+    LOG         PATHNAME
+    mylog       /var/log/mysystem/mylog-*.log      
+    Apache      Multiple:/var/log/apache*/apache.log
+    Cassandra   /srv/log/cassandra/system.out
+
+The second list will display any files found by the agent at this time after 
+processing the pathname that fall within the scope of the wildcard. This list
+reflects the files that will be followed by the agent for this pathname however,
+the files actually followed may differ if directories are deleted or added 
+before the agent has been restarted or is actively monitoring the log files. 
+
+The agent will detect where directories that have a file being followed
+is deleted, and will stop following that file. Like wise the agent will monitor
+for directories with a file that falls within the scope of the wildcard expansion.
+If such a directory is created while the agent is active, it will attempt to 
+follow this new file - with the same log settings.
+
+The user then has the option to quit without setting any new files to be followed
+or the user may continue, in which case the agent will process the pathname.
+
+**Note** that there is no restriction on different destination logs having pathnames
+with wildcards that are similar. It is possible therefore that a number of files
+will appear to be common to these destination logs. The agent will not prevent this.
+It is dependant on the user to understand the scope of the wildcard in the pathname
+that is being applied.
+
+For example the following two examples result in a subset of directories with the
+same log file falling within the scope of both destination directories:
+  
+    le follow '/var/log/apache*/apache.log' --multilog --name=Apace
+    le follow '/var/log/*/apache.log' --multilog --name=WebLogs
+  
+It is recommended to avoid scenarios like this.
+
+### Client Configuration File
+As explained above in the section on using the client side configuration to 
+follow files, a similar configuration section can used to set up a pathname
+with a wildcard - as long as the pathname meets the same rules for one 
+entered via the command line.
+ 
+The prefix Multilog: is mandatory.
+
+Example: 
+
+    [Apache]
+	path = Multilog:/var/log/apache*/current
+	token = MY_TOKEN
 
 
 Manipulate your data in transit
