@@ -48,6 +48,7 @@ How to use
 	follow <filename>  Follow the given log
 	--name=  name of the log
 	--type=  type of the log
+	--multilog option used with directory wildcard (restricted behaviour - see below for details)
 	followed <filename>  Check if the file is followed
 	clean     Removes configuration file
 	ls        List internal filesystem and settings: <path>
@@ -67,7 +68,6 @@ How to use
 	--suppress-ssl    do not use SSL with API server
 	--yes	          always respond yes
 	--pull-server-side-config=False do not use server-side config for following files
-	--multilog        option used with directory wildcard (restricted behaviour - see below for details)
 
 
 Repositories

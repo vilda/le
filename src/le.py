@@ -81,20 +81,18 @@ EMBEDDED_STRUCTURES = {
 }
 
 # '--multilog' option related
-# max number of files that are allowed to be followed at any one time 
+# Max number of files that are allowed to be followed at any one time 
 MAX_FILES_FOLLOWED = 100
-# prefix used to distinguish pathnames in config or server side
+# Prefix used to distinguish pathnames in config or server side
 # as intended for mutlilog behaviour
 PREFIX_MULTILOG_FILENAME = "Multilog:"
-# time interval to retry glob of multilog pathname to catch any 
+# Time interval to retry glob of multilog pathname to catch any 
 # change in relevant directories that may have been deleted or added
 RETRY_GLOB_INTERVAL = 0.250 # in seconds 
-
-# intervals for .join() on several threads
+# Intervals for .join() on several threads
 FOLLOWMULTI_JOIN_INTERVAL = 1.0  # in seconds
 FOLLOWER_JOIN_INTERVAL = 1.0    # in seconds
 TRANSPORT_JOIN_INTERVAL = 1.5   # in seconds
-
 
 class Domain(object):
 
@@ -204,6 +202,7 @@ Where command is one of:
   follow <filename>  Follow the given log
     --name=  name of the log
     --type=  type of the log
+    --multilog option used with directory wildcard * (restricted behaviour)
   followed <filename>  Check if the file is followed
   clean     Removes configuration file
   ls        List internal filesystem and settings: <path>
@@ -224,11 +223,10 @@ Where parameters are:
   --datahub               send logs to the specified data hub address
                           the format is address:port with port being optional
   --system-stat-token=    set the token for system stats log (beta)
-  --pull-server-side-config=False do not use server-side config for following files
-  --multilog              option used with directory wildcard * (restricted behaviour)
+  --pull-server-side-config=False do not use server-side config for following files 
 """
 
-# multilog option usage
+# Multilog option usage
 MULTILOG_USAGE = \
 """
 Usage:
@@ -239,7 +237,6 @@ Usage:
   Place path name with wildcard between single quotes:
         example: \"/var/log/directory*/file.log\"
 """
-
 
 def print_usage(version_only=False):
     if version_only:
@@ -1496,8 +1493,13 @@ class FollowMultilog(object):
     In which case multiple local (log) files will be followed, but with all the new events
     from all the files forwarded to the same single log in the logentries infrastructure.
     """
-
-    def __init__(self, name, entry_filter, entry_formatter, entry_identifier, transport, max_num_followers=MAX_FILES_FOLLOWED ):
+    def __init__(self, 
+                 name, 
+                 entry_filter, 
+                 entry_formatter, 
+                 entry_identifier, 
+                 transport, 
+                 max_num_followers=MAX_FILES_FOLLOWED ):
         """ Initializes the FollowMultilog. """
         self.name = name
         self.flush = True
@@ -1518,19 +1520,23 @@ class FollowMultilog(object):
         """
         Only regular files passed
         """
-        # fail if a symbolic link
+        # Fail if a symbolic link
         if os.path.islink(candidate):
             return False
-        # fail if not a regular file (passes links!)
+        # Fail if not a regular file (passes links!)
         if not os.path.isfile(candidate):
             return False
         return True
     
-    def _append_followers(self, add_files):
-        
+    def _append_followers(self, add_files):        
         for filename in add_files:
             if len(self._followers) < self._max_num_followers:        
-                follower = Follower(filename, self.entry_filter, self.entry_formatter, self.entry_identifier, self.transport, True)
+                follower = Follower(filename, 
+                                    self.entry_filter, 
+                                    self.entry_formatter, 
+                                    self.entry_identifier, 
+                                    self.transport, 
+                                    True)
                 self._followers.append(follower)
                 if config.debug_multilog:
                     print >> sys.stderr, "Number of followers increased to: %s " %len(self._followers)
@@ -1539,7 +1545,6 @@ class FollowMultilog(object):
                 break
                         
     def _remove_followers(self, removed_files):
-        
         for follower in self._followers:
             if follower.name in removed_files:                
                 follower.close()
@@ -1553,7 +1558,7 @@ class FollowMultilog(object):
         followers to close each one - then waits for the worker thread to stop.
         """
         self._shutdown = True
-        #run through list of followers closing each one
+        # Run through list of followers closing each one
         for follower in self._followers:
             follower.close()
         self._worker.join(FOLLOWMULTI_JOIN_INTERVAL)
@@ -1590,7 +1595,13 @@ class Follower(object):
     The follower keeps an eye on the file specified and sends new events to the
     logentries infrastructure.  """
 
-    def __init__(self, name, entry_filter, entry_formatter, entry_identifier, transport, disable_glob=False):
+    def __init__(self, 
+                 name, 
+                 entry_filter, 
+                 entry_formatter, 
+                 entry_identifier, 
+                 transport, 
+                 disable_glob=False):
         """ Initializes the follower. """
         self.name = name
         self.flush = True
@@ -1635,7 +1646,6 @@ class Follower(object):
         self.real_name = None
 
         while not self._shutdown:
-
             # FollowMultilog usage
             if self._disable_glob:
                 candidate = self.name
@@ -2619,37 +2629,38 @@ class Config(object):
         if cmd_line and path is None:
             if args is not None:
                 pname_slice = args[1:]
-                # validate that a pathname is detected in parameters to agent
+                # Validate that a pathname is detected in parameters to agent
                 if len(pname_slice) == 0:
-                    die("\nError: No pathname detected - Specify the path to the file to be followed\n" + MULTILOG_USAGE, EXIT_OK)
-                # validate that agent is not receiving a list of pathnames (possibly shell is expanding wildcard)
+                    die("\nError: No pathname detected - Specify the path to the file to be followed\n" 
+                        + MULTILOG_USAGE, EXIT_OK)
+                # Validate that agent is not receiving a list of pathnames (possibly shell is expanding wildcard)
                 if len(pname_slice) > 1:
                     die("\nError: Too many arguments being passed to agent\n" + MULTILOG_USAGE, EXIT_OK)
                 pname = str(pname_slice[0])
         elif not cmd_line and path is None:
-            #for anything not coming in on command line no output is written to command line
+            # For anything not coming in on command line no output is written to command line
             log.error("Error: Pathname argument is empty")
             return False
         elif not cmd_line and path is not None:
             pname=path
         filename = os.path.basename(pname)
-        # verify there is a filename
+        # Verify there is a filename
         if not filename:
             if not cmd_line:
                 log.error("Error: No filename detected in the pathname")
                 return False
             else:
                 die("\nError: No filename detected - Specify the filename to be followed\n" + MULTILOG_USAGE, EXIT_OK)
-        # check if a wildcard detected in pathname
+        # Check if a wildcard detected in pathname
         if '*' in pname:
-            # verify that only one wildcard is in pathname
+            # Verify that only one wildcard is in pathname
             if pname.count('*') > 1:
                 if not cmd_line:
                     log.error("Error: More then one wildcard * detected in pathname")
                     return False
                 else:                
                     die("\nError: Only one wildcard * allowed\n" + MULTILOG_USAGE, EXIT_OK)
-            # verify that no wildcard is in filename
+            # Verify that no wildcard is in filename
             if '*' in filename:
                 if not cmd_line:
                     log.error("Error: Wildcard detected in filename of path argument")
@@ -2768,7 +2779,7 @@ class Config(object):
             elif name == "--datahub":
                 self.set_datahub_settings(value)
             elif name == "--multilog":
-                # multilog is only True if pathname is good
+                # self.multilog is only True if pathname is good
                 self.multilog = self.validate_pathname(args,True,None)
 
         if self.datahub_ip and not self.datahub_port:
@@ -3585,7 +3596,7 @@ def cmd_follow_multilog(args):
     config.agent_key_required()
     arg = args[0]
     path = os.path.abspath(arg)
-    # when testing ignore user input
+    # When testing ignore user input
     if config.debug_multilog:
         follow = True
     else:
@@ -3611,7 +3622,7 @@ def user_prompt(path):
     print "\nExisting destination Logs for this host and the associated Paths are:"
     print('\t{0:50}{1}'.format('LOGNAME', 'PATH'))
     for logname, filepath in loglist_with_paths.items():
-        # test if an identical path is already in use!
+        # Test if an identical path is already in use!
         if path == filepath.replace(PREFIX_MULTILOG_FILENAME,'',1).lstrip():
             identical_path = True
             print('\t{0:40}{1:10}{2}'.format(logname,"IDENTICAL", filepath))
