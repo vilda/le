@@ -23,6 +23,7 @@ $LE
 #e   follow <filename>  Follow the given log
 #e     --name=  name of the log
 #e     --type=  type of the log
+#e     --multilog option used with directory wildcard * (restricted behaviour)
 #e   followed <filename>  Check if the file is followed
 #e   clean     Removes configuration file
 #e   ls        List internal filesystem and settings: <path>
@@ -43,6 +44,7 @@ $LE
 #e   --datahub               send logs to the specified data hub address
 #e                           the format is address:port with port being optional
 #e   --system-stat-token=    set the token for system stats log (beta)
-#e   --pull-server-side-config=False do not use server-side config for following files
-#e
+#e   --pull-server-side-config=False do not use server-side config for following files 
+#e 
+ 
 
