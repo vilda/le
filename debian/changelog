@@ -1,3 +1,16 @@
+logentries (1.4.34) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Charles Phillips ]
+  * Add socks.py from #165 to fix ImportError line 264
+
+  [ Paul CLune ]
+  * Log-7549 and LOG-7550 Linux Agent Stories
+  * LOG-7549 Styling issues addressed
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Thu, 05 May 2016 15:22:25 +0000
+
 logentries (1.4.33) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Viliam Holub ]
