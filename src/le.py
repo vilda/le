@@ -81,14 +81,14 @@ EMBEDDED_STRUCTURES = {
 }
 
 # '--multilog' option related
-# Max number of files that are allowed to be followed at any one time 
+# Max number of files that are allowed to be followed at any one time
 MAX_FILES_FOLLOWED = 100
 # Prefix used to distinguish pathnames in config or server side
 # as intended for mutlilog behaviour
 PREFIX_MULTILOG_FILENAME = "Multilog:"
-# Time interval to retry glob of multilog pathname to catch any 
+# Time interval to retry glob of multilog pathname to catch any
 # change in relevant directories that may have been deleted or added
-RETRY_GLOB_INTERVAL = 0.250 # in seconds 
+RETRY_GLOB_INTERVAL = 0.250 # in seconds
 # Intervals for .join() on several threads
 FOLLOWMULTI_JOIN_INTERVAL = 1.0  # in seconds
 FOLLOWER_JOIN_INTERVAL = 1.0    # in seconds
@@ -223,7 +223,7 @@ Where parameters are:
   --datahub               send logs to the specified data hub address
                           the format is address:port with port being optional
   --system-stat-token=    set the token for system stats log (beta)
-  --pull-server-side-config=False do not use server-side config for following files 
+  --pull-server-side-config=False do not use server-side config for following files
 """
 
 # Multilog option usage
@@ -1493,12 +1493,12 @@ class FollowMultilog(object):
     In which case multiple local (log) files will be followed, but with all the new events
     from all the files forwarded to the same single log in the logentries infrastructure.
     """
-    def __init__(self, 
-                 name, 
-                 entry_filter, 
-                 entry_formatter, 
-                 entry_identifier, 
-                 transport, 
+    def __init__(self,
+                 name,
+                 entry_filter,
+                 entry_formatter,
+                 entry_identifier,
+                 transport,
                  max_num_followers=MAX_FILES_FOLLOWED ):
         """ Initializes the FollowMultilog. """
         self.name = name
@@ -1527,15 +1527,15 @@ class FollowMultilog(object):
         if not os.path.isfile(candidate):
             return False
         return True
-    
-    def _append_followers(self, add_files):        
+
+    def _append_followers(self, add_files):
         for filename in add_files:
-            if len(self._followers) < self._max_num_followers:        
-                follower = Follower(filename, 
-                                    self.entry_filter, 
-                                    self.entry_formatter, 
-                                    self.entry_identifier, 
-                                    self.transport, 
+            if len(self._followers) < self._max_num_followers:
+                follower = Follower(filename,
+                                    self.entry_filter,
+                                    self.entry_formatter,
+                                    self.entry_identifier,
+                                    self.transport,
                                     True)
                 self._followers.append(follower)
                 if config.debug_multilog:
@@ -1543,15 +1543,15 @@ class FollowMultilog(object):
             else:
                 log.debug("Warning: Allowed maximum of files that can be followed reached")
                 break
-                        
+
     def _remove_followers(self, removed_files):
         for follower in self._followers:
-            if follower.name in removed_files:                
+            if follower.name in removed_files:
                 follower.close()
                 self._followers.remove(follower)
                 if config.debug_multilog:
                     print >> sys.stderr, "Number of followers decreased to: %s " %len(self._followers)
-                
+
     def close(self):
         """
         Stops all FollowMultilog activity, and then loops through list of existing
@@ -1562,14 +1562,14 @@ class FollowMultilog(object):
         for follower in self._followers:
             follower.close()
         self._worker.join(FOLLOWMULTI_JOIN_INTERVAL)
-        
+
     def supervise_followers(self):
         """
          Instantiates a Follower object for each file found - all log events from all
          files are forwarded to the same log in the lE infrastructure
-        """ 
+        """
         try:
-            start_set = set([filename for filename in glob.glob(self.name)])         
+            start_set = set([filename for filename in glob.glob(self.name)])
         except os.error:
             log.error("Error: FollowerMultiple glob has failed")
         if len(start_set) == 0:
@@ -1579,15 +1579,15 @@ class FollowMultilog(object):
         while not self._shutdown:
             time.sleep(RETRY_GLOB_INTERVAL)
             try:
-                current_set = set([filename for filename in glob.glob(self.name)])                
+                current_set = set([filename for filename in glob.glob(self.name)])
             except os.error:
                 log.error("Error: FollowerMultiple glob has failed")
             followed_files = [follower.name for follower in self._followers]
-            added_files = [filename for filename in current_set if not filename in followed_files]            
-            self._append_followers(added_files)                
+            added_files = [filename for filename in current_set if not filename in followed_files]
+            self._append_followers(added_files)
             removed_files = [filename for filename in followed_files if not filename in current_set]
             self._remove_followers(removed_files)
-                                          
+
 
 class Follower(object):
 
@@ -1595,12 +1595,12 @@ class Follower(object):
     The follower keeps an eye on the file specified and sends new events to the
     logentries infrastructure.  """
 
-    def __init__(self, 
-                 name, 
-                 entry_filter, 
-                 entry_formatter, 
-                 entry_identifier, 
-                 transport, 
+    def __init__(self,
+                 name,
+                 entry_filter,
+                 entry_formatter,
+                 entry_identifier,
+                 transport,
                  disable_glob=False):
         """ Initializes the follower. """
         self.name = name
@@ -2625,13 +2625,13 @@ class Config(object):
         If error from config file (or server) then error message written to log and False is returned.
         :param args: the pathname given to the agent
         :return:    True if okay, the agent will die otherwise
-        """        
+        """
         if cmd_line and path is None:
             if args is not None:
                 pname_slice = args[1:]
                 # Validate that a pathname is detected in parameters to agent
                 if len(pname_slice) == 0:
-                    die("\nError: No pathname detected - Specify the path to the file to be followed\n" 
+                    die("\nError: No pathname detected - Specify the path to the file to be followed\n"
                         + MULTILOG_USAGE, EXIT_OK)
                 # Validate that agent is not receiving a list of pathnames (possibly shell is expanding wildcard)
                 if len(pname_slice) > 1:
@@ -2658,7 +2658,7 @@ class Config(object):
                 if not cmd_line:
                     log.error("Error: More then one wildcard * detected in pathname")
                     return False
-                else:                
+                else:
                     die("\nError: Only one wildcard * allowed\n" + MULTILOG_USAGE, EXIT_OK)
             # Verify that no wildcard is in filename
             if '*' in filename:
@@ -3319,7 +3319,7 @@ def start_followers(default_transport):
             if l['type'] == 'token':
                 log_token = l['token']
             multilog_filename = False
-            if log_filename.startswith(PREFIX_MULTILOG_FILENAME):                                    
+            if log_filename.startswith(PREFIX_MULTILOG_FILENAME):
                 log_filename = log_filename.replace(PREFIX_MULTILOG_FILENAME,'',1).lstrip()
                 if not config.validate_pathname(None,False,log_filename):
                     continue
@@ -3390,7 +3390,7 @@ def start_followers(default_transport):
                 entry_formatter = formats.get_formatter('syslog', config.hostname, log_name, log_token)
 
             # Instantiate the follow_multilog for 'multilog' filename, otherwise the individual follower
-            if multilog_filename:                
+            if multilog_filename:
                 follow_multilog = FollowMultilog(log_filename, entry_filter, entry_formatter, entry_identifier, transport)
                 follow_multilogs.append(follow_multilog)
             else:
@@ -3639,10 +3639,10 @@ def user_prompt(path):
         for filename in file_candidates:
             if file_count < MAX_FILES_FOLLOWED:
                 print ('\t{0}'.format(filename))
-                file_count = file_count+1        
+                file_count = file_count+1
     while True:
-        print "\nUse new path to follow files [y] or quit [n]?"        
-        user_resp = raw_input().lower()        
+        print "\nUse new path to follow files [y] or quit [n]?"
+        user_resp = raw_input().lower()
         if user_resp == 'n':
             sys.exit(EXIT_OK)
         elif user_resp == 'y':
