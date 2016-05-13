@@ -1,3 +1,15 @@
+logentries (1.4.35) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Mr Jenkins ]
+  * Release new version 1.4.34
+
+  [ Viliam Holub ]
+  * Send IAA token via transport layer
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Fri, 13 May 2016 15:11:13 +0000
+
 logentries (1.4.34) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Charles Phillips ]
