@@ -1,3 +1,12 @@
+logentries (1.4.36) wheezy jessie lucid precise quantal saucy trusty; urgency=low
+
+  [ Viliam Holub ]
+  * Fix trailing space in help.sh test
+
+  [ Logentries Team ]
+
+ -- Logentries Team <hello@logentries.com>  Fri, 13 May 2016 16:00:14 +0000
+
 logentries (1.4.35) wheezy jessie lucid precise quantal saucy trusty; urgency=low
 
   [ Mr Jenkins ]
