@@ -136,9 +136,10 @@ TAIL_RECHECK = 0.2  # Seconds
 # Number of attemps to read a file, until the name is recheck
 NAME_CHECK = 4  # TAIL_RECHECK cycles
 
-# Number of read line false attemps between are-you-alive packets
-IAA_INTERVAL = 100
-IAA_TOKEN = "###LE-IAA###\n"
+# Interval of inactivity when IAA token is sent
+IAA_INTERVAL = 10.0 # Seconds
+# I am alive token that's passed at fixed interval during inactivity
+IAA_TOKEN = "###LE-IAA###"
 
 # Maximal size of a block of events
 MAX_BLOCK_SIZE = 65536 - 512 # Space for formatting
@@ -1760,9 +1761,8 @@ class Follower(object):
 
         # TODO: investigate select-like approach?
         idle_cnt = 0
-        iaa_cnt = 0
         lines = []
-        while iaa_cnt != IAA_INTERVAL and not self._shutdown:
+        while not self._shutdown:
             # Collect lines
             lines = self._read_log_lines()
             lines = self._collect_lines(lines)
@@ -1781,7 +1781,6 @@ class Follower(object):
             if idle_cnt == NAME_CHECK:
                 if self._log_rename():
                     self._open_log()
-                    iaa_cnt = 0
                 else:
                     # Recover from external file modification
                     position = self._get_file_position()
@@ -1796,7 +1795,6 @@ class Follower(object):
             else:
                 # To reset end-of-line error
                 self._set_file_position(self._get_file_position())
-            iaa_cnt += 1
 
         return lines
 
@@ -1857,7 +1855,7 @@ class Transport(object):
         self._socket = None # Socket with optional TLS encyption
         self._debug_transport_events = debug_transport_events
 
-        self._shutdown = False
+        self._shutdown = False # Shutdown flag - terminates the networking thread
 
         # proxy setup
         self._use_proxy = False
@@ -2043,6 +2041,7 @@ class Transport(object):
 
     def close(self):
         self._shutdown = True
+        self.send('') # Force the networking thread to check the shutdown flag
         self._worker.join(TRANSPORT_JOIN_INTERVAL)
 
     def run(self):
@@ -2051,10 +2050,11 @@ class Transport(object):
         self._open_connection()
         while not self._shutdown:
             try:
-                entry = self._entries.get(True, 1)
+                try:
+                    entry = self._entries.get(True, IAA_INTERVAL)
+                except Queue.Empty:
+                    entry = IAA_TOKEN
                 self._send_entry(entry + '\n')
-            except Queue.Empty:
-                pass
             except Exception:
                 log.error("Exception in run: %s", traceback.format_exc())
         self._close_connection()
