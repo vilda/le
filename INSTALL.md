@@ -106,6 +106,8 @@ Ubuntu 16.04 Xenial Xerus
 	apt-get install logentries
 	exit
 
+Debian and Ubuntu enforce SHA256 digest in the Release and/or Packages files. Expect a warning message.
+
 
 Fedora 14-19
 ------------
