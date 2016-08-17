@@ -70,6 +70,9 @@ LE_SERVER_API = '/'
 LE_DEFAULT_SSL_PORT = 20000
 LE_DEFAULT_NON_SSL_PORT = 10000
 
+# Maximal pattern priority
+MAX_PATTERN_PRIORITY = 10000
+
 # Structures embedded (beta)
 EMBEDDED_STRUCTURES = {
     # JSON with support for nested objects
@@ -209,6 +212,19 @@ Where command is one of:
   ls        List internal filesystem and settings: <path>
   rm        Remove entity: <path>
   pull      Pull log file: <path> <when> <filter> <limit>
+
+  Structure management (beta)
+  ls structures          List structures defined
+  add structure <name>
+  add structures/<name>  Add a new structure
+  add structures/<name> <pattern_name> [priority] [exclusive]
+    List structures defined, add a structure, add a pattern in a structure
+    name          structure name
+    pattern_name  pattern name
+    priority      priority of the pattern, integer between 0 and 10000
+                  (optional, default 100)
+    exclusive     exclusivity flag, allowed values are exclusive, inclusive,
+                  true, and false (optional, default true)
 
 Where parameters are:
   --help                  show usage help and exit
@@ -2676,7 +2692,7 @@ class Config(object):
         param_list = """user-key= account-key= agent-key= host-key= no-timestamps debug-events
                     debug-transport-events debug-metrics
                     debug-filters debug-formatters debug-loglist local debug-stats debug-nostats
-                    debug-stats-only debug-cmd-line debug-system help version yes force uuid list
+                    debug-stats-only debug-cmd-line debug-system help version yes force id uuid list
                     std std-all name= hostname= type= pid-file= debug no-defaults
                     suppress-ssl use-ca-provided force-api-host= force-domain=
                     system-stat-token= datahub= legacy_v1_metrics
@@ -2708,6 +2724,8 @@ class Config(object):
                 self.force = True
             elif name == "--list":
                 self.xlist = True
+            elif name == "--id":
+                self.uuid = True
             elif name == "--uuid":
                 self.uuid = True
             elif name == "--name":
@@ -2839,8 +2857,9 @@ def api_request(request, required=False, check_status=False, silent=False, die_o
     Processes a request on the logentries domain.
     """
     # Obtain response
+    request_encoded = urllib.urlencode(request)
     response, conn = get_response(
-        "POST", LE_SERVER_API, urllib.urlencode(request),
+        "POST", LE_SERVER_API, request_encoded,
         silent=silent, die_on_error=die_on_error, domain=Domain.API,
         headers={'Content-Type': 'application/x-www-form-urlencoded'})
 
@@ -2882,6 +2901,58 @@ def api_request(request, required=False, check_status=False, silent=False, die_o
         else:
             log.info(error)
             d_response = None
+
+    return d_response
+
+
+
+def api_v2_request(method, url, request, required=False, silent=False, die_on_error=True):
+    """
+    Processes a request on the logentries domain.
+    """
+    # Obtain response
+    request_encoded = json.dumps(request)
+    response, conn = get_response(
+        method, '/v2/accounts/%s/%s'%(config.user_key, url), request_encoded,
+        silent=silent, die_on_error=die_on_error, domain=Domain.API,
+        headers={'Content-Type': 'application/x-www-form-urlencoded'})
+
+    # Check the response
+    if not response:
+        if required:
+            die("Error: Cannot process LE request, no response")
+        if conn:
+            conn.close()
+        return None
+
+    xresponse = response.read()
+    conn.close()
+
+    log.debug('Domain response: "%s"', xresponse)
+    try:
+        if xresponse:
+            d_response = json_loads(xresponse)
+        else:
+            d_response = {}
+    except ValueError:
+        error = 'Error: Invalid response, parse error.'
+        if die_on_error:
+            die(error)
+        else:
+            log.info(error)
+            d_response = None
+
+    if response.status not in [200, 201, 204]:
+        reason = ''
+        if 'reason' in d_response:
+            reason = d_response['reason']
+        if required:
+            if reason:
+                die("Error: %s" % reason)
+            else:
+                die("Error: Cannot process LE request: (%s)" % response.status)
+        return None
+
 
     return d_response
 
@@ -3780,7 +3851,7 @@ def is_log_fs(addr):
     return False
 
 
-def cmd_ls_ips(ags):
+def cmd_ls_ips():
     """
     List IPs used by the agent.
     """
@@ -3794,12 +3865,99 @@ def cmd_ls_ips(ags):
     print ' '.join(l)
 
 
+def cmd_ls_structures():
+    """
+    List user defined structures.
+    """
+    config.load()
+    config.user_key_required(True)
+
+    response = api_v2_request('GET', 'structures', {}, True)
+    structures = response['structures']
+
+    structures = response['structures']
+    for structure in sorted(structures, key=lambda x: x['name']):
+        if config.uuid:
+            print c_id(structure['id']),
+        print structure['name']
+
+    if len(structures) == 0:
+        print >> sys.stderr, 'No structures defined'
+    elif len(structures) == 1:
+        print >> sys.stderr, '1 structure'
+    else:
+        print >> sys.stderr, '%s structures' % len(structures)
+
+
+def cmp_patterns(a, b):
+    """
+    Intuitive comparison of two patterns.
+    """
+    v = cmp(a['priority'], b['priority'])
+    if v == 0:
+        ap = a['pattern'].lower()
+        if ap.endswith('/'):
+            ap = ap[:-1]
+        bp = b['pattern'].lower()
+        if bp.endswith('/'):
+            bp = bp[:-1]
+        v = cmp(ap, bp)
+    return v
+
+
+def cmd_ls_patterns(structure_name):
+    """
+    Lists patterns associated with the structure given.
+    """
+    if not structure_name:
+        error('Structure name not specified')
+
+    config.load()
+    config.user_key_required(True)
+
+    response = api_v2_request('GET', 'structures', {}, True)
+    structures = response['structures']
+
+    # Find structure
+    matches = [s['id'] for s in structures if structure_name.lower() == s['id'].lower() or structure_name == s['name']]
+    if len(matches) == 0:
+        error('Structure `%s\' does not exist', structure_name)
+    if len(matches) > 1:
+        error('Multiple matches for `%s\'', structure_name)
+    structure_id = matches[0]
+
+    response = api_v2_request('GET', 'structures/%s/patterns'%structure_id, {}, True)
+
+    patterns = response['patterns']
+    #for pattern in sorted(patterns, key=lambda x: x['priority']):
+    for pattern in sorted(patterns, cmp=cmp_patterns):
+        if config.uuid:
+            print c_id(pattern['id']),
+        if pattern['exclusive']:
+            exclusive = ''
+        else:
+            exclusive = ' not exclusive'
+        print '%-3d %s%s' % (pattern['priority'], pattern['pattern'], exclusive)
+    if len(patterns) == 0:
+        print >> sys.stderr, 'No patterns in structure `%s\'' % structure_name
+    elif len(patterns) == 1:
+        print >> sys.stderr, '1 pattern'
+    else:
+        print >> sys.stderr, '%s patterns' % len(patterns)
+
+
 def cmd_ls(args):
     """
     General list command
     """
     if len(args) == 1 and args[0] == 'ips':
-        cmd_ls_ips(args)
+        cmd_ls_ips()
+        return
+    if len(args) == 1 and args[0] == 'structures':
+        cmd_ls_structures()
+        return
+    if len(args) == 1 and args[0].startswith('structures/'):
+        cmd_ls_patterns(args[0][len('structures/'):])
         return
     if len(args) == 0:
         args = ['/']
@@ -3819,12 +3977,195 @@ def cmd_ls(args):
                 hostnames=addr.startswith('hostnames'))
 
 
+def cmd_add_structure(args):
+    """
+    Add a new structure command.
+
+    Args:
+        args: structure name followed by (optionally) pattern and priority
+    """
+    if not args:
+        error('No structure name specified')
+    structure_name = args[0].strip()
+    if not structure_name:
+        error('Empty structure name')
+
+    pattern = ''
+    priority = 100
+    exclusive = True
+
+    # Get and check the pattern
+    if len(args) > 1:
+        pattern = args[1]
+        if not pattern:
+            error('Pattern in empty')
+
+    if len(args) > 2:
+        try:
+            priority = int(args[2])
+            if priority < 0:
+                error('Priority must be a positive integer')
+            if priority > MAX_PATTERN_PRIORITY:
+                error('Priority `%s\'is above the limit (%s)', args[2], MAX_PATTERN_PRIORITY)
+        except ValueError:
+            error('Invalid priority `%s\', must be a positive integer', args[2])
+
+    if len(args) > 3:
+        exclusivity = args[3].strip().lower()
+        if exclusivity in ['exclusive', 'true']:
+            exclusive = True
+        elif exclusivity in ['inclusive', 'false']:
+            exclusive = False
+        else:
+            error('Invalid exclusivity parameter `%s\'', args[3])
+
+    if len(args) > 4:
+        error('Too many arguments')
+
+    config.load()
+    config.user_key_required(True)
+
+    # Get all structures
+    response = api_v2_request('GET', 'structures', {}, True)
+    structures = response['structures']
+
+    # Find the structure
+    matches = [s['id'] for s in structures if structure_name.lower() == s['id'].lower() or structure_name == s['name']]
+    if len(matches) == 0:
+        # Add the structure
+        response = api_v2_request('POST', 'structures', {
+            'name': structure_name,
+            'shortcut': structure_name,
+            'description': '',
+            'aux': {},
+            }, True)
+        print >> sys.stderr, 'Added structure `%s\'' % structure_name
+        structure_id = response['structure']['id']
+    else:
+        structure_id = matches[0]
+        if not pattern:
+            print >> sys.stderr, 'Structure `%s\' already exists' % structure_name
+
+    # Add pattern (if specified)
+    if pattern:
+
+        # TODO - check that the pattern does not exist already
+
+        response = api_v2_request('POST', 'structures/%s/patterns'%structure_id, {
+            'priority': priority,
+            'exclusive': exclusive,
+            'pattern': pattern,
+            }, True)
+        print >> sys.stderr, 'Added pattern `%s\' with priority %s' % (pattern, priority)
+
+
+
+def cmd_add(args):
+    """
+    General add command.
+    """
+    if len(args) >= 1 and args[0] == 'structure':
+        cmd_add_structure(args[1:])
+    elif len(args) >= 1 and args[0].startswith('structures/'):
+        cmd_add_structure([args[0][len('structures/'):]] + args[1:])
+    elif len(args) == 0:
+        error('Specify what to add, i.e. structure')
+    else:
+        error('Unknown item to add: `%s\'', args[0])
+
+
+def cmd_rm_pattern(patterns, structure_name, structure_id):
+    if not patterns:
+        error('No pattern specified (append pattern ID or beginning of the pattern or .) to remove.')
+    if len(patterns) > 1:
+        error('Too many arguments, only one pattern allowed')
+    pattern = patterns[0]
+
+    rm_all = pattern in ['*', '.']
+
+    # Load all patterns
+    response = api_v2_request('GET', 'structures/%s/patterns'%structure_id, {}, True)
+    patterns = response['patterns']
+
+    # Go though patterns one by one, identify pattern IDs
+    # Use a different call for pattern=*
+    matches = [[p['id'], p['pattern']] for p in patterns if rm_all or p['id'] == pattern or p['pattern'].startswith(pattern)]
+    if not matches:
+        if rm_all:
+            print >> sys.stderr, 'No pattern to be removed; structure is empty'
+        else:
+            error('No pattern matching `%s\' found', pattern)
+    if len(matches) > 1 and not rm_all:
+        error('Pattern `%s\' is not specific enough; multiple matches', pattern)
+
+    # Do the physical deletion
+    for pattern_id, pattern_p in matches:
+        response = api_v2_request('DELETE', 'structures/%s/patterns/%s'%(structure_id, pattern_id), {}, True)
+        print >> sys.stderr, 'Removed pattern `%s\'' % pattern_p
+
+
+def cmd_rm_structure(args):
+    """ Remove the structure (or pattern) command.
+
+    Arguments contain command line (including 'structure' at the beginning)
+    """
+    subject = args[0]
+    structure_name = ''
+    if subject == 'structures':
+        # We don't support removing structures
+        error('Invalid command. Use `rm structure name\' or `rm structures/name\'')
+    if subject == 'structure':
+        if len(args) == 1:
+            error('No structure name specified (append structure name)')
+        if len(args) > 2:
+            error('Too many structure names specified (specify only one name)')
+        structure_name = args[1]
+        patterns = args[2:]
+    elif subject.startswith('structures/'):
+        structure_name = subject[len('structures/'):]
+        patterns = args[1:]
+
+    if not structure_name:
+        error('No structure name specified (append structure name)')
+
+    # Not args contain structure name or ID and an optional pattern
+
+    config.load()
+    config.user_key_required(True)
+
+    # Load all structures
+    response = api_v2_request('GET', 'structures', {}, True)
+    structures = response['structures']
+
+    # Find structure IDs
+    structure = [[structure_name, s['id']] for s in structures if structure_name.lower() == s['id'].lower() or structure_name == s['name']]
+    if not structure:
+        error('Structure `%s\' does not exist', structure_name)
+    if len(structure) > 1:
+        error('Multiple matches for `%s\'', structure_name)
+    structure_id = structure[0][1]
+
+    # Now we know structure exists and we know its ID
+
+    if not patterns: # Removing structure
+        response = api_v2_request('DELETE', 'structures/%s'%structure_id, {}, True)
+        print >> sys.stderr, 'Removed structure `%s\'' % structure_name
+    else: # Removing patterns
+        cmd_rm_pattern(patterns, structure_name, structure_id)
+
+
 def cmd_rm(args):
     """
     General remove command
     """
-    if len(args) == 0:
+    # In case of removing structures and patterns
+    if args and (args[0] in ['structure', 'structures'] or args[0].startswith('structures/')):
+        cmd_rm_structure(args)
+        return
+
+    if not args:
         args = ['/']
+
     config.load()
     config.user_key_required(True)
 
@@ -3914,9 +4255,12 @@ def main_root():
         'followed': cmd_followed,
         'clean': cmd_clean,
         'whoami': cmd_whoami,
+        'add': cmd_add,
         # Filesystem operations
         'ls': cmd_ls,
+        'list': cmd_ls,
         'rm': cmd_rm,
+        'remove': cmd_rm,
         'pull': cmd_pull,
     }
     for cmd, func in commands.items():
